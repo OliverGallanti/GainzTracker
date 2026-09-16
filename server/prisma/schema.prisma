@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  googleId  String   @unique
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions        Session[]
+  weightEntries   WeightEntry[]
+  macroEntries    MacroEntry[]
+  workoutRoutines WorkoutRoutine[]
+  workoutSets     WorkoutSet[]
+}
+
+// Server-side session store backing @fastify/session (avoids adding Redis).
+model Session {
+  id        String   @id
+  data      Json
+  expiresAt DateTime
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model WeightEntry {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg Float
+  loggedAt DateTime @default(now())
+  note     String?
+
+  @@index([userId, loggedAt])
+}
+
+model MacroEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description String
+  calories    Int
+  proteinG    Float?
+  carbsG      Float?
+  fatG        Float?
+  loggedAt    DateTime @default(now())
+
+  @@index([userId, loggedAt])
+}
+
+// Exercise list kept as JSON for v1 ([{ name, targetSets, targetReps, order }]) —
+// normalize into a separate table later if per-exercise querying/editing needs grow.
+model WorkoutRoutine {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  exercises Json
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workoutSets WorkoutSet[]
+
+  @@index([userId])
+}
+
+model WorkoutSet {
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  routineId    String?
+  routine      WorkoutRoutine? @relation(fields: [routineId], references: [id], onDelete: SetNull)
+  exerciseName String
+  weightKg     Float?
+  reps         Int?
+  performedAt  DateTime        @default(now())
+
+  @@index([userId, performedAt])
+}
