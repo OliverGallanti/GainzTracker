@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-neutral-950 text-neutral-50 antialiased;
+  }
+}
+
+/* Shared app background: a faint wireframe grid over a soft radial highlight,
+   masked so both fade out toward the viewport edges instead of cutting off
+   with a hard border. Plain CSS (not @apply) because mask-image needs
+   multi-stop gradients Tailwind's utilities don't express. */
+.app-background {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(163, 163, 163, 0.2), transparent 70%);
+  background-size: 40px 40px, 40px 40px, 100% 100%;
+  mask-image: radial-gradient(ellipse 100% 80% at 50% 35%, black 25%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 80% at 50% 35%, black 25%, transparent 85%);
+}

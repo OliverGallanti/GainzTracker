@@ -1,6 +1,6 @@
-# GainzTracker BFF
+# Gainz.Tracker BFF
 
-This is the backend for GainzTracker: a Fastify service that sits between the React SPA and Postgres. It owns the Google sign-in flow, holds the session, and is the only thing that ever talks to the database. The frontend never sees a database credential, a Google token, or a client secret — it only ever calls `/api/*` and `/auth/*` on this server.
+This is the backend for Gainz.Tracker: a Fastify service that sits between the React SPA and Postgres. It owns the Google sign-in flow, holds the session, and is the only thing that ever talks to the database. The frontend never sees a database credential, a Google token, or a client secret — it only ever calls `/api/*` and `/auth/*` on this server.
 
 ## Why a custom BFF instead of a managed platform
 
@@ -17,6 +17,22 @@ The frontend never does any OAuth logic itself — it just navigates the browser
 5. The browser is redirected back to the SPA. From there, the SPA calls `GET /api/me` to find out who's logged in.
 
 **Why `openid-client` (panva)**: it's the spec-compliant, actively maintained standard for Node OIDC clients. It handles discovery, PKCE, and token/id_token verification correctly so none of that security-sensitive logic had to be written by hand. It's also provider-agnostic, so adding a second SSO provider later doesn't mean switching libraries.
+
+## Passkeys (WebAuthn) — the second login method
+
+Passkeys are an *additional* credential on an account that already exists via Google, not an independent signup path. A logged-in user adds one from the Dashboard; afterward they can log in with it directly, without Google. This was a deliberate scoping choice: a passkey-only signup flow would need profile/email collection UI (WebAuthn gives you no email at all) plus duplicate-account reconciliation — a second system, not a small addition — while scoping it as "one more credential on an existing account" needed zero changes to `User`'s required, unique `googleId`/`email` fields.
+
+Both ceremonies (`server/src/routes/passkeys.js`, using `@simplewebauthn/server`) are a two-step **options → browser ceremony → verify** dance, reusing the exact `oauth_state` cookie pattern from the Google flow — a short-lived (5 min), signed, httpOnly cookie holds the challenge between the two legs. There are two separate cookie names (`passkey_reg_challenge`, `passkey_auth_challenge`, defined in [auth/webauthn.js](src/auth/webauthn.js)) so a stale registration challenge can never be consumed by a login verify call or vice versa.
+
+**Usernameless login**: there's no username field on the Login page. Registration asks for a *discoverable* credential (`authenticatorSelection: { residentKey: 'required' }`), and the login ceremony's `generateAuthenticationOptions` call omits `allowCredentials` entirely — the browser lets the user pick from any passkey registered for this origin, and the response's credential `id` is looked up directly in the `Credential` table to find the owning user. This is safe because a credential ID is a public identifier, not a secret — all real security comes from `verifyAuthenticationResponse` cryptographically checking the signature against the stored public key, which requires the private key that never leaves the user's device.
+
+**rpID vs. this server's own origin**: the ceremony always runs in the browser context of `FRONTEND_URL` (the page the user is actually looking at, `localhost:5173` in dev) — never this server's own origin, even though the browser's requests get proxied here. So `rpID` is derived as the *hostname only* (no port) of `FRONTEND_URL`, and `expectedOrigin` is normalized to strip a trailing slash, since that one is an exact-string comparison rather than a domain match. Get either wrong and every ceremony fails with a confusing, generic error — see [auth/webauthn.js](src/auth/webauthn.js) for both derivations in one place.
+
+**Two library gotchas worth knowing if you touch this code**: (1) `verifyAuthenticationResponse` returns the updated counter as `authenticationInfo.newCounter` — *not* `.counter`, which is what the *registration* side calls it, an easy copy-paste mistake between the two verify calls. (2) Both verify functions are hybrid — they throw on some failures (malformed input, challenge mismatch) and return `{ verified: false }` on others (bad signature) — so the route code needs both a `try/catch` *and* a `.verified` check, the same class of bug already fixed once for the OAuth state cookie's `JSON.parse`.
+
+The `Credential.counter` field detects cloned authenticators (an authenticator's signature counter must always increase); for platform passkeys synced via iCloud/Google Password Manager it's commonly always `0`, which is a known, accepted limitation of the WebAuthn ecosystem, not a bug in this code. `GET /api/passkeys` / `DELETE /api/passkeys/:id` ([routes/passkey-credentials.js](src/routes/passkey-credentials.js)) are plain authenticated CRUD, following the exact same atomic ownership-scoped-delete pattern as `weights.js`.
+
+No CSRF protection was added to the public `authentication/*` endpoints beyond what already exists — the `sameSite: 'lax'` challenge cookie won't ride along on a forged cross-site request, and a WebAuthn assertion is cryptographically bound to the origin by the browser/authenticator itself, so there's nothing to forge without the private key.
 
 ## Why sessions live in Postgres, not Redis or a signed cookie
 
@@ -56,7 +72,7 @@ In production, the intended shape is for this server to serve the built SPA itse
 
 ## Database
 
-PostgreSQL via Prisma ([prisma/schema.prisma](prisma/schema.prisma)). Models: `User`, `Session` (backs the session store described above), `WeightEntry`, `MacroEntry`, `WorkoutRoutine`, `WorkoutSet`. `WorkoutRoutine.exercises` is a JSON column for now rather than a normalized child table — fine for "define a routine, show it back," but it would need to become a real table if per-exercise editing/querying UI shows up later.
+PostgreSQL via Prisma ([prisma/schema.prisma](prisma/schema.prisma)). Models: `User`, `Session` (backs the session store described above), `Credential` (registered passkeys, see above), `WeightEntry`, `MacroEntry`, `WorkoutRoutine`, `WorkoutSet`. `WorkoutRoutine.exercises` is a JSON column for now rather than a normalized child table — fine for "define a routine, show it back," but it would need to become a real table if per-exercise editing/querying UI shows up later.
 
 ## Running locally
 
@@ -74,6 +90,8 @@ PostgreSQL via Prisma ([prisma/schema.prisma](prisma/schema.prisma)). Models: `U
 
 - No refresh-token handling — only the Google `id_token` is used for identity; we never request ongoing access to Google APIs, so there's nothing to refresh.
 - No second SSO provider. `User.googleId` is provider-specific; adding another provider later means introducing a separate `Account`/`Identity` table rather than reworking `User`.
+- No passkey-only signup — see the Passkeys section above for why.
+- No passkey renaming/relabeling beyond an optional `deviceLabel` set at creation.
 - No production deployment config (no prod Dockerfile, no static-file serving wired up, no CI).
-- No automated tests — everything so far has been verified by hand against a real Postgres instance and a real Google OAuth app.
-- No rate limiting.
+- No automated tests — everything so far has been verified by hand against a real Postgres instance, a real Google OAuth app, and (for passkeys) Chrome's WebAuthn virtual authenticator via CDP.
+- No rate limiting anywhere, including on the passkey endpoints — deliberately consistent with the rest of the app rather than singled out; if added, it should be a uniform pass across all public auth endpoints, not passkey-specific.

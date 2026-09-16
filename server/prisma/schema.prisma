@@ -21,6 +21,24 @@ model User {
   macroEntries    MacroEntry[]
   workoutRoutines WorkoutRoutine[]
   workoutSets     WorkoutSet[]
+  credentials     Credential[]
+}
+
+// A registered WebAuthn passkey. Always an additional credential on an
+// account created via Google — see server/README.md for why v1 doesn't
+// support passkey-only signup.
+model Credential {
+  id          String    @id // base64url credential ID from the authenticator
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publicKey   Bytes
+  counter     BigInt    @default(0)
+  transports  String[]  @default([])
+  deviceLabel String?
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+
+  @@index([userId])
 }
 
 // Server-side session store backing @fastify/session (avoids adding Redis).

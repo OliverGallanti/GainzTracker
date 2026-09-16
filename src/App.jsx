@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 
@@ -6,8 +6,8 @@ function App() {
   const [authStatus, setAuthStatus] = useState('loading')
   const [user, setUser] = useState(null)
 
-  useEffect(() => {
-    fetch('/api/me', { credentials: 'include' })
+  const checkAuth = useCallback(() => {
+    return fetch('/api/me', { credentials: 'include' })
       .then((res) => {
         if (res.ok) return res.json()
         throw new Error('Not authenticated')
@@ -21,15 +21,18 @@ function App() {
       })
   }, [])
 
-  if (authStatus === 'loading') {
-    return null
-  }
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
 
-  if (authStatus === 'authed') {
-    return <Dashboard user={user} onLogout={() => setAuthStatus('anon')} />
-  }
-
-  return <Login />
+  return (
+    <div className="app-background min-h-dvh">
+      {authStatus === 'authed' && (
+        <Dashboard user={user} onLogout={() => setAuthStatus('anon')} />
+      )}
+      {authStatus === 'anon' && <Login onAuthenticated={checkAuth} />}
+    </div>
+  )
 }
 
 export default App

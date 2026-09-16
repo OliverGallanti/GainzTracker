@@ -48,7 +48,13 @@ export default async function authRoutes(app) {
       return reply.badRequest('Invalid OAuth state — please try signing in again')
     }
 
-    const { state: expectedState, codeVerifier } = JSON.parse(unsigned.value)
+    let expectedState
+    let codeVerifier
+    try {
+      ({ state: expectedState, codeVerifier } = JSON.parse(unsigned.value))
+    } catch {
+      return reply.badRequest('Invalid OAuth state — please try signing in again')
+    }
 
     const oidcConfig = await getGoogleOidcConfig()
     const currentUrl = new URL(request.url, config.GOOGLE_REDIRECT_URI)
@@ -66,21 +72,38 @@ export default async function authRoutes(app) {
 
     const claims = tokens.claims()
 
-    const user = await prisma.user.upsert({
-      where: { googleId: claims.sub },
-      update: {
-        email: claims.email,
-        name: claims.name ?? null,
-        avatarUrl: claims.picture ?? null,
-      },
-      create: {
-        googleId: claims.sub,
-        email: claims.email,
-        name: claims.name ?? null,
-        avatarUrl: claims.picture ?? null,
-      },
-    })
+    // Google can return an unverified address on some account types; treating one
+    // as an identity would let someone claim an email they don't control.
+    if (!claims.email || claims.email_verified !== true) {
+      return reply.badRequest('Your Google account needs a verified email address to sign in')
+    }
 
+    const profile = {
+      email: claims.email,
+      name: claims.name ?? null,
+      avatarUrl: claims.picture ?? null,
+    }
+
+    let user
+    try {
+      user = await prisma.user.upsert({
+        where: { googleId: claims.sub },
+        update: profile,
+        create: { googleId: claims.sub, ...profile },
+      })
+    } catch (err) {
+      // An address can move between Google accounts, so a new sub can arrive
+      // carrying an email already held by another row.
+      if (err.code === 'P2002') {
+        request.log.warn({ googleId: claims.sub }, 'Sign-in blocked: email belongs to another account')
+        return reply.conflict('That email address is already linked to a different account')
+      }
+      throw err
+    }
+
+    // Issue a fresh session ID now that this session is being elevated to a
+    // logged-in user, so a pre-existing ID can't be replayed by whoever set it.
+    await request.session.regenerate()
     request.session.set('userId', user.id)
     await request.session.save()
 

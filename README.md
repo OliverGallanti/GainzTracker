@@ -1,4 +1,4 @@
-# GainzTracker
+# Gainz.Tracker
 
 A personal weight, calorie/macro, and workout-routine tracker. This is the frontend (React SPA); the backend lives in [server/](server/README.md) and has its own README covering the auth/data architecture.
 
@@ -9,9 +9,11 @@ This README is more of a working plan than a finished description — the app is
 **Built:**
 
 - Real Google sign-in (`src/components/Login.jsx`) — hands off to the BFF, no fake auth.
-- A placeholder `Dashboard.jsx` that shows who's logged in and a working logout.
-- `App.jsx` checks session state on load (`/api/me`) and switches between Login/Dashboard.
+- Passkey (WebAuthn) sign-in as a second, passwordless option — `src/lib/webauthn.js` wraps the registration/authentication ceremonies; see [server/README.md](server/README.md) for how the crypto side works. Passkeys are managed (added/removed) from the Dashboard.
+- A placeholder `Dashboard.jsx` that shows who's logged in, passkey management, and a working logout.
+- `App.jsx` checks session state on load (`/api/me`) and switches between Login/Dashboard. Exposes a `checkAuth`/`onAuthenticated` callback so an in-page login (passkey) can re-check auth state without a page reload, the way a full-page redirect (Google) naturally would.
 - `src/lib/api.js` — a small fetch wrapper for talking to the BFF (always sends cookies, throws on non-2xx).
+- Mobile-first Tailwind design system (black/grey/white, wireframe-gradient background) applied consistently across Login and Dashboard.
 
 **Not built at all yet:** any actual tracking UI. The backend already has working, authenticated CRUD endpoints for weight entries, macro/calorie entries, and workout routines/sets (see [server/README.md](server/README.md)) — there is simply no frontend for any of it. That's the next phase of work, not a future maybe.
 
@@ -19,7 +21,7 @@ This README is more of a working plan than a finished description — the app is
 
 Kept deliberately boring: Vite for fast dev/build with no framework opinions forced on us (no server rendering, no file-based routing we don't need for what's currently a single authenticated app, not a public site), React because it's the most transferable choice for a learning project, Tailwind for styling so we're not hand-rolling CSS files per component as the app grows.
 
-**Note on current inconsistency**: `Login.jsx` still uses a hand-written `Login.css`, and `Dashboard.jsx` uses inline `style={}` — neither uses Tailwind yet, even though it's installed (`src/index.css` just does `@import "tailwindcss"`). This wasn't a decision, it's just that nothing past the login screen has been built with real UI intent yet. **Whatever component is built next should use Tailwind**, and `Login.jsx` should get migrated when it's next touched, so we don't end up with three different styling approaches in one app.
+Every component uses Tailwind utility classes exclusively — no per-component CSS files. The one exception is `src/index.css`, which holds the Tailwind import plus `.app-background` (the shared wireframe-grid/gradient background), since a `mask-image` with multi-stop gradients isn't expressible as Tailwind utilities. **Whatever component is built next should stay Tailwind-only**, so this doesn't drift back into mixed approaches.
 
 ## How the frontend talks to the backend
 
@@ -27,7 +29,7 @@ The SPA never touches Google, tokens, or the database directly — it only calls
 
 - No `.env` is needed on the frontend in dev — there's nothing to configure, the proxy makes everything same-origin.
 - Every call needs `credentials: 'include'` so the session cookie actually gets sent — `src/lib/api.js` does this automatically, so new code should go through that helper rather than calling `fetch` directly.
-- Login/logout are full-page navigations (`window.location.href = '/auth/google'`), not `fetch` calls — that's an OAuth requirement, not a frontend choice, and should stay that way if this ever gets a second SSO provider.
+- Google login is a full-page navigation (`window.location.href = '/auth/google'`), not a `fetch` call — that's an OAuth requirement, not a frontend choice, and should stay that way if this ever gets a second SSO provider. Passkey login/registration, by contrast, are `fetch`-based (`src/lib/webauthn.js`) since WebAuthn ceremonies run via the browser's `navigator.credentials` API, not a redirect.
 
 ## Planned feature build-out
 
