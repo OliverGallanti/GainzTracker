@@ -26,19 +26,19 @@ function Login({ onAuthenticated }) {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12 sm:px-6">
-      <div className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 shadow-2xl shadow-black/40 backdrop-blur sm:max-w-md sm:p-8">
+      <div className="w-full max-w-sm rounded-2xl border border-secondary/40 bg-card/90 p-6 shadow-2xl shadow-black/40 backdrop-blur sm:max-w-md sm:p-8">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Gainz<span className="text-neutral-500">.Tracker</span>
+          <h1 className="text-2xl font-bold tracking-tight text-third sm:text-3xl">
+            Gainz<span className="text-third/60">.Tracker</span>
           </h1>
-          <p className="mt-2 text-sm text-neutral-400">Track your fitness gains</p>
+          <p className="mt-2 text-sm text-third/60">Track your fitness gains</p>
         </div>
 
         <div className="flex flex-col gap-3">
           <button
             type="button"
             onClick={handleGoogleSignIn}
-            className="flex w-full items-center justify-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-medium text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-3 rounded-lg bg-third px-4 py-3 text-sm font-medium text-main transition hover:bg-third/90 active:scale-[0.98]"
           >
             <svg viewBox="0 0 48 48" aria-hidden="true" className="h-5 w-5 shrink-0">
               <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
@@ -49,17 +49,17 @@ function Login({ onAuthenticated }) {
             Sign in with Google
           </button>
 
-          <div className="flex items-center gap-3 text-xs text-neutral-500">
-            <div className="h-px flex-1 bg-neutral-800" />
+          <div className="flex items-center gap-3 text-xs text-secondary">
+            <div className="h-px flex-1 bg-secondary/25" />
             or
-            <div className="h-px flex-1 bg-neutral-800" />
+            <div className="h-px flex-1 bg-secondary/25" />
           </div>
 
           <button
             type="button"
             onClick={handlePasskeySignIn}
             disabled={passkeyPending}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-700 px-4 py-3 text-sm font-medium text-neutral-200 transition hover:border-neutral-500 hover:text-white disabled:opacity-60 active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-secondary/40 px-4 py-3 text-sm font-medium text-third disabled:opacity-60 active:scale-[0.98] transition hover:border-secondary hover:text-third"
           >
             {passkeyPending ? 'Waiting for your passkey…' : 'Sign in with a passkey'}
           </button>
@@ -67,7 +67,7 @@ function Login({ onAuthenticated }) {
           {passkeyError ? (
             <p className="text-center text-xs text-red-400">{passkeyError}</p>
           ) : (
-            <p className="text-center text-xs text-neutral-600">
+            <p className="text-center text-xs text-secondary">
               New here? Sign in with Google first to set up a passkey.
             </p>
           )}

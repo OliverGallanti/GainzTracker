@@ -10,15 +10,17 @@ import {
 } from 'recharts'
 import { api } from '../lib/api'
 
-// Chart chrome mapped to the app's existing Tailwind neutral scale rather than
+// Chart chrome mapped to the app's theme tokens (index.css) rather than
 // Recharts' bright defaults — a single series needs no legend (the card title
 // already says what's plotted), so the only color decision is the line itself
-// (white, matching the app's primary-ink accent) against recessive gridlines.
-const GRID_COLOR = '#262626' // neutral-800
-const AXIS_COLOR = '#737373' // neutral-500
-const LINE_COLOR = '#ffffff'
-const TOOLTIP_BG = '#171717' // neutral-900, solid (not the card's translucent bg)
-const TOOLTIP_BORDER = '#404040' // neutral-700
+// (third, the app's primary-ink accent) against recessive gridlines. Resolved
+// to plain hex (not CSS var references) since Recharts renders these as SVG
+// attributes, which don't resolve var() the way DOM/CSS properties do.
+const GRID_COLOR = '#244a55' // secondary blended ~25% into main — matches border-secondary/25
+const AXIS_COLOR = '#869b9e' // third blended ~60% into main — matches text-third/60
+const LINE_COLOR = '#dce0d9' // third
+const TOOLTIP_BG = '#16495d' // card, solid (not the card's translucent bg)
+const TOOLTIP_BORDER = '#40656d' // secondary blended ~40% into card — matches border-secondary/40
 
 function formatDateTick(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -31,8 +33,8 @@ function TooltipContent({ active, payload, label }) {
       className="rounded-lg border px-3 py-2 text-xs shadow-lg"
       style={{ backgroundColor: TOOLTIP_BG, borderColor: TOOLTIP_BORDER }}
     >
-      <p className="text-neutral-400">{formatDateTick(label)}</p>
-      <p className="font-semibold text-white">{payload[0].value.toFixed(1)} kg</p>
+      <p className="text-third/60">{formatDateTick(label)}</p>
+      <p className="font-semibold text-third">{payload[0].value.toFixed(1)} kg</p>
     </div>
   )
 }
@@ -50,11 +52,11 @@ function WeightChart() {
   const isEmpty = entries?.length === 0
 
   return (
-    <div className="w-full rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
-      <h2 className="mb-4 text-sm font-semibold text-white">Weight</h2>
+    <div className="w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+      <h2 className="mb-4 text-sm font-semibold text-third">Weight</h2>
 
-      {isLoading && <p className="text-xs text-neutral-500">Loading…</p>}
-      {isEmpty && <p className="text-xs text-neutral-500">No weight entries logged yet.</p>}
+      {isLoading && <p className="text-xs text-third/60">Loading…</p>}
+      {isEmpty && <p className="text-xs text-third/60">No weight entries logged yet.</p>}
 
       {!isLoading && !isEmpty && (
         <div className="h-48 sm:h-64">
@@ -84,8 +86,8 @@ function WeightChart() {
                 dataKey="weightKg"
                 stroke={LINE_COLOR}
                 strokeWidth={2}
-                dot={{ r: 4, fill: LINE_COLOR, stroke: '#171717', strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: LINE_COLOR, stroke: '#171717', strokeWidth: 2 }}
+                dot={{ r: 4, fill: LINE_COLOR, stroke: TOOLTIP_BG, strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: LINE_COLOR, stroke: TOOLTIP_BG, strokeWidth: 2 }}
               />
             </LineChart>
           </ResponsiveContainer>

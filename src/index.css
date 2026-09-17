@@ -1,12 +1,19 @@
 @import "tailwindcss";
 
+@theme {
+  --color-main: #053345;
+  --color-secondary: #808f85;
+  --color-third: #dce0d9;
+  --color-card: #16495d;
+}
+
 @layer base {
   html {
     color-scheme: dark;
   }
 
   body {
-    @apply bg-cyan-950 text-neutral-50 antialiased;
+    @apply bg-main text-third antialiased;
   }
 }
 
@@ -16,9 +23,9 @@
    multi-stop gradients Tailwind's utilities don't express. */
 .app-background {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(163, 163, 163, 0.2), transparent 70%);
+    linear-gradient(rgba(220, 224, 217, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(220, 224, 217, 0.07) 1px, transparent 1px),
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(128, 143, 133, 0.25), transparent 70%);
   background-size: 40px 40px, 40px 40px, 100% 100%;
   mask-image: radial-gradient(ellipse 100% 80% at 50% 35%, black 25%, transparent 85%);
   -webkit-mask-image: radial-gradient(ellipse 100% 80% at 50% 35%, black 25%, transparent 85%);
