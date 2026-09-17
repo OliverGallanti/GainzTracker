@@ -11,12 +11,28 @@ const createSchema = z.object({
   loggedAt: z.coerce.date().optional(),
 })
 
+const listQuerySchema = z.object({
+  since: z.coerce.date().optional(),
+  until: z.coerce.date().optional(),
+})
+
 export default async function mealRoutes(app) {
   app.addHook('onRequest', requireAuth)
 
-  app.get('/meals', async (request) => {
+  app.get('/meals', async (request, reply) => {
+    const parsedQuery = listQuerySchema.safeParse(request.query)
+    if (!parsedQuery.success) {
+      return reply.badRequest(parsedQuery.error.message)
+    }
+    const { since, until } = parsedQuery.data
+
     return prisma.macroEntry.findMany({
-      where: { userId: request.session.userId },
+      where: {
+        userId: request.session.userId,
+        ...((since || until) && {
+          loggedAt: { ...(since && { gte: since }), ...(until && { lte: until }) },
+        }),
+      },
       orderBy: { loggedAt: 'desc' },
     })
   })

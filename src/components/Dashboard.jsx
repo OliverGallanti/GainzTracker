@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { isPasskeyCancellation, registerPasskey } from '../lib/webauthn'
+import MacroStatsCard from './MacroStatsCard'
+import WeightChart from './WeightChart'
+import GymStreak from './GymStreak'
 
 function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString(undefined, {
@@ -66,7 +69,9 @@ function Dashboard({ user, onLogout }) {
       </header>
 
       <main className="flex flex-1 flex-col items-center px-4 py-12 sm:px-6">
-        <div className="w-full max-w-sm text-center sm:max-w-md">
+        <div className="flex w-full max-w-sm flex-col gap-6 text-center sm:max-w-md md:max-w-2xl">
+          <MacroStatsCard />
+
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
             {user.avatarUrl && (
               <img
@@ -81,7 +86,10 @@ function Dashboard({ user, onLogout }) {
             <p className="mt-1 text-sm text-neutral-400">{user.email}</p>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+          <WeightChart />
+          <GymStreak />
+
+          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
             <h2 className="text-sm font-semibold text-white">Passkeys</h2>
             <p className="mt-1 text-xs text-neutral-500">
               Sign in without Google using your device's fingerprint, face, or PIN.

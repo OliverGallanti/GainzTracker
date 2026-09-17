@@ -8,12 +8,28 @@ const createSchema = z.object({
   note: z.string().optional(),
 })
 
+const listQuerySchema = z.object({
+  since: z.coerce.date().optional(),
+  until: z.coerce.date().optional(),
+})
+
 export default async function weightRoutes(app) {
   app.addHook('onRequest', requireAuth)
 
-  app.get('/weights', async (request) => {
+  app.get('/weights', async (request, reply) => {
+    const parsedQuery = listQuerySchema.safeParse(request.query)
+    if (!parsedQuery.success) {
+      return reply.badRequest(parsedQuery.error.message)
+    }
+    const { since, until } = parsedQuery.data
+
     return prisma.weightEntry.findMany({
-      where: { userId: request.session.userId },
+      where: {
+        userId: request.session.userId,
+        ...((since || until) && {
+          loggedAt: { ...(since && { gte: since }), ...(until && { lte: until }) },
+        }),
+      },
       orderBy: { loggedAt: 'desc' },
     })
   })

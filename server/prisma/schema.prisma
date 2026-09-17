@@ -22,6 +22,20 @@ model User {
   workoutRoutines WorkoutRoutine[]
   workoutSets     WorkoutSet[]
   credentials     Credential[]
+  macroGoal       MacroGoal?
+}
+
+// A user's current daily macro targets — a singleton per user (re-editing
+// replaces it via upsert), not a per-day row.
+model MacroGoal {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proteinG      Float
+  fatG          Float
+  carbsG        Float
+  calorieTarget Int?
+  updatedAt     DateTime @updatedAt
 }
 
 // A registered WebAuthn passkey. Always an additional credential on an
