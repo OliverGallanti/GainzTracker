@@ -32,3 +32,17 @@ export function getStrengthTier(exerciseName, liftKg, bodyweightKg, sex) {
   const ratio = liftKg / bodyweightKg
   return STRENGTH_TIERS[thresholds.filter((t) => ratio >= t).length]
 }
+
+// The same thresholds, converted to this person's kg at their current
+// bodyweight, for drawing as reference lines on a lift's progression chart —
+// "here's what Novice/Intermediate/Advanced/Elite look like for you."
+// Beginner has no threshold of its own (it's "below Novice"), so only the
+// four real boundaries get a line.
+export function getStrengthReferenceLines(exerciseName, bodyweightKg, sex) {
+  const thresholds = sex && STRENGTH_STANDARDS[sex]?.[exerciseName]
+  if (!thresholds || !bodyweightKg) return []
+  return thresholds.map((ratio, i) => ({
+    label: STRENGTH_TIERS[i + 1].label,
+    value: Math.round(ratio * bodyweightKg * 10) / 10,
+  }))
+}

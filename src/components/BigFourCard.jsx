@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import { getStrengthTier } from '../lib/strength'
+import { getStrengthReferenceLines, getStrengthTier } from '../lib/strength'
 import { StatLineChart } from './StatLineChart'
+
+const HELP_TEXT =
+  "Ranked by your most recent lift, not your all-time best. The icon is your strength level " +
+  '(Beginner → Elite) - your lift as a multiple of your latest logged bodyweight, against standard ' +
+  "ratios for your sex. The chart's faint lines mark the Novice/Intermediate/Advanced/Elite " +
+  'weights for you specifically, so you can see what to aim for next.'
 
 const BIG_FOUR_LIFTS = ['Deadlift', 'Squat', 'Bench Press', 'Overhead Press']
 
@@ -16,7 +22,7 @@ const emptyForm = { exerciseName: BIG_FOUR_LIFTS[0], weightKg: '', reps: '' }
 const emptyGoalsForm = { deadliftGoalKg: '', squatGoalKg: '', benchPressGoalKg: '', overheadPressGoalKg: '' }
 
 function formatDate(isoString) {
-  return new Date(isoString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return new Date(isoString).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 // Reuses the existing (previously frontend-less) /api/workout-sets — a plain
@@ -31,6 +37,9 @@ function BigFourCard() {
 
   const [mode, setMode] = useState('view') // 'view' | 'log' | 'editGoals'
   const [selectedLift, setSelectedLift] = useState(BIG_FOUR_LIFTS[0])
+  const [showHelp, setShowHelp] = useState(false)
+  const [logsExpanded, setLogsExpanded] = useState(false)
+  const [showStandards, setShowStandards] = useState(true)
 
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
@@ -137,7 +146,9 @@ function BigFourCard() {
     return { name, entry, tier: getStrengthTier(name, entry?.weightKg, bodyweight, sex) }
   })
   const ranked = [...latestByLift].sort((a, b) => (b.entry?.weightKg ?? -1) - (a.entry?.weightKg ?? -1))
-  const recentEntries = sets?.filter((s) => BIG_FOUR_LIFTS.includes(s.exerciseName)).slice(0, 6) ?? []
+  // Collapsed by default (see logsExpanded), so no need to cap this list —
+  // it's the full history, not just a recent few.
+  const recentEntries = sets?.filter((s) => BIG_FOUR_LIFTS.includes(s.exerciseName)) ?? []
 
   const liftEntries = (sets ?? [])
     .filter((s) => s.exerciseName === selectedLift)
@@ -145,11 +156,23 @@ function BigFourCard() {
     .reverse() // sets are newest-first; the chart wants oldest-first
   const selectedGoal = meGoals?.[GOAL_FIELD[selectedLift]]
   const selectedTier = getStrengthTier(selectedLift, liftEntries.at(-1)?.weightKg, bodyweight, sex)
+  const selectedTierLines = getStrengthReferenceLines(selectedLift, bodyweight, sex)
 
   return (
     <div className="w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-third">Big 4</h2>
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-sm font-semibold text-third">Big 4</h2>
+          <button
+            type="button"
+            onClick={() => setShowHelp((v) => !v)}
+            aria-expanded={showHelp}
+            aria-label="What does this card show?"
+            className="flex h-4 w-4 items-center justify-center rounded-full border border-secondary/40 text-[10px] font-semibold text-third/60 transition hover:border-secondary hover:text-third"
+          >
+            ?
+          </button>
+        </div>
         {mode === 'view' && (
           <button
             type="button"
@@ -160,6 +183,12 @@ function BigFourCard() {
           </button>
         )}
       </div>
+
+      {showHelp && (
+        <p className="mb-4 rounded-lg border border-secondary/25 bg-main/40 px-3 py-2 text-xs text-third/60">
+          {HELP_TEXT}
+        </p>
+      )}
 
       {isLoading && <p className="text-xs text-third/60">Loading…</p>}
 
@@ -228,37 +257,65 @@ function BigFourCard() {
             {liftEntries.length === 0 ? (
               <p className="text-xs text-third/60">No {selectedLift} entries logged yet.</p>
             ) : (
-              <StatLineChart
-                data={liftEntries.map((e) => ({ loggedAt: e.performedAt, value: e.weightKg }))}
-                unit="kg"
-                goal={selectedGoal}
-              />
+              <>
+                {selectedTierLines.length > 0 && (
+                  <label className="mb-2 flex items-center gap-1.5 text-xs text-third/60">
+                    <input
+                      type="checkbox"
+                      checked={showStandards}
+                      onChange={(e) => setShowStandards(e.target.checked)}
+                      className="accent-third"
+                    />
+                    Show strength-standard lines
+                  </label>
+                )}
+                <StatLineChart
+                  data={liftEntries.map((e) => ({ loggedAt: e.performedAt, value: e.weightKg }))}
+                  unit="kg"
+                  goal={selectedGoal}
+                  referenceLines={showStandards ? selectedTierLines : []}
+                />
+              </>
             )}
           </div>
 
           {recentEntries.length > 0 && (
-            <ul className="mt-5 flex flex-col gap-2 border-t border-secondary/25 pt-4">
-              {recentEntries.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center justify-between rounded-lg border border-secondary/25 px-3 py-2 text-sm"
-                >
-                  <div>
-                    <span className="text-third">{s.exerciseName}</span>
-                    <span className="ml-2 text-xs text-third/60">
-                      {s.weightKg}kg{s.reps ? ` × ${s.reps}` : ''} · {formatDate(s.performedAt)}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(s.id)}
-                    className="text-xs font-medium text-third/60 transition hover:text-red-400"
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-5 border-t border-secondary/25 pt-4">
+              <button
+                type="button"
+                onClick={() => setLogsExpanded((v) => !v)}
+                aria-expanded={logsExpanded}
+                className="flex w-full items-center justify-between text-xs font-medium text-third/60 transition hover:text-third"
+              >
+                <span>Recent logs ({recentEntries.length})</span>
+                <span>{logsExpanded ? '▲ Hide' : '▼ Show'}</span>
+              </button>
+
+              {logsExpanded && (
+                <ul className="mt-3 flex flex-col gap-2">
+                  {recentEntries.map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex items-center justify-between rounded-lg border border-secondary/25 px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <span className="text-third">{s.exerciseName}</span>
+                        <span className="ml-2 text-xs text-third/60">
+                          {s.weightKg}kg{s.reps ? ` × ${s.reps}` : ''} · {formatDate(s.performedAt)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(s.id)}
+                        className="text-xs font-medium text-third/60 transition hover:text-red-400"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </>
       )}

@@ -42,12 +42,16 @@ function TooltipContent({ active, payload, label, unit, decimals }) {
 // silently misalign multiple panels sharing an `xDomain`).
 //
 // `data`: [{ loggedAt: ISOString, value: number }], ascending by loggedAt.
-export function StatLineChart({ data, unit, goal, xDomain, decimals = 1 }) {
+// `referenceLines`: extra dashed lines besides `goal` (e.g. strength-standard
+// thresholds) — [{ label, value }], rendered lighter than the personal goal.
+export function StatLineChart({ data, unit, goal, referenceLines = [], xDomain, decimals = 1 }) {
   // The default 'dataMin'/'dataMax' domain only looks at plotted points, so a
   // goal reference line outside that range would render off-screen. Compute
-  // the domain from both the data AND the goal so it's always on-screen.
+  // the domain from the data AND every reference value so all of them stay
+  // on-screen.
   const values = data.map((d) => d.value).filter((v) => v != null)
-  const allValues = goal != null ? [...values, goal] : values
+  const extraValues = [...(goal != null ? [goal] : []), ...referenceLines.map((r) => r.value)]
+  const allValues = [...values, ...extraValues]
   const min = Math.min(...allValues)
   const max = Math.max(...allValues)
   const padding = Math.max((max - min) * 0.1, 1)
@@ -82,6 +86,16 @@ export function StatLineChart({ data, unit, goal, xDomain, decimals = 1 }) {
             domain={yDomain}
           />
           <Tooltip content={<TooltipContent unit={unit} decimals={decimals} />} cursor={{ stroke: GRID_COLOR }} />
+          {referenceLines.map((r) => (
+            <ReferenceLine
+              key={r.label}
+              y={r.value}
+              stroke={AXIS_COLOR}
+              strokeOpacity={0.35}
+              strokeDasharray="2 2"
+              label={{ value: r.label, position: 'insideTopLeft', fill: AXIS_COLOR, fontSize: 9, opacity: 0.6 }}
+            />
+          ))}
           {goal != null && (
             <ReferenceLine
               y={goal}
