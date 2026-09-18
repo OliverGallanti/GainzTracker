@@ -17,10 +17,15 @@ const createRoutineSchema = z.object({
 
 const createSetSchema = z.object({
   routineId: z.string().optional(),
+  splitLogId: z.string().optional(),
   exerciseName: z.string().min(1),
   weightKg: z.number().nonnegative().optional(),
   reps: z.number().int().nonnegative().optional(),
   performedAt: z.coerce.date().optional(),
+})
+
+const listSetsQuerySchema = z.object({
+  splitLogId: z.string().optional(),
 })
 
 export default async function workoutRoutes(app) {
@@ -55,9 +60,17 @@ export default async function workoutRoutes(app) {
     return reply.code(204).send()
   })
 
-  app.get('/workout-sets', async (request) => {
+  app.get('/workout-sets', async (request, reply) => {
+    const parsedQuery = listSetsQuerySchema.safeParse(request.query)
+    if (!parsedQuery.success) {
+      return reply.badRequest(parsedQuery.error.message)
+    }
+
     return prisma.workoutSet.findMany({
-      where: { userId: request.session.userId },
+      where: {
+        userId: request.session.userId,
+        ...(parsedQuery.data.splitLogId && { splitLogId: parsedQuery.data.splitLogId }),
+      },
       orderBy: { performedAt: 'desc' },
     })
   })
@@ -75,6 +88,16 @@ export default async function workoutRoutes(app) {
       })
       if (!routine) {
         return reply.badRequest('routineId does not belong to a routine you own')
+      }
+    }
+
+    if (parsed.data.splitLogId) {
+      const log = await prisma.splitLog.findFirst({
+        where: { id: parsed.data.splitLogId, userId: request.session.userId },
+        select: { id: true },
+      })
+      if (!log) {
+        return reply.badRequest('splitLogId does not belong to a log you own')
       }
     }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { isPasskeyCancellation, registerPasskey } from '../lib/webauthn'
+import { ACTIVITY_LEVELS } from '../lib/tdee'
 
 function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString(undefined, {
@@ -21,6 +22,13 @@ function ProfileSecurityPage({ user, onBack }) {
   const [sex, setSex] = useState(undefined) // undefined = loading, null = unset
   const [savingSex, setSavingSex] = useState(false)
 
+  const [age, setAge] = useState(undefined) // undefined = loading, null = unset
+  const [ageDraft, setAgeDraft] = useState('')
+  const [savingAge, setSavingAge] = useState(false)
+
+  const [activityLevel, setActivityLevel] = useState(undefined)
+  const [savingActivity, setSavingActivity] = useState(false)
+
   const loadPasskeys = () => {
     api('/api/passkeys')
       .then(setPasskeys)
@@ -29,7 +37,12 @@ function ProfileSecurityPage({ user, onBack }) {
 
   useEffect(() => {
     loadPasskeys()
-    api('/api/me').then((me) => setSex(me.sex ?? null))
+    api('/api/me').then((me) => {
+      setSex(me.sex ?? null)
+      setAge(me.age ?? null)
+      setAgeDraft(me.age ?? '')
+      setActivityLevel(me.activityLevel ?? null)
+    })
   }, [])
 
   const handleSaveSex = async (value) => {
@@ -39,6 +52,27 @@ function ProfileSecurityPage({ user, onBack }) {
       setSex(value)
     } finally {
       setSavingSex(false)
+    }
+  }
+
+  const handleSaveAge = async (e) => {
+    e.preventDefault()
+    setSavingAge(true)
+    try {
+      await api('/api/me', { method: 'PUT', body: JSON.stringify({ age: Number(ageDraft) }) })
+      setAge(Number(ageDraft))
+    } finally {
+      setSavingAge(false)
+    }
+  }
+
+  const handleSaveActivity = async (value) => {
+    setSavingActivity(true)
+    try {
+      await api('/api/me', { method: 'PUT', body: JSON.stringify({ activityLevel: value }) })
+      setActivityLevel(value)
+    } finally {
+      setSavingActivity(false)
     }
   }
 
@@ -87,8 +121,10 @@ function ProfileSecurityPage({ user, onBack }) {
       <div className="rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
         <h2 className="text-sm font-semibold text-third">Profile details</h2>
         <p className="mt-1 text-xs text-third/60">
-          Only used for the Big 4 strength-level rating — optional, nothing else depends on it.
+          Optional - powers the Big 4 strength-level rating and the TDEE calorie estimate, nothing else
+          depends on it.
         </p>
+
         <div className="mt-3 flex items-center gap-2">
           <span className="text-xs text-third/60">Sex</span>
           {['male', 'female'].map((value) => (
@@ -104,6 +140,45 @@ function ProfileSecurityPage({ user, onBack }) {
               {value === 'male' ? 'Male' : 'Female'}
             </button>
           ))}
+        </div>
+
+        <form onSubmit={handleSaveAge} className="mt-3 flex items-center gap-2 text-xs">
+          <span className="text-third/60">Age</span>
+          <input
+            type="number"
+            min="10"
+            max="120"
+            step="1"
+            value={ageDraft}
+            onChange={(e) => setAgeDraft(e.target.value)}
+            className="w-16 rounded-md border border-secondary/40 bg-main px-2 py-1 text-third outline-none focus:border-secondary"
+          />
+          <button
+            type="submit"
+            disabled={savingAge || !ageDraft || Number(ageDraft) === age}
+            className="text-third underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary disabled:opacity-40"
+          >
+            Save
+          </button>
+        </form>
+
+        <div className="mt-3 flex items-center gap-2 text-xs">
+          <span className="shrink-0 text-third/60">Activity</span>
+          <select
+            value={activityLevel ?? ''}
+            onChange={(e) => handleSaveActivity(e.target.value)}
+            disabled={savingActivity}
+            className="w-full rounded-md border border-secondary/40 bg-main px-2 py-1 text-third outline-none focus:border-secondary disabled:opacity-60"
+          >
+            <option value="" disabled>
+              Select…
+            </option>
+            {ACTIVITY_LEVELS.map((level) => (
+              <option key={level.key} value={level.key}>
+                {level.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

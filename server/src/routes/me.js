@@ -11,11 +11,16 @@ const userSelect = {
   weightGoalKg: true,
   bodyFatGoalPercent: true,
   sex: true,
+  age: true,
+  activityLevel: true,
   deadliftGoalKg: true,
   squatGoalKg: true,
   benchPressGoalKg: true,
   overheadPressGoalKg: true,
 }
+
+// Must match the keys in src/lib/tdee.js's ACTIVITY_LEVELS on the client.
+const ACTIVITY_LEVEL_KEYS = ['sedentary', 'light', 'moderate', 'active', 'very_active']
 
 // A general profile-update endpoint: every field is optional and only the
 // keys actually present in the body get written, so editing one (e.g. just
@@ -26,6 +31,8 @@ const updateSchema = z
     weightGoalKg: z.number().positive().optional(),
     bodyFatGoalPercent: z.number().min(0).max(100).optional(),
     sex: z.enum(['male', 'female']).optional(),
+    age: z.number().int().positive().max(120).optional(),
+    activityLevel: z.enum(ACTIVITY_LEVEL_KEYS).optional(),
     deadliftGoalKg: z.number().positive().optional(),
     squatGoalKg: z.number().positive().optional(),
     benchPressGoalKg: z.number().positive().optional(),

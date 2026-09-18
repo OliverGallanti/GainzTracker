@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
 import { computeAdherenceStreak, nextDayIndex } from '../lib/splits'
 import TrainingCalendar from './TrainingCalendar'
+import SessionEditor from './SessionEditor'
 
 function todayBounds() {
   const dayStart = startOfLocalDay()
@@ -15,6 +16,7 @@ function TrainingLogCard({ refreshKey }) {
   const [logs, setLogs] = useState(null)
   const [logging, setLogging] = useState(false)
   const [error, setError] = useState(null)
+  const [editingLog, setEditingLog] = useState(null)
 
   const load = () => {
     api('/api/workout-splits').then((splits) => {
@@ -37,10 +39,11 @@ function TrainingLogCard({ refreshKey }) {
     setLogging(true)
     try {
       const { dayStart, dayEnd } = todayBounds()
-      await api(`/api/workout-splits/${split.id}/logs`, {
+      const created = await api(`/api/workout-splits/${split.id}/logs`, {
         method: 'POST',
         body: JSON.stringify({ completed, dayStart, dayEnd }),
       })
+      if (completed) setEditingLog(created)
       load()
     } catch {
       setError('Could not log that day — please try again')
@@ -129,7 +132,17 @@ function TrainingLogCard({ refreshKey }) {
 
           {error && <p className="mt-2 text-center text-xs text-red-400">{error}</p>}
 
-          <TrainingCalendar logs={logs} days={split.days} onRemove={handleRemoveLog} />
+          {editingLog && (
+            <SessionEditor
+              log={editingLog}
+              onClose={() => {
+                setEditingLog(null)
+                load()
+              }}
+            />
+          )}
+
+          <TrainingCalendar logs={logs} days={split.days} onRemove={handleRemoveLog} onSessionChange={load} />
         </>
       )}
     </div>

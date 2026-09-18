@@ -17,6 +17,8 @@ model User {
   weightGoalKg       Float? // a target, not historized — re-editing replaces it
   bodyFatGoalPercent Float?
   sex                String? // 'male' | 'female' — app-validated, not a DB enum; only used for the Big 4 strength-standard lookup, everything else works without it
+  age                   Int? // years — a plain number, not birthDate; drifts by a year at most, fine for a TDEE estimate
+  activityLevel         String? // one of ACTIVITY_LEVELS' keys in src/lib/tdee.js, app-validated like `sex`
   deadliftGoalKg        Float?
   squatGoalKg           Float?
   benchPressGoalKg      Float?
@@ -57,14 +59,17 @@ model WorkoutSplit {
 // Both completed and skipped advance dayIndex — skipping a day still
 // consumes that slot rather than letting it be dodged indefinitely.
 model SplitLog {
-  id        String       @id @default(cuid())
-  userId    String
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  splitId   String
-  split     WorkoutSplit @relation(fields: [splitId], references: [id], onDelete: Cascade)
-  dayIndex  Int
-  completed Boolean
-  loggedAt  DateTime     @default(now())
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  splitId         String
+  split           WorkoutSplit @relation(fields: [splitId], references: [id], onDelete: Cascade)
+  dayIndex        Int
+  completed       Boolean
+  loggedAt        DateTime     @default(now())
+  durationMinutes Int? // manual entry — what you actually did that session, not a stopwatch
+
+  workoutSets WorkoutSet[]
 
   @@index([userId, loggedAt])
   @@index([splitId, loggedAt])
@@ -162,10 +167,13 @@ model WorkoutSet {
   user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   routineId    String?
   routine      WorkoutRoutine? @relation(fields: [routineId], references: [id], onDelete: SetNull)
+  splitLogId   String? // ties an actually-performed set to the specific day it happened on; independent of routineId
+  splitLog     SplitLog?       @relation(fields: [splitLogId], references: [id], onDelete: Cascade)
   exerciseName String
   weightKg     Float?
   reps         Int?
   performedAt  DateTime        @default(now())
 
   @@index([userId, performedAt])
+  @@index([splitLogId])
 }

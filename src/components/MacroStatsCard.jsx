@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
+import { computeBmr, computeTdee } from '../lib/tdee'
 import LifeBar from './LifeBar'
+
+const TDEE_GOALS = [
+  { label: 'Cut', delta: -500 },
+  { label: 'Maintain', delta: 0 },
+  { label: 'Bulk', delta: 300 },
+]
 
 const emptyTargetForm = { proteinG: '', fatG: '', carbsG: '', calorieTarget: '' }
 const emptyMealForm = { description: '', calories: '', proteinG: '', fatG: '', carbsG: '' }
@@ -35,6 +42,11 @@ function MacroStatsCard() {
   const [mode, setMode] = useState('view') // 'view' | 'editTargets' | 'logFood'
   const [unit, setUnit] = useState('g') // 'g' | 'cal' | 'percent' — display only, never affects fill
 
+  // Only fetched for the TDEE calculator inside the targets form — nothing
+  // else on this card needs a bodyweight or profile.
+  const [bodyweight, setBodyweight] = useState(undefined) // undefined = loading, null = none logged
+  const [tdeeProfile, setTdeeProfile] = useState(undefined)
+
   const [targetForm, setTargetForm] = useState(emptyTargetForm)
   const [calorieTargetTouched, setCalorieTargetTouched] = useState(false)
   const [savingTarget, setSavingTarget] = useState(false)
@@ -49,6 +61,12 @@ function MacroStatsCard() {
 
     const since = startOfLocalDay().toISOString()
     api(`/api/meals?since=${encodeURIComponent(since)}`).then(setMeals)
+
+    api('/api/me').then((me) =>
+      setTdeeProfile({ heightCm: me.heightCm, sex: me.sex, age: me.age, activityLevel: me.activityLevel }),
+    )
+    // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
+    api('/api/weights').then((data) => setBodyweight(data.length ? data[0].weightKg : null))
   }
 
   useEffect(() => {
@@ -143,6 +161,16 @@ function MacroStatsCard() {
 
   const isLoading = goal === undefined || meals === undefined
   const todayTotals = meals ? sumToday(meals) : null
+
+  const bmr = tdeeProfile
+    ? computeBmr(bodyweight, tdeeProfile.heightCm, tdeeProfile.age, tdeeProfile.sex)
+    : null
+  const tdee = tdeeProfile ? computeTdee(bmr, tdeeProfile.activityLevel) : null
+
+  const applyTdeeGoal = (delta) => {
+    setCalorieTargetTouched(true)
+    setTargetForm((f) => ({ ...f, calorieTarget: String(tdee + delta) }))
+  }
 
   return (
     <div className="w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
@@ -306,6 +334,39 @@ function MacroStatsCard() {
               <p className="mt-1 text-right text-xs text-third/60">
                 Auto-calculated from protein/fat/carbs — edit to override
               </p>
+            )}
+          </div>
+
+          <div className="border-t border-secondary/25 pt-3">
+            <p className="text-xs font-medium text-third">TDEE calculator</p>
+            {tdee == null ? (
+              <p className="mt-1 text-xs text-third/60">
+                Set your sex, age, and activity level in Profile &amp; security, and log your weight and
+                height, to estimate your calories.
+              </p>
+            ) : (
+              <>
+                <p className="mt-1 text-xs text-third/60">
+                  Estimated maintenance: <span className="text-third">{tdee} cal/day</span>
+                </p>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {TDEE_GOALS.map(({ label, delta }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => applyTdeeGoal(delta)}
+                      className="rounded-lg border border-secondary/40 px-2 py-1.5 text-center text-xs text-third transition hover:border-secondary active:scale-[0.98]"
+                    >
+                      <span className="block font-medium">{label}</span>
+                      <span className="block text-third/60">{tdee + delta} cal</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[10px] text-third/60">
+                  Estimate only (Mifflin-St Jeor) — not medical advice. Adjust based on real-world
+                  results.
+                </p>
+              </>
             )}
           </div>
 

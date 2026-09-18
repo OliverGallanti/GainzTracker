@@ -13,6 +13,12 @@ const createLogSchema = z.object({
   dayEnd: z.coerce.date(),
 })
 
+const updateLogSchema = z
+  .object({
+    durationMinutes: z.number().int().positive().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, { message: 'No fields to update' })
+
 export default async function workoutSplitRoutes(app) {
   app.addHook('onRequest', requireAuth)
 
@@ -102,6 +108,26 @@ export default async function workoutSplitRoutes(app) {
       },
     })
     return reply.code(201).send(log)
+  })
+
+  app.patch('/workout-splits/:id/logs/:logId', async (request, reply) => {
+    const parsed = updateLogSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.badRequest(parsed.error.message)
+    }
+
+    const { count } = await prisma.splitLog.updateMany({
+      where: {
+        id: request.params.logId,
+        splitId: request.params.id,
+        userId: request.session.userId,
+      },
+      data: parsed.data,
+    })
+    if (count === 0) {
+      return reply.notFound()
+    }
+    return reply.code(204).send()
   })
 
   app.delete('/workout-splits/:id/logs/:logId', async (request, reply) => {

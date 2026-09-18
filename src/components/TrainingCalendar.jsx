@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import SessionEditor from './SessionEditor'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -13,10 +14,11 @@ function buildMonthGrid(viewDate) {
   return cells
 }
 
-function TrainingCalendar({ logs, days, onRemove }) {
+function TrainingCalendar({ logs, days, onRemove, onSessionChange }) {
   const today = new Date()
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedLogId, setSelectedLogId] = useState(null)
+  const [sessionEditorOpen, setSessionEditorOpen] = useState(false)
 
   // Enforced once-per-day server-side, so this map is always at most one log per key.
   const logsByDate = new Map(logs.map((log) => [new Date(log.loggedAt).toDateString(), log]))
@@ -28,6 +30,7 @@ function TrainingCalendar({ logs, days, onRemove }) {
 
   const selectCell = (log) => {
     setSelectedLogId((current) => (current === log.id ? null : log.id))
+    setSessionEditorOpen(false)
   }
 
   return (
@@ -95,33 +98,60 @@ function TrainingCalendar({ logs, days, onRemove }) {
       </div>
 
       {selectedLog && (
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-secondary/25 px-3 py-2 text-sm">
-          <div>
-            <span className="text-third">{days[selectedLog.dayIndex]}</span>
-            <span className="ml-2 text-xs text-third/60">
-              {new Date(selectedLog.loggedAt).toLocaleDateString(undefined, {
-                month: 'short',
-                day: 'numeric',
-              })}
-            </span>
-            <span
-              className={
-                selectedLog.completed ? 'ml-2 text-xs text-third/60' : 'ml-2 text-xs text-amber-400'
-              }
-            >
-              {selectedLog.completed ? 'Done' : 'Skipped'}
-            </span>
+        <div className="mt-3 rounded-lg border border-secondary/25 px-3 py-2 text-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-third">{days[selectedLog.dayIndex]}</span>
+              <span className="ml-2 text-xs text-third/60">
+                {new Date(selectedLog.loggedAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </span>
+              <span
+                className={
+                  selectedLog.completed ? 'ml-2 text-xs text-third/60' : 'ml-2 text-xs text-amber-400'
+                }
+              >
+                {selectedLog.completed ? 'Done' : 'Skipped'}
+              </span>
+              {selectedLog.durationMinutes && (
+                <span className="ml-2 text-xs text-third/60">{selectedLog.durationMinutes} min</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {selectedLog.completed && (
+                <button
+                  type="button"
+                  onClick={() => setSessionEditorOpen((v) => !v)}
+                  className="text-xs font-medium text-third/60 transition hover:text-third"
+                >
+                  {sessionEditorOpen ? 'Hide' : 'Log session'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  onRemove(selectedLog.id)
+                  setSelectedLogId(null)
+                  setSessionEditorOpen(false)
+                }}
+                className="text-xs font-medium text-third/60 transition hover:text-red-400"
+              >
+                Remove
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              onRemove(selectedLog.id)
-              setSelectedLogId(null)
-            }}
-            className="text-xs font-medium text-third/60 transition hover:text-red-400"
-          >
-            Remove
-          </button>
+
+          {sessionEditorOpen && (
+            <SessionEditor
+              log={selectedLog}
+              onClose={() => {
+                setSessionEditorOpen(false)
+                onSessionChange()
+              }}
+            />
+          )}
         </div>
       )}
 

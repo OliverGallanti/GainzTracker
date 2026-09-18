@@ -10,20 +10,20 @@ import ProfileSecurityPage from './ProfileSecurityPage'
 function Dashboard({ user, onLogout }) {
   const [splitVersion, setSplitVersion] = useState(0)
   const [view, setView] = useState('dashboard') // 'dashboard' | 'profile'
-  const [sex, setSex] = useState(undefined) // undefined = loading, null = unset
+  const [profile, setProfile] = useState(undefined) // undefined = loading
 
-  const loadSex = () => {
-    api('/api/me').then((me) => setSex(me.sex ?? null))
+  const loadProfile = () => {
+    api('/api/me').then((me) => setProfile({ sex: me.sex, age: me.age, activityLevel: me.activityLevel }))
   }
 
   useEffect(() => {
-    loadSex()
+    loadProfile()
   }, [])
 
-  // Only field the profile bar's badge tracks — sex is the one thing the
-  // Profile & security page itself lets you set (height/goals live on their
-  // own cards), so it's the only thing "incomplete" can coherently mean here.
-  const profileIncomplete = sex === null
+  // Tracks exactly the fields the Profile & security page itself lets you
+  // set (height/goals live on their own cards) — the only things
+  // "incomplete" can coherently mean here.
+  const profileIncomplete = profile != null && (!profile.sex || !profile.age || !profile.activityLevel)
 
   const handleLogout = async () => {
     await api('/auth/logout', { method: 'POST' })
@@ -32,7 +32,7 @@ function Dashboard({ user, onLogout }) {
 
   const handleBackFromProfile = () => {
     setView('dashboard')
-    loadSex()
+    loadProfile()
   }
 
   return (

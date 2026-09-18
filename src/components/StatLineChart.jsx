@@ -8,6 +8,7 @@ const AXIS_COLOR = '#869b9e' // third blended ~60% into main — matches text-th
 const LINE_COLOR = '#dce0d9' // third
 const TOOLTIP_BG = '#16495d' // card, solid (not the card's translucent bg)
 const TOOLTIP_BORDER = '#40656d' // secondary blended ~40% into card — matches border-secondary/40
+const GOAL_COLOR = '#facc15' // Tailwind yellow-400 — deliberately distinct from amber (already "needs attention" elsewhere) so a goal line reads as its own thing
 
 function formatDateTick(iso, showYear) {
   return new Date(iso).toLocaleDateString(
@@ -99,9 +100,9 @@ export function StatLineChart({ data, unit, goal, referenceLines = [], xDomain, 
           {goal != null && (
             <ReferenceLine
               y={goal}
-              stroke={AXIS_COLOR}
+              stroke={GOAL_COLOR}
               strokeDasharray="4 4"
-              label={{ value: 'Goal', position: 'insideTopRight', fill: AXIS_COLOR, fontSize: 10 }}
+              label={{ value: 'Goal', position: 'insideTopRight', fill: GOAL_COLOR, fontSize: 10 }}
             />
           )}
           <Line
