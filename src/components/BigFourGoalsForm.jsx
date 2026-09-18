@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
 import { BIG_FOUR_LIFTS, GOAL_FIELD } from '../lib/lifts'
+import { useSubmit } from '../lib/useSubmit'
 
 function BigFourGoalsForm({ meGoals, onSaved, onCancel }) {
   const [form, setForm] = useState({
@@ -9,36 +10,25 @@ function BigFourGoalsForm({ meGoals, onSaved, onCancel }) {
     benchPressGoalKg: meGoals?.benchPressGoalKg ?? '',
     overheadPressGoalKg: meGoals?.overheadPressGoalKg ?? '',
   })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      // Empty fields are dropped rather than nulled, so a goal can be changed
-      // but not cleared. Pre-existing behavior, preserved deliberately.
-      await api('/api/me', {
-        method: 'PUT',
-        body: JSON.stringify(
-          Object.fromEntries(
-            Object.entries(form)
-              .filter(([, v]) => v)
-              .map(([k, v]) => [k, Number(v)]),
-          ),
+  const { submit, saving, error } = useSubmit(async () => {
+    // Empty fields are dropped rather than nulled, so a goal can be changed
+    // but not cleared. Pre-existing behavior, preserved deliberately.
+    await api('/api/me', {
+      method: 'PUT',
+      body: JSON.stringify(
+        Object.fromEntries(
+          Object.entries(form)
+            .filter(([, v]) => v)
+            .map(([k, v]) => [k, Number(v)]),
         ),
-      })
-      onSaved()
-    } catch {
-      setError('Could not save your goals — please check the values and try again')
-    } finally {
-      setSaving(false)
-    }
-  }
+      ),
+    })
+    onSaved()
+  }, 'Could not save your goals — please check the values and try again')
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-3">
       {BIG_FOUR_LIFTS.map((name) => (
         <label key={name} className="flex items-center justify-between gap-3 text-sm">
           <span className="text-third">{name} goal (kg)</span>

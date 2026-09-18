@@ -1,42 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../lib/api'
+import { useMe } from '../lib/sharedData'
 import MacroStatsCard from './MacroStatsCard'
 import WeightChart from './WeightChart'
 import RoutineCard from './RoutineCard'
 import TrainingLogCard from './TrainingLogCard'
 import BigFourCard from './BigFourCard'
 import ProfileSecurityPage from './ProfileSecurityPage'
+import SharedDataProvider from './SharedDataProvider'
 
-function Dashboard({ user, onLogout }) {
+function DashboardShell({ user, onLogout }) {
   const [splitVersion, setSplitVersion] = useState(0)
   const [view, setView] = useState('dashboard') // 'dashboard' | 'profile'
-  const [profile, setProfile] = useState(undefined) // undefined = loading
-
-  // A failed load just leaves `profile` undefined, which hides the
-  // completeness badge — no error UI needed for a purely decorative hint.
-  const loadProfile = () => {
-    api('/api/me')
-      .then((me) => setProfile({ sex: me.sex, age: me.age, activityLevel: me.activityLevel }))
-      .catch(() => setProfile(undefined))
-  }
-
-  useEffect(() => {
-    loadProfile()
-  }, [])
+  const me = useMe()
 
   // Tracks exactly the fields the Profile & security page itself lets you
   // set (height/goals live on their own cards) — the only things
-  // "incomplete" can coherently mean here.
-  const profileIncomplete = profile != null && (!profile.sex || !profile.age || !profile.activityLevel)
+  // "incomplete" can coherently mean here. A failed or pending load leaves
+  // `me.data` undefined, which hides the badge: no error UI for a decorative hint.
+  const profileIncomplete = me.data != null && (!me.data.sex || !me.data.age || !me.data.activityLevel)
 
   const handleLogout = async () => {
     await api('/auth/logout', { method: 'POST' })
     onLogout()
-  }
-
-  const handleBackFromProfile = () => {
-    setView('dashboard')
-    loadProfile()
   }
 
   return (
@@ -56,7 +42,7 @@ function Dashboard({ user, onLogout }) {
 
       <main className="flex flex-1 flex-col items-center px-4 py-12 sm:px-6">
         {view === 'profile' ? (
-          <ProfileSecurityPage user={user} onBack={handleBackFromProfile} />
+          <ProfileSecurityPage user={user} onBack={() => setView('dashboard')} />
         ) : (
           <div className="grid w-full max-w-sm grid-cols-1 gap-6 text-left sm:max-w-md md:max-w-2xl lg:max-w-5xl lg:grid-cols-2">
             <button
@@ -95,6 +81,14 @@ function Dashboard({ user, onLogout }) {
         )}
       </main>
     </div>
+  )
+}
+
+function Dashboard(props) {
+  return (
+    <SharedDataProvider>
+      <DashboardShell {...props} />
+    </SharedDataProvider>
   )
 }
 

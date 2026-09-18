@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
 import { computeBmr, computeTdee } from '../lib/tdee'
 import { formatMacro, sumToday } from '../lib/macros'
+import { useMe, useWeights } from '../lib/sharedData'
+import { useLoad } from '../lib/useLoad'
 import LifeBar from './LifeBar'
 import MacroTargetsForm from './MacroTargetsForm'
 import MealForm from './MealForm'
@@ -14,65 +16,53 @@ const UNITS = [
 ]
 
 function MacroStatsCard() {
-  const [goal, setGoal] = useState(undefined) // undefined = loading, null = unset
-  const [meals, setMeals] = useState(undefined) // undefined = loading
   const [mode, setMode] = useState('view') // 'view' | 'editTargets' | 'logFood'
   const [unit, setUnit] = useState('g') // 'g' | 'cal' | 'percent' — display only, never affects fill
 
-  // Only fetched for the TDEE calculator inside the targets form — nothing
-  // else on this card needs a bodyweight or profile.
-  const [bodyweight, setBodyweight] = useState(undefined) // undefined = loading, null = none logged
-  const [tdeeProfile, setTdeeProfile] = useState(undefined)
+  // The card's own data: the macro target and today's meals.
+  const own = useLoad(async () => {
+    const since = startOfLocalDay().toISOString()
+    const [goal, meals] = await Promise.all([
+      api('/api/macro-goal'),
+      api(`/api/meals?since=${encodeURIComponent(since)}`),
+    ])
+    return { goal, meals }
+  })
 
-  const [loadError, setLoadError] = useState(false)
+  // Only read for the TDEE calculator inside the targets form.
+  const me = useMe()
+  const weights = useWeights()
 
-  // The error clears on success rather than on entry: setting state
-  // synchronously here would cascade an extra render from the mount effect.
-  const load = async () => {
-    try {
-      const since = startOfLocalDay().toISOString()
-      const [fetchedGoal, fetchedMeals, me, weights] = await Promise.all([
-        api('/api/macro-goal'),
-        api(`/api/meals?since=${encodeURIComponent(since)}`),
-        api('/api/me'),
-        api('/api/weights'),
-      ])
-      setLoadError(false)
-      setGoal(fetchedGoal)
-      setMeals(fetchedMeals)
-      setTdeeProfile({ heightCm: me.heightCm, sex: me.sex, age: me.age, activityLevel: me.activityLevel })
-      // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
-      setBodyweight(weights.length ? weights[0].weightKg : null)
-    } catch {
-      setLoadError(true)
-    }
+  const goal = own.data?.goal // null = no target set yet
+  const meals = own.data?.meals
+
+  // All four were fetched together before, so loading/error stay all-or-nothing.
+  const isLoading = own.data === undefined || me.data === undefined || weights.data === undefined
+  const loadError = own.error || me.error || weights.error
+  const retry = () => {
+    own.reload()
+    me.reload()
+    weights.reload()
   }
-
-  // Fetch-on-mount is how every card in this app loads; the rule only surfaces
-  // here because this component is now small enough for the analyzer to trace
-  // it. Remove the suppression when the shared data-loading hook lands.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [])
 
   const handleSaved = () => {
     setMode('view')
-    load()
+    own.reload()
   }
 
   const handleRemoveMeal = async (id) => {
     await api(`/api/meals/${id}`, { method: 'DELETE' })
-    load()
+    own.reload()
   }
 
-  const isLoading = goal === undefined || meals === undefined
   const todayTotals = meals ? sumToday(meals) : null
 
-  const bmr = tdeeProfile
-    ? computeBmr(bodyweight, tdeeProfile.heightCm, tdeeProfile.age, tdeeProfile.sex)
+  // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
+  const bodyweight = weights.data?.length ? weights.data[0].weightKg : null
+  const bmr = me.data
+    ? computeBmr(bodyweight, me.data.heightCm, me.data.age, me.data.sex)
     : null
-  const tdee = tdeeProfile ? computeTdee(bmr, tdeeProfile.activityLevel) : null
+  const tdee = me.data ? computeTdee(bmr, me.data.activityLevel) : null
 
   return (
     <div className="w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
@@ -105,7 +95,7 @@ function MacroStatsCard() {
       {loadError && (
         <p className="text-xs text-red-400">
           Could not load your macros —{' '}
-          <button type="button" onClick={load} className="underline hover:no-underline">
+          <button type="button" onClick={retry} className="underline hover:no-underline">
             retry
           </button>
         </p>

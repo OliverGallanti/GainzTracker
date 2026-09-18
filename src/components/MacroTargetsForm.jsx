@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { useSubmit } from '../lib/useSubmit'
 
 const TDEE_GOALS = [
   { label: 'Cut', delta: -500 },
@@ -21,8 +22,19 @@ function MacroTargetsForm({ goal, tdee, onSaved, onCancel }) {
   // A saved calorieTarget is treated as a deliberate value, not a stale
   // suggestion — only start auto-computing once the macros actually change.
   const [calorieTargetTouched, setCalorieTargetTouched] = useState(Boolean(goal?.calorieTarget))
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+
+  const { submit, saving, error } = useSubmit(async () => {
+    await api('/api/macro-goal', {
+      method: 'PUT',
+      body: JSON.stringify({
+        proteinG: Number(form.proteinG),
+        fatG: Number(form.fatG),
+        carbsG: Number(form.carbsG),
+        ...(form.calorieTarget ? { calorieTarget: Number(form.calorieTarget) } : {}),
+      }),
+    })
+    onSaved()
+  }, 'Could not save your targets — please check the values and try again')
 
   // Atwater factors (4 kcal/g protein & carbs, 9 kcal/g fat) — a live
   // suggestion, not a lock: it keeps recomputing until the calorie field
@@ -43,30 +55,8 @@ function MacroTargetsForm({ goal, tdee, onSaved, onCancel }) {
     setForm((f) => ({ ...f, calorieTarget: String(tdee + delta) }))
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await api('/api/macro-goal', {
-        method: 'PUT',
-        body: JSON.stringify({
-          proteinG: Number(form.proteinG),
-          fatG: Number(form.fatG),
-          carbsG: Number(form.carbsG),
-          ...(form.calorieTarget ? { calorieTarget: Number(form.calorieTarget) } : {}),
-        }),
-      })
-      onSaved()
-    } catch {
-      setError('Could not save your targets — please check the values and try again')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-3">
       {['proteinG', 'fatG', 'carbsG'].map((field) => (
         <label key={field} className="flex items-center justify-between gap-3 text-sm">
           <span className="capitalize text-third">{FIELD_LABELS[field]}</span>

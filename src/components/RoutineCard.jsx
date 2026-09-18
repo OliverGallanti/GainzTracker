@@ -1,29 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../lib/api'
 import { SPLIT_TEMPLATES } from '../lib/templates'
+import { useLoad } from '../lib/useLoad'
+import { useSubmit, ValidationError } from '../lib/useSubmit'
 
 function RoutineCard({ onSplitChanged }) {
-  const [splits, setSplits] = useState(null) // undefined-free: null = loading
   const [mode, setMode] = useState('view') // 'view' | 'pickTemplate' | 'buildCustom'
   const [name, setName] = useState('')
   const [days, setDays] = useState([])
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
 
-  const [loadError, setLoadError] = useState(false)
+  const { data: splits, error: loadError, reload } = useLoad(() => api('/api/workout-splits'))
 
-  const load = async () => {
-    setLoadError(false)
-    try {
-      setSplits(await api('/api/workout-splits'))
-    } catch {
-      setLoadError(true)
-    }
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
+  const { submit, saving, error, setError } = useSubmit(async () => {
+    const cleanedDays = days.map((d) => d.trim()).filter(Boolean)
+    if (cleanedDays.length === 0) throw new ValidationError('Add at least one day')
+    await api('/api/workout-splits', {
+      method: 'POST',
+      body: JSON.stringify({ name: name.trim() || 'My routine', days: cleanedDays }),
+    })
+    setMode('view')
+    reload()
+    onSplitChanged?.()
+  }, 'Could not save that routine — please check the values and try again')
 
   const activeSplit = splits?.find((s) => s.active) ?? null
 
@@ -64,38 +62,14 @@ function RoutineCard({ onSplitChanged }) {
     setDays(next)
   }
 
-  const handleSave = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    const cleanedDays = days.map((d) => d.trim()).filter(Boolean)
-    if (cleanedDays.length === 0) {
-      setError('Add at least one day')
-      setSaving(false)
-      return
-    }
-    try {
-      await api('/api/workout-splits', {
-        method: 'POST',
-        body: JSON.stringify({ name: name.trim() || 'My routine', days: cleanedDays }),
-      })
-      setMode('view')
-      load()
-      onSplitChanged?.()
-    } catch {
-      setError('Could not save that routine — please check the values and try again')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const handleDelete = async (id) => {
     await api(`/api/workout-splits/${id}`, { method: 'DELETE' })
-    load()
+    reload()
     onSplitChanged?.()
   }
 
-  const isLoading = splits === null
+  // `splits` is undefined until the first successful load.
+  const isLoading = splits === undefined
 
   return (
     <div className="w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
@@ -117,7 +91,7 @@ function RoutineCard({ onSplitChanged }) {
       {loadError && (
         <p className="text-xs text-red-400">
           Could not load your routine —{' '}
-          <button type="button" onClick={load} className="underline hover:no-underline">
+          <button type="button" onClick={reload} className="underline hover:no-underline">
             retry
           </button>
         </p>
@@ -176,7 +150,7 @@ function RoutineCard({ onSplitChanged }) {
       )}
 
       {mode === 'buildCustom' && (
-        <form onSubmit={handleSave} className="flex flex-col gap-3">
+        <form onSubmit={submit} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-third">Routine name</span>
             <input

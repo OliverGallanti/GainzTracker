@@ -1,33 +1,23 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { useSubmit } from '../lib/useSubmit'
 
 function WeightForm({ onSaved, onCancel }) {
   const [form, setForm] = useState({ weightKg: '', bodyFatPercent: '' })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await api('/api/weights', {
-        method: 'POST',
-        body: JSON.stringify({
-          weightKg: Number(form.weightKg),
-          ...(form.bodyFatPercent ? { bodyFatPercent: Number(form.bodyFatPercent) } : {}),
-        }),
-      })
-      onSaved()
-    } catch {
-      setError('Could not log that weight — please check the values and try again')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const { submit, saving, error } = useSubmit(async () => {
+    await api('/api/weights', {
+      method: 'POST',
+      body: JSON.stringify({
+        weightKg: Number(form.weightKg),
+        ...(form.bodyFatPercent ? { bodyFatPercent: Number(form.bodyFatPercent) } : {}),
+      }),
+    })
+    onSaved()
+  }, 'Could not log that weight — please check the values and try again')
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-third">Weight (kg)</span>
         <input

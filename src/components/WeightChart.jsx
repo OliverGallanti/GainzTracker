@@ -1,45 +1,42 @@
-import { useEffect, useState } from 'react'
-import { api } from '../lib/api'
+import { useState } from 'react'
 import { computeBmi } from '../lib/body'
+import { useMe, useWeights } from '../lib/sharedData'
 import WeightCharts from './WeightCharts'
 import WeightForm from './WeightForm'
 import HeightForm from './HeightForm'
 import WeightGoalsForm from './WeightGoalsForm'
 
 function WeightChart() {
-  const [entries, setEntries] = useState(null)
-  const [height, setHeight] = useState(undefined) // undefined = loading, null = unset
-  const [weightGoal, setWeightGoal] = useState(undefined)
-  const [bodyFatGoal, setBodyFatGoal] = useState(undefined)
   const [mode, setMode] = useState('view') // 'view' | 'logWeight' | 'editHeight' | 'editGoals'
 
-  const [loadError, setLoadError] = useState(false)
+  const me = useMe()
+  const weights = useWeights()
 
-  const load = async () => {
-    try {
-      const [data, me] = await Promise.all([api('/api/weights'), api('/api/me')])
-      setLoadError(false)
-      setEntries([...data].sort((a, b) => new Date(a.loggedAt) - new Date(b.loggedAt)))
-      setHeight(me.heightCm)
-      setWeightGoal(me.weightGoalKg)
-      setBodyFatGoal(me.bodyFatGoalPercent)
-    } catch {
-      setLoadError(true)
-    }
+  // The API returns newest-first; the charts and "latest" lookups want oldest-first.
+  const entries = weights.data
+    ? [...weights.data].sort((a, b) => new Date(a.loggedAt) - new Date(b.loggedAt))
+    : null
+  const height = me.data?.heightCm // null = unset
+  const weightGoal = me.data?.weightGoalKg
+  const bodyFatGoal = me.data?.bodyFatGoalPercent
+
+  const loadError = weights.error || me.error
+  const retry = () => {
+    weights.reload()
+    me.reload()
   }
 
-  // See MacroStatsCard — same fetch-on-mount pattern, same pending hook.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [])
-
-  const handleSaved = () => {
+  // Each form knows which of the two shared resources its write invalidates.
+  const handleWeightSaved = () => {
     setMode('view')
-    load()
+    weights.reload()
+  }
+  const handleProfileSaved = () => {
+    setMode('view')
+    me.reload()
   }
 
-  const isLoading = entries === null || height === undefined || weightGoal === undefined
+  const isLoading = entries === null || me.data === undefined
   const isEmpty = entries?.length === 0
   const latestEntry = entries?.length ? entries[entries.length - 1] : null
   const latestBodyFat = entries ? [...entries].reverse().find((e) => e.bodyFatPercent != null) : null
@@ -65,7 +62,7 @@ function WeightChart() {
       {loadError && (
         <p className="text-xs text-red-400">
           Could not load your weight data —{' '}
-          <button type="button" onClick={load} className="underline hover:no-underline">
+          <button type="button" onClick={retry} className="underline hover:no-underline">
             retry
           </button>
         </p>
@@ -128,18 +125,18 @@ function WeightChart() {
       )}
 
       {mode === 'logWeight' && (
-        <WeightForm onSaved={handleSaved} onCancel={() => setMode('view')} />
+        <WeightForm onSaved={handleWeightSaved} onCancel={() => setMode('view')} />
       )}
 
       {mode === 'editHeight' && (
-        <HeightForm height={height} onSaved={handleSaved} onCancel={() => setMode('view')} />
+        <HeightForm height={height} onSaved={handleProfileSaved} onCancel={() => setMode('view')} />
       )}
 
       {mode === 'editGoals' && (
         <WeightGoalsForm
           weightGoal={weightGoal}
           bodyFatGoal={bodyFatGoal}
-          onSaved={handleSaved}
+          onSaved={handleProfileSaved}
           onCancel={() => setMode('view')}
         />
       )}

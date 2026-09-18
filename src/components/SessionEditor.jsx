@@ -1,41 +1,39 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../lib/api'
+import { useLoad } from '../lib/useLoad'
+import { useSubmit } from '../lib/useSubmit'
 
 const emptyRow = () => ({ exerciseName: '', weightKg: '', reps: '' })
+
+const toRows = (sets) =>
+  sets.length > 0
+    ? sets.map((s) => ({
+        exerciseName: s.exerciseName,
+        weightKg: s.weightKg ?? '',
+        reps: s.reps ?? '',
+      }))
+    : [emptyRow()]
 
 // Reused from both TrainingLogCard (right after marking a day done) and
 // TrainingCalendar (editing a past day's session). `log` is the full
 // SplitLog object the caller already has loaded — no dedicated
 // "get one log" endpoint needed.
 function SessionEditor({ log, onClose }) {
-  const [rows, setRows] = useState(null) // null = loading
   const [durationMinutes, setDurationMinutes] = useState(log.durationMinutes ?? '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
-  const [loadError, setLoadError] = useState(false)
 
-  const loadRows = () => {
-    setLoadError(false)
-    api(`/api/workout-sets?splitLogId=${log.id}`)
-      .then((sets) => {
-        setRows(
-          sets.length > 0
-            ? sets.map((s) => ({
-                id: s.id,
-                exerciseName: s.exerciseName,
-                weightKg: s.weightKg ?? '',
-                reps: s.reps ?? '',
-              }))
-            : [emptyRow()],
-        )
-      })
-      // Saving is delete-then-recreate, so an editor that failed to read the
-      // existing rows would wipe them on save. Block saving instead of
-      // rendering a blank form over data we never actually loaded.
-      .catch(() => setLoadError(true))
-  }
+  // Saving is delete-then-recreate, so an editor that failed to read the
+  // existing rows would wipe them on save. A failed load therefore blocks the
+  // form entirely (see the render below) instead of showing a blank one.
+  const existing = useLoad(() => api(`/api/workout-sets?splitLogId=${log.id}`), log.id)
+  const loadError = existing.error
 
-  useEffect(loadRows, [log.id])
+  // The rows are the server's rows until the user edits; from then on the
+  // draft wins. Tagged with the log it belongs to so a different `log` prop
+  // can never show a stale draft.
+  const [draft, setDraft] = useState(null)
+  const loadedRows = existing.data ? toRows(existing.data) : null
+  const rows = draft?.forId === log.id ? draft.rows : loadedRows
+  const setRows = (next) => setDraft({ forId: log.id, rows: next })
 
   const updateRow = (index, field, value) => {
     setRows(rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
@@ -49,57 +47,48 @@ function SessionEditor({ log, onClose }) {
     setRows([...rows, emptyRow()])
   }
 
-  const handleSave = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      // Delete-then-recreate rather than diffing — simpler, and these sets
-      // are only ever queried by splitLogId, never by their own timestamp,
-      // so resetting performedAt/id on every save costs nothing here.
-      const existing = await api(`/api/workout-sets?splitLogId=${log.id}`)
-      await Promise.all(existing.map((s) => api(`/api/workout-sets/${s.id}`, { method: 'DELETE' })))
+  const { submit, saving, error } = useSubmit(async () => {
+    // Delete-then-recreate rather than diffing — simpler, and these sets
+    // are only ever queried by splitLogId, never by their own timestamp,
+    // so resetting performedAt/id on every save costs nothing here.
+    const existing = await api(`/api/workout-sets?splitLogId=${log.id}`)
+    await Promise.all(existing.map((s) => api(`/api/workout-sets/${s.id}`, { method: 'DELETE' })))
 
-      const cleanedRows = rows.filter((r) => r.exerciseName.trim())
-      await Promise.all(
-        cleanedRows.map((r) =>
-          api('/api/workout-sets', {
-            method: 'POST',
-            body: JSON.stringify({
-              splitLogId: log.id,
-              exerciseName: r.exerciseName.trim(),
-              ...(r.weightKg ? { weightKg: Number(r.weightKg) } : {}),
-              ...(r.reps ? { reps: Number(r.reps) } : {}),
-            }),
+    const cleanedRows = rows.filter((r) => r.exerciseName.trim())
+    await Promise.all(
+      cleanedRows.map((r) =>
+        api('/api/workout-sets', {
+          method: 'POST',
+          body: JSON.stringify({
+            splitLogId: log.id,
+            exerciseName: r.exerciseName.trim(),
+            ...(r.weightKg ? { weightKg: Number(r.weightKg) } : {}),
+            ...(r.reps ? { reps: Number(r.reps) } : {}),
           }),
-        ),
-      )
+        }),
+      ),
+    )
 
-      if (durationMinutes) {
-        await api(`/api/workout-splits/${log.splitId}/logs/${log.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ durationMinutes: Number(durationMinutes) }),
-        })
-      }
-
-      onClose()
-    } catch {
-      setError('Could not save this session — please check the values and try again')
-    } finally {
-      setSaving(false)
+    if (durationMinutes) {
+      await api(`/api/workout-splits/${log.splitId}/logs/${log.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ durationMinutes: Number(durationMinutes) }),
+      })
     }
-  }
+
+    onClose()
+  }, 'Could not save this session — please check the values and try again')
 
   return (
     <form
-      onSubmit={handleSave}
+      onSubmit={submit}
       className="mt-4 flex flex-col gap-3 rounded-lg border border-secondary/25 p-3"
     >
       {loadError ? (
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-red-400">
             Could not load this session —{' '}
-            <button type="button" onClick={loadRows} className="underline hover:no-underline">
+            <button type="button" onClick={existing.reload} className="underline hover:no-underline">
               retry
             </button>
           </p>

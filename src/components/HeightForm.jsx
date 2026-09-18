@@ -1,27 +1,17 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { useSubmit } from '../lib/useSubmit'
 
 function HeightForm({ height, onSaved, onCancel }) {
   const [heightCm, setHeightCm] = useState(height ?? '')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await api('/api/me', { method: 'PUT', body: JSON.stringify({ heightCm: Number(heightCm) }) })
-      onSaved()
-    } catch {
-      setError('Could not save your height — please check the value and try again')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const { submit, saving, error } = useSubmit(async () => {
+    await api('/api/me', { method: 'PUT', body: JSON.stringify({ heightCm: Number(heightCm) }) })
+    onSaved()
+  }, 'Could not save your height — please check the value and try again')
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-3">
       <label className="flex items-center justify-between gap-3 text-sm">
         <span className="text-third">Height (cm)</span>
         <input

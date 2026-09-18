@@ -1,38 +1,28 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { useSubmit } from '../lib/useSubmit'
 
 function WeightGoalsForm({ weightGoal, bodyFatGoal, onSaved, onCancel }) {
   const [form, setForm] = useState({
     weightGoalKg: weightGoal ?? '',
     bodyFatGoalPercent: bodyFatGoal ?? '',
   })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      // Note: an emptied field is omitted rather than nulled, so a goal can be
-      // changed but not cleared. Pre-existing behavior, preserved deliberately.
-      await api('/api/me', {
-        method: 'PUT',
-        body: JSON.stringify({
-          ...(form.weightGoalKg ? { weightGoalKg: Number(form.weightGoalKg) } : {}),
-          ...(form.bodyFatGoalPercent ? { bodyFatGoalPercent: Number(form.bodyFatGoalPercent) } : {}),
-        }),
-      })
-      onSaved()
-    } catch {
-      setError('Could not save your goals — please check the values and try again')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const { submit, saving, error } = useSubmit(async () => {
+    // Note: an emptied field is omitted rather than nulled, so a goal can be
+    // changed but not cleared. Pre-existing behavior, preserved deliberately.
+    await api('/api/me', {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...(form.weightGoalKg ? { weightGoalKg: Number(form.weightGoalKg) } : {}),
+        ...(form.bodyFatGoalPercent ? { bodyFatGoalPercent: Number(form.bodyFatGoalPercent) } : {}),
+      }),
+    })
+    onSaved()
+  }, 'Could not save your goals — please check the values and try again')
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-3">
       <label className="flex items-center justify-between gap-3 text-sm">
         <span className="text-third">Weight goal (kg)</span>
         <input

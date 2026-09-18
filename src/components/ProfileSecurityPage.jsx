@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../lib/api'
-import { isPasskeyCancellation, registerPasskey } from '../lib/webauthn'
+import { useMe } from '../lib/sharedData'
 import { ACTIVITY_LEVELS } from '../lib/tdee'
+import { useLoad } from '../lib/useLoad'
+import { useSubmit } from '../lib/useSubmit'
+import { isPasskeyCancellation, registerPasskey } from '../lib/webauthn'
 
 function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString(undefined, {
@@ -15,98 +18,55 @@ function formatDate(isoString) {
 // credential is a security-sensitive action that shouldn't sit one tap away
 // on the page you land on every visit.
 function ProfileSecurityPage({ user, onBack }) {
-  const [passkeys, setPasskeys] = useState(null)
-  const [passkeyPending, setPasskeyPending] = useState(false)
-  const [passkeyError, setPasskeyError] = useState(null)
-  const [passkeyListError, setPasskeyListError] = useState(false)
+  // Profile fields come from the shared /api/me resource; saving one reloads it
+  // so the dashboard's completeness badge and every card reading the profile
+  // update too, with no plumbing back up the tree.
+  const me = useMe()
+  const sex = me.data ? me.data.sex ?? null : undefined // null = unset, undefined = loading
+  const age = me.data?.age ?? null
+  const activityLevel = me.data?.activityLevel ?? null
 
-  const [sex, setSex] = useState(undefined) // undefined = loading, null = unset
-  const [savingSex, setSavingSex] = useState(false)
+  // Null until the user types; until then the input shows the saved age.
+  const [ageDraft, setAgeDraft] = useState(null)
+  const ageValue = ageDraft ?? age ?? ''
 
-  const [age, setAge] = useState(undefined) // undefined = loading, null = unset
-  const [ageDraft, setAgeDraft] = useState('')
-  const [savingAge, setSavingAge] = useState(false)
+  const saveProfile = (fields) =>
+    api('/api/me', { method: 'PUT', body: JSON.stringify(fields) }).then(me.reload)
 
-  const [activityLevel, setActivityLevel] = useState(undefined)
-  const [savingActivity, setSavingActivity] = useState(false)
+  const sexSubmit = useSubmit((value) => saveProfile({ sex: value }), 'Could not save your sex')
+  const ageSubmit = useSubmit(
+    () => saveProfile({ age: Number(ageValue) }),
+    'Could not save your age',
+  )
+  const activitySubmit = useSubmit(
+    (value) => saveProfile({ activityLevel: value }),
+    'Could not save your activity level',
+  )
+  const profileSaveError = sexSubmit.error ?? ageSubmit.error ?? activitySubmit.error
 
-  const [loadError, setLoadError] = useState(false)
+  // A failed load is kept distinct from an empty list on purpose — "no passkeys
+  // registered" and "we couldn't check" mean very different things on a
+  // security screen.
+  const passkeys = useLoad(() => api('/api/passkeys'))
 
-  // Distinguished from an empty list on purpose — "no passkeys registered"
-  // and "we couldn't check" mean very different things on a security screen.
-  const loadPasskeys = () => {
-    setPasskeyListError(false)
-    api('/api/passkeys')
-      .then(setPasskeys)
-      .catch(() => setPasskeyListError(true))
-  }
-
-  const loadProfile = () => {
-    setLoadError(false)
-    api('/api/me')
-      .then((me) => {
-        setSex(me.sex ?? null)
-        setAge(me.age ?? null)
-        setAgeDraft(me.age ?? '')
-        setActivityLevel(me.activityLevel ?? null)
-      })
-      .catch(() => setLoadError(true))
-  }
-
-  useEffect(() => {
-    loadPasskeys()
-    loadProfile()
-  }, [])
-
-  const handleSaveSex = async (value) => {
-    setSavingSex(true)
-    try {
-      await api('/api/me', { method: 'PUT', body: JSON.stringify({ sex: value }) })
-      setSex(value)
-    } finally {
-      setSavingSex(false)
-    }
-  }
-
-  const handleSaveAge = async (e) => {
-    e.preventDefault()
-    setSavingAge(true)
-    try {
-      await api('/api/me', { method: 'PUT', body: JSON.stringify({ age: Number(ageDraft) }) })
-      setAge(Number(ageDraft))
-    } finally {
-      setSavingAge(false)
-    }
-  }
-
-  const handleSaveActivity = async (value) => {
-    setSavingActivity(true)
-    try {
-      await api('/api/me', { method: 'PUT', body: JSON.stringify({ activityLevel: value }) })
-      setActivityLevel(value)
-    } finally {
-      setSavingActivity(false)
-    }
-  }
-
-  const handleAddPasskey = async () => {
-    setPasskeyError(null)
-    setPasskeyPending(true)
+  const {
+    submit: handleAddPasskey,
+    saving: passkeyPending,
+    error: passkeyError,
+  } = useSubmit(async () => {
     try {
       await registerPasskey()
-      loadPasskeys()
     } catch (err) {
-      if (!isPasskeyCancellation(err)) {
-        setPasskeyError('Could not add that passkey — please try again')
-      }
-    } finally {
-      setPasskeyPending(false)
+      // Dismissing the browser prompt isn't a failure worth reporting.
+      if (isPasskeyCancellation(err)) return
+      throw err
     }
-  }
+    passkeys.reload()
+  }, 'Could not add that passkey — please try again')
 
   const handleRemovePasskey = async (id) => {
     await api(`/api/passkeys/${id}`, { method: 'DELETE' })
-    loadPasskeys()
+    passkeys.reload()
   }
 
   return (
@@ -138,10 +98,10 @@ function ProfileSecurityPage({ user, onBack }) {
           depends on it.
         </p>
 
-        {loadError && (
+        {me.error && (
           <p className="mt-2 text-xs text-red-400">
             Could not load your profile details —{' '}
-            <button type="button" onClick={loadProfile} className="underline hover:no-underline">
+            <button type="button" onClick={me.reload} className="underline hover:no-underline">
               retry
             </button>
           </p>
@@ -153,8 +113,8 @@ function ProfileSecurityPage({ user, onBack }) {
             <button
               key={value}
               type="button"
-              onClick={() => handleSaveSex(value)}
-              disabled={savingSex}
+              onClick={() => sexSubmit.submit(value)}
+              disabled={sexSubmit.saving}
               className={`rounded-md px-3 py-1 text-xs font-medium transition disabled:opacity-60 ${
                 sex === value ? 'bg-third text-main' : 'text-third/60 hover:text-third'
               }`}
@@ -164,20 +124,20 @@ function ProfileSecurityPage({ user, onBack }) {
           ))}
         </div>
 
-        <form onSubmit={handleSaveAge} className="mt-3 flex items-center gap-2 text-xs">
+        <form onSubmit={ageSubmit.submit} className="mt-3 flex items-center gap-2 text-xs">
           <span className="text-third/60">Age</span>
           <input
             type="number"
             min="10"
             max="120"
             step="1"
-            value={ageDraft}
+            value={ageValue}
             onChange={(e) => setAgeDraft(e.target.value)}
             className="w-16 rounded-md border border-secondary/40 bg-main px-2 py-1 text-third outline-none focus:border-secondary"
           />
           <button
             type="submit"
-            disabled={savingAge || !ageDraft || Number(ageDraft) === age}
+            disabled={ageSubmit.saving || !ageValue || Number(ageValue) === age}
             className="text-third underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary disabled:opacity-40"
           >
             Save
@@ -188,8 +148,8 @@ function ProfileSecurityPage({ user, onBack }) {
           <span className="shrink-0 text-third/60">Activity</span>
           <select
             value={activityLevel ?? ''}
-            onChange={(e) => handleSaveActivity(e.target.value)}
-            disabled={savingActivity}
+            onChange={(e) => activitySubmit.submit(e.target.value)}
+            disabled={activitySubmit.saving}
             className="w-full rounded-md border border-secondary/40 bg-main px-2 py-1 text-third outline-none focus:border-secondary disabled:opacity-60"
           >
             <option value="" disabled>
@@ -202,6 +162,10 @@ function ProfileSecurityPage({ user, onBack }) {
             ))}
           </select>
         </div>
+
+        {profileSaveError && (
+          <p className="mt-2 text-xs text-red-400">{profileSaveError} — please try again</p>
+        )}
       </div>
 
       <div className="rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
@@ -211,21 +175,21 @@ function ProfileSecurityPage({ user, onBack }) {
         </p>
 
         <ul className="mt-4 flex flex-col gap-2">
-          {passkeys === null && !passkeyListError && (
+          {passkeys.data === undefined && !passkeys.error && (
             <li className="text-xs text-third/60">Loading…</li>
           )}
-          {passkeyListError && (
+          {passkeys.error && (
             <li className="text-xs text-red-400">
               Could not load your passkeys —{' '}
-              <button type="button" onClick={loadPasskeys} className="underline hover:no-underline">
+              <button type="button" onClick={passkeys.reload} className="underline hover:no-underline">
                 retry
               </button>
             </li>
           )}
-          {passkeys?.length === 0 && (
+          {passkeys.data?.length === 0 && (
             <li className="text-xs text-third/60">No passkeys registered yet.</li>
           )}
-          {passkeys?.map((passkey) => (
+          {passkeys.data?.map((passkey) => (
             <li
               key={passkey.id}
               className="flex items-center justify-between rounded-lg border border-secondary/25 px-3 py-2 text-sm"

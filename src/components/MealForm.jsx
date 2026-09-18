@@ -1,39 +1,29 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { useSubmit } from '../lib/useSubmit'
 
 const emptyForm = { description: '', calories: '', proteinG: '', fatG: '', carbsG: '' }
 const FIELD_LABELS = { proteinG: 'Protein (g)', fatG: 'Fat (g)', carbsG: 'Carbs (g)' }
 
 function MealForm({ onSaved, onCancel }) {
   const [form, setForm] = useState(emptyForm)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await api('/api/meals', {
-        method: 'POST',
-        body: JSON.stringify({
-          description: form.description,
-          calories: Number(form.calories),
-          ...(form.proteinG ? { proteinG: Number(form.proteinG) } : {}),
-          ...(form.fatG ? { fatG: Number(form.fatG) } : {}),
-          ...(form.carbsG ? { carbsG: Number(form.carbsG) } : {}),
-        }),
-      })
-      onSaved()
-    } catch {
-      setError('Could not log that meal — please check the values and try again')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const { submit, saving, error } = useSubmit(async () => {
+    await api('/api/meals', {
+      method: 'POST',
+      body: JSON.stringify({
+        description: form.description,
+        calories: Number(form.calories),
+        ...(form.proteinG ? { proteinG: Number(form.proteinG) } : {}),
+        ...(form.fatG ? { fatG: Number(form.fatG) } : {}),
+        ...(form.carbsG ? { carbsG: Number(form.carbsG) } : {}),
+      }),
+    })
+    onSaved()
+  }, 'Could not log that meal — please check the values and try again')
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-third">Description</span>
         <input

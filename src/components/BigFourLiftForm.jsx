@@ -1,35 +1,25 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
 import { BIG_FOUR_LIFTS } from '../lib/lifts'
+import { useSubmit } from '../lib/useSubmit'
 
 function BigFourLiftForm({ onSaved, onCancel }) {
   const [form, setForm] = useState({ exerciseName: BIG_FOUR_LIFTS[0], weightKg: '', reps: '' })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await api('/api/workout-sets', {
-        method: 'POST',
-        body: JSON.stringify({
-          exerciseName: form.exerciseName,
-          weightKg: Number(form.weightKg),
-          ...(form.reps ? { reps: Number(form.reps) } : {}),
-        }),
-      })
-      onSaved()
-    } catch {
-      setError('Could not log that lift — please check the values and try again')
-    } finally {
-      setSaving(false)
-    }
-  }
+  const { submit, saving, error } = useSubmit(async () => {
+    await api('/api/workout-sets', {
+      method: 'POST',
+      body: JSON.stringify({
+        exerciseName: form.exerciseName,
+        weightKg: Number(form.weightKg),
+        ...(form.reps ? { reps: Number(form.reps) } : {}),
+      }),
+    })
+    onSaved()
+  }, 'Could not log that lift — please check the values and try again')
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form onSubmit={submit} className="flex flex-col gap-3">
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-third">Lift</span>
         <select

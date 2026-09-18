@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../lib/api'
 import { BIG_FOUR_LIFTS } from '../lib/lifts'
+import { useMe, useWeights } from '../lib/sharedData'
 import { getStrengthTier } from '../lib/strength'
+import { useLoad } from '../lib/useLoad'
 import BigFourProgress from './BigFourProgress'
 import BigFourLogList from './BigFourLogList'
 import BigFourLiftForm from './BigFourLiftForm'
@@ -16,55 +18,42 @@ const HELP_TEXT =
 // Reuses the existing (previously frontend-less) /api/workout-sets — a plain
 // exerciseName + weightKg + reps log, exactly the shape this needs.
 function BigFourCard() {
-  const [sets, setSets] = useState(null)
-  const [sex, setSex] = useState(undefined) // undefined = loading, null = unset
-  const [meGoals, setMeGoals] = useState(undefined)
-  const [bodyweight, setBodyweight] = useState(undefined) // undefined = loading, null = no weight logged
-
   const [mode, setMode] = useState('view') // 'view' | 'log' | 'editGoals'
   const [showHelp, setShowHelp] = useState(false)
-  const [loadError, setLoadError] = useState(false)
 
-  const load = async () => {
-    try {
-      const [fetchedSets, me, weights] = await Promise.all([
-        api('/api/workout-sets'),
-        api('/api/me'),
-        api('/api/weights'),
-      ])
-      setLoadError(false)
-      setSets(fetchedSets)
-      setSex(me.sex ?? null)
-      setMeGoals({
-        deadliftGoalKg: me.deadliftGoalKg,
-        squatGoalKg: me.squatGoalKg,
-        benchPressGoalKg: me.benchPressGoalKg,
-        overheadPressGoalKg: me.overheadPressGoalKg,
-      })
-      // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
-      setBodyweight(weights.length ? weights[0].weightKg : null)
-    } catch {
-      setLoadError(true)
-    }
+  const lifts = useLoad(() => api('/api/workout-sets'))
+  const me = useMe()
+  const weights = useWeights()
+
+  const sets = lifts.data ?? null
+  const sex = me.data ? me.data.sex ?? null : undefined // null = unset, undefined = loading
+  const meGoals = me.data
+  // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
+  const bodyweight = weights.data ? (weights.data.length ? weights.data[0].weightKg : null) : undefined
+
+  const loadError = lifts.error || me.error || weights.error
+  const retry = () => {
+    lifts.reload()
+    me.reload()
+    weights.reload()
   }
 
-  // See MacroStatsCard — same fetch-on-mount pattern, same pending hook.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [])
-
-  const handleSaved = () => {
+  // Logging a lift only touches the lift log; goals only touch the profile.
+  const handleLiftSaved = () => {
     setMode('view')
-    load()
+    lifts.reload()
+  }
+  const handleGoalsSaved = () => {
+    setMode('view')
+    me.reload()
   }
 
   const handleRemove = async (id) => {
     await api(`/api/workout-sets/${id}`, { method: 'DELETE' })
-    load()
+    lifts.reload()
   }
 
-  const isLoading = sets === null || sex === undefined || meGoals === undefined || bodyweight === undefined
+  const isLoading = sets === null || sex === undefined || bodyweight === undefined
 
   // The API already returns sets newest-first, so the first match per lift
   // is its most recent entry — the "current" number the ranking and the
@@ -113,7 +102,7 @@ function BigFourCard() {
       {loadError && (
         <p className="text-xs text-red-400">
           Could not load your Big 4 data —{' '}
-          <button type="button" onClick={load} className="underline hover:no-underline">
+          <button type="button" onClick={retry} className="underline hover:no-underline">
             retry
           </button>
         </p>
@@ -159,12 +148,12 @@ function BigFourCard() {
         </>
       )}
 
-      {mode === 'log' && <BigFourLiftForm onSaved={handleSaved} onCancel={() => setMode('view')} />}
+      {mode === 'log' && <BigFourLiftForm onSaved={handleLiftSaved} onCancel={() => setMode('view')} />}
 
       {mode === 'editGoals' && (
         <BigFourGoalsForm
           meGoals={meGoals}
-          onSaved={handleSaved}
+          onSaved={handleGoalsSaved}
           onCancel={() => setMode('view')}
         />
       )}

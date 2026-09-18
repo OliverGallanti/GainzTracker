@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
 import { computeAdherenceStreak, nextDayIndex } from '../lib/splits'
+import { useLoad } from '../lib/useLoad'
+import { useSubmit } from '../lib/useSubmit'
 import TrainingCalendar from './TrainingCalendar'
 import SessionEditor from './SessionEditor'
 
@@ -12,50 +14,34 @@ function todayBounds() {
 }
 
 function TrainingLogCard({ refreshKey }) {
-  const [split, setSplit] = useState(undefined) // undefined = loading, null = none active
-  const [logs, setLogs] = useState(null)
-  const [logging, setLogging] = useState(false)
-  const [error, setError] = useState(null)
   const [editingLog, setEditingLog] = useState(null)
-  const [loadError, setLoadError] = useState(false)
 
-  const load = async () => {
-    setLoadError(false)
-    try {
-      const splits = await api('/api/workout-splits')
-      const active = splits.find((s) => s.active) ?? null
-      setSplit(active)
-      setLogs(active ? await api(`/api/workout-splits/${active.id}/logs`) : null)
-    } catch {
-      setLoadError(true)
-    }
-  }
+  // The logs depend on which split is active, so this is one dependent load
+  // rather than two independent ones. `refreshKey` re-runs it when the
+  // routine card changes the active split.
+  const { data, error: loadError, reload } = useLoad(async () => {
+    const splits = await api('/api/workout-splits')
+    const split = splits.find((s) => s.active) ?? null
+    const logs = split ? await api(`/api/workout-splits/${split.id}/logs`) : null
+    return { split, logs }
+  }, refreshKey)
 
-  useEffect(() => {
-    load()
-  }, [refreshKey])
+  const split = data?.split // undefined = loading, null = none active
+  const logs = data?.logs ?? null
 
-  const handleLog = async (completed) => {
-    setError(null)
-    setLogging(true)
-    try {
-      const { dayStart, dayEnd } = todayBounds()
-      const created = await api(`/api/workout-splits/${split.id}/logs`, {
-        method: 'POST',
-        body: JSON.stringify({ completed, dayStart, dayEnd }),
-      })
-      if (completed) setEditingLog(created)
-      load()
-    } catch {
-      setError('Could not log that day — please try again')
-    } finally {
-      setLogging(false)
-    }
-  }
+  const { submit: handleLog, saving: logging, error } = useSubmit(async (completed) => {
+    const { dayStart, dayEnd } = todayBounds()
+    const created = await api(`/api/workout-splits/${split.id}/logs`, {
+      method: 'POST',
+      body: JSON.stringify({ completed, dayStart, dayEnd }),
+    })
+    if (completed) setEditingLog(created)
+    reload()
+  }, 'Could not log that day — please try again')
 
   const handleRemoveLog = async (logId) => {
     await api(`/api/workout-splits/${split.id}/logs/${logId}`, { method: 'DELETE' })
-    load()
+    reload()
   }
 
   const isLoading = split === undefined || (split && logs === null)
@@ -89,7 +75,7 @@ function TrainingLogCard({ refreshKey }) {
       {loadError && (
         <p className="text-xs text-red-400">
           Could not load your training log —{' '}
-          <button type="button" onClick={load} className="underline hover:no-underline">
+          <button type="button" onClick={reload} className="underline hover:no-underline">
             retry
           </button>
         </p>
@@ -147,12 +133,12 @@ function TrainingLogCard({ refreshKey }) {
               log={editingLog}
               onClose={() => {
                 setEditingLog(null)
-                load()
+                reload()
               }}
             />
           )}
 
-          <TrainingCalendar logs={logs} days={split.days} onRemove={handleRemoveLog} onSessionChange={load} />
+          <TrainingCalendar logs={logs} days={split.days} onRemove={handleRemoveLog} onSessionChange={reload} />
         </>
       )}
     </div>
