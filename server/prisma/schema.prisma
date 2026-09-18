@@ -8,13 +8,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  googleId  String   @unique
-  email     String   @unique
-  name      String?
-  avatarUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  googleId           String   @unique
+  email              String   @unique
+  name               String?
+  avatarUrl          String?
+  heightCm           Float? // one-time profile value, not historized like weight/bodyFatPercent
+  weightGoalKg       Float? // a target, not historized — re-editing replaces it
+  bodyFatGoalPercent Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   sessions        Session[]
   weightEntries   WeightEntry[]
@@ -23,6 +26,43 @@ model User {
   workoutSets     WorkoutSet[]
   credentials     Credential[]
   macroGoal       MacroGoal?
+  workoutSplits   WorkoutSplit[]
+  splitLogs       SplitLog[]
+}
+
+// A repeating training split (e.g. 6-day PPL) — an ordered, rotating cycle of
+// day-type labels, not tied to calendar weekdays. Only one is `active` per
+// user; older splits and their logs are kept (not deleted) so switching
+// programs doesn't lose history.
+model WorkoutSplit {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  days      String[] // e.g. ["Push","Pull","Legs","Push","Pull","Legs"]
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  logs SplitLog[]
+
+  @@index([userId])
+}
+
+// One yes/no log against a specific position in the split's day cycle.
+// Both completed and skipped advance dayIndex — skipping a day still
+// consumes that slot rather than letting it be dodged indefinitely.
+model SplitLog {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  splitId   String
+  split     WorkoutSplit @relation(fields: [splitId], references: [id], onDelete: Cascade)
+  dayIndex  Int
+  completed Boolean
+  loggedAt  DateTime     @default(now())
+
+  @@index([userId, loggedAt])
+  @@index([splitId, loggedAt])
 }
 
 // A user's current daily macro targets — a singleton per user (re-editing
@@ -69,12 +109,13 @@ model Session {
 }
 
 model WeightEntry {
-  id       String   @id @default(cuid())
-  userId   String
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  weightKg Float
-  loggedAt DateTime @default(now())
-  note     String?
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg       Float
+  bodyFatPercent Float? // measured alongside weight (smart scale, calipers), so it lives on the same entry rather than its own table
+  loggedAt       DateTime @default(now())
+  note           String?
 
   @@index([userId, loggedAt])
 }

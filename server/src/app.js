@@ -12,6 +12,7 @@ import workoutRoutes from './routes/workouts.js'
 import passkeyRoutes from './routes/passkeys.js'
 import passkeyCredentialRoutes from './routes/passkey-credentials.js'
 import macroGoalRoutes from './routes/macro-goal.js'
+import workoutSplitRoutes from './routes/workout-splits.js'
 
 export function buildApp() {
   // Behind a TLS-terminating proxy, request.protocol reads as http unless the
@@ -32,6 +33,7 @@ export function buildApp() {
   app.register(workoutRoutes, { prefix: '/api' })
   app.register(passkeyCredentialRoutes, { prefix: '/api' })
   app.register(macroGoalRoutes, { prefix: '/api' })
+  app.register(workoutSplitRoutes, { prefix: '/api' })
 
   return app
 }

@@ -36,6 +36,7 @@ function MacroStatsCard() {
   const [unit, setUnit] = useState('g') // 'g' | 'cal' | 'percent' — display only, never affects fill
 
   const [targetForm, setTargetForm] = useState(emptyTargetForm)
+  const [calorieTargetTouched, setCalorieTargetTouched] = useState(false)
   const [savingTarget, setSavingTarget] = useState(false)
   const [targetError, setTargetError] = useState(null)
 
@@ -61,8 +62,25 @@ function MacroStatsCard() {
       carbsG: goal?.carbsG ?? '',
       calorieTarget: goal?.calorieTarget ?? '',
     })
+    // A saved calorieTarget is treated as a deliberate value, not a stale
+    // suggestion — only start auto-computing once the macros actually change.
+    setCalorieTargetTouched(Boolean(goal?.calorieTarget))
     setTargetError(null)
     setMode('editTargets')
+  }
+
+  // Atwater factors (4 kcal/g protein & carbs, 9 kcal/g fat) — a live
+  // suggestion, not a lock: it keeps recomputing until the calorie field
+  // itself is edited, at which point it becomes a deliberate override.
+  const updateTargetField = (field, rawValue) => {
+    const next = { ...targetForm, [field]: rawValue }
+    if (!calorieTargetTouched) {
+      const p = Number(next.proteinG) || 0
+      const f = Number(next.fatG) || 0
+      const c = Number(next.carbsG) || 0
+      next.calorieTarget = p || f || c ? String(Math.round(p * 4 + f * 9 + c * 4)) : ''
+    }
+    setTargetForm(next)
   }
 
   const handleSaveTargets = async (e) => {
@@ -263,23 +281,33 @@ function MacroStatsCard() {
                 step="any"
                 required
                 value={targetForm[field]}
-                onChange={(e) => setTargetForm({ ...targetForm, [field]: e.target.value })}
+                onChange={(e) => updateTargetField(field, e.target.value)}
                 className="w-24 rounded-lg border border-secondary/40 bg-main px-2 py-1 text-right text-third outline-none focus:border-secondary"
               />
             </label>
           ))}
 
-          <label className="flex items-center justify-between gap-3 border-t border-secondary/25 pt-3 text-sm">
-            <span className="text-third">Total calories (optional)</span>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={targetForm.calorieTarget}
-              onChange={(e) => setTargetForm({ ...targetForm, calorieTarget: e.target.value })}
-              className="w-24 rounded-lg border border-secondary/40 bg-main px-2 py-1 text-right text-third outline-none focus:border-secondary"
-            />
-          </label>
+          <div className="border-t border-secondary/25 pt-3">
+            <label className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-third">Total calories (optional)</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={targetForm.calorieTarget}
+                onChange={(e) => {
+                  setCalorieTargetTouched(true)
+                  setTargetForm({ ...targetForm, calorieTarget: e.target.value })
+                }}
+                className="w-24 rounded-lg border border-secondary/40 bg-main px-2 py-1 text-right text-third outline-none focus:border-secondary"
+              />
+            </label>
+            {!calorieTargetTouched && targetForm.calorieTarget && (
+              <p className="mt-1 text-right text-xs text-third/60">
+                Auto-calculated from protein/fat/carbs — edit to override
+              </p>
+            )}
+          </div>
 
           <div className="mt-1 flex gap-2">
             <button

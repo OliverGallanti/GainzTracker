@@ -2,7 +2,7 @@
 
 A personal weight, calorie/macro, and workout-routine tracker. This is the frontend (React SPA); the backend lives in [server/](server/README.md) and has its own README covering the auth/data architecture.
 
-This README is more of a working plan than a finished description — the app is genuinely just a login screen right now, and most of what's below is "what we're building toward" rather than "what exists." Update it as things land instead of leaving it aspirational.
+This README is more of a working plan than a finished description — update it as things land instead of leaving it aspirational.
 
 ## Where things actually stand
 
@@ -10,12 +10,15 @@ This README is more of a working plan than a finished description — the app is
 
 - Real Google sign-in (`src/components/Login.jsx`) — hands off to the BFF, no fake auth.
 - Passkey (WebAuthn) sign-in as a second, passwordless option — `src/lib/webauthn.js` wraps the registration/authentication ceremonies; see [server/README.md](server/README.md) for how the crypto side works. Passkeys are managed (added/removed) from the Dashboard.
-- A placeholder `Dashboard.jsx` that shows who's logged in, passkey management, and a working logout.
 - `App.jsx` checks session state on load (`/api/me`) and switches between Login/Dashboard. Exposes a `checkAuth`/`onAuthenticated` callback so an in-page login (passkey) can re-check auth state without a page reload, the way a full-page redirect (Google) naturally would.
 - `src/lib/api.js` — a small fetch wrapper for talking to the BFF (always sends cookies, throws on non-2xx).
-- Mobile-first Tailwind design system (black/grey/white, wireframe-gradient background) applied consistently across Login and Dashboard.
+- Mobile-first Tailwind design system (`#053345`/`#808F85`/`#DCE0D9`, wireframe-gradient background) applied consistently across every screen.
+- **`MacroStatsCard.jsx`** — today's protein/fat/carbs as lifebars against a personal target (editable inline, with the calorie field auto-suggested from the macros via Atwater factors — 4/4/9 — but always overridable), a `g`/`Cal`/`%` display toggle that only changes what's shown, never the bar's fill math, a "Total calories" bar (only once a calorie target exists), and inline food logging with a traceable list of today's entries (each removable).
+- **`WeightChart.jsx`** — a Recharts line chart of weight over time (themed to the app's palette, not Recharts' defaults), inline weight logging (with optional body fat %), a one-time editable height, and a derived BMI (never stored — computed from the latest weight entry + height each render).
+- **`RoutineCard.jsx`** + **`TrainingLogCard.jsx`** — a training split (e.g. "6-Day PPL") as a rotating cycle of day-type labels (`src/lib/templates.js` holds five named presets, plus a custom builder), not tied to calendar weekdays. Logging is an explicit yes/no per scheduled day (`src/lib/splits.js`), capped at one log per calendar day (enforced server-side, not just in the UI — see `server/README.md`), and the streak counts consecutive completed days — skipping still advances the cycle so a day can't be dodged forever. History is a real month calendar (`TrainingCalendar.jsx`), not a flat list — click a logged day to see what it was and remove it, which is also how you correct today's entry once it's already logged. Split into two cards deliberately: routine setup is rare, daily logging is frequent.
+- `Dashboard.jsx` composes all of the above plus the welcome card and passkey management.
 
-**Not built at all yet:** any actual tracking UI. The backend already has working, authenticated CRUD endpoints for weight entries, macro/calorie entries, and workout routines/sets (see [server/README.md](server/README.md)) — there is simply no frontend for any of it. That's the next phase of work, not a future maybe.
+**Not built yet:** the original `WorkoutRoutine`/`WorkoutSet` backend (exercise lists with target sets/reps, and per-set weight/reps logging) has no frontend and isn't used by the routine-split feature above — it's a lower-level, finer-grained layer that's a natural extension point (e.g. linking a split's day-label to a real exercise list) rather than something this pass needed.
 
 ## Why React + Vite + Tailwind
 
@@ -33,21 +36,15 @@ The SPA never touches Google, tokens, or the database directly — it only calls
 
 ## Planned feature build-out
 
-Roughly in the order it makes sense to build, since each one is a fairly self-contained CRUD screen against an endpoint that already exists server-side:
-
-1. **Weight tracking** — log a body weight entry, see history/trend. Backend: `/api/weights` (GET/POST/DELETE).
-2. **Macro/calorie logging** — log a meal/food entry with calories and optional protein/carbs/fat. Backend: `/api/meals` (GET/POST/DELETE).
-3. **Workout routines** — define a named routine (a list of exercises with target sets/reps), and log actual sets performed against it. Backend: `/api/workouts` + `/api/workout-sets`.
-4. **Dashboard / trends** — once there's real data, replace the placeholder `Dashboard.jsx` with actual summaries (recent weight trend, today's macros vs. some target, recent workouts). This is the one piece with no backend counterpart yet — it's just aggregating what the other endpoints already return.
+1. **Exercise-level tracking within a training day** — the remaining gap. The routine-split feature tracks adherence ("did you do Push day"), not what you actually did in it. Linking a split's day-label to a real `WorkoutRoutine` (exercise list) and logging actual `WorkoutSet` rows (weight/reps) would sit underneath the existing streak feature, not replace it. Backend already exists for this: `/api/workouts` + `/api/workout-sets`, both still unused by any frontend.
 
 ## Open questions to decide before/while building the above
 
 These are real open decisions, not settled defaults — flagging them here so they get made deliberately instead of by accident:
 
-- **Routing.** Nothing beyond Login/Dashboard exists, so there's no router yet. Once there's more than one logged-in screen, we need `react-router-dom` (or similar) — this should happen at the start of building feature #1 above, not be retrofitted later.
-- **Client state / data fetching.** Right now `App.jsx` does a single manual `fetch` + `useState`. That won't scale cleanly once multiple screens need to fetch/mutate/cache server data (e.g. adding a weight entry should update a list without a full reload). Worth deciding early whether to reach for something like TanStack Query, or keep it manual as long as possible — no decision has been made either way.
-- **Charts.** Trend views (weight over time, macros over time) will need a charting library eventually. Not needed until the dashboard phase.
-- **Units.** The backend schema is metric-only right now (`weightKg`). If imperial units matter, that's a backend + frontend decision to make together, not a frontend-only formatting concern — worth resolving before building the weight-tracking screen, since retrofitting a unit system after data exists is more painful than deciding upfront.
+- **Routing.** Every screen so far has fit as an inline card on the single Dashboard (view/edit toggles, not navigation) — deliberately, so `react-router-dom` hasn't been needed yet. Workout routines might be the thing that finally justifies it, if a routine gets complex enough to want its own screen rather than another inline toggle.
+- **Client state / data fetching.** Every card (`MacroStatsCard`, `WeightChart`, `RoutineCard`, `TrainingLogCard`, passkeys) independently does its own manual `fetch` + `useState` + a `load()` refetch-after-mutation. `RoutineCard`/`TrainingLogCard` were the first case where one card's change (creating a routine) needed to be reflected in a sibling (the training log) — solved for now with a simple parent-owned counter passed down as a prop (`Dashboard.jsx`'s `splitVersion`), not a data-fetching library. If a third card ever needs this kind of cross-card coordination, that's the point to revisit reaching for something like TanStack Query instead of adding more one-off counters.
+- **Units.** The backend schema is metric-only (`weightKg`, `heightCm`). If imperial units matter, that's a backend + frontend decision to make together — now that real weight/height data exists, retrofitting a unit system means a migration choice (convert stored data vs. store a unit preference), not just a frontend formatting change.
 
 ## Running locally
 

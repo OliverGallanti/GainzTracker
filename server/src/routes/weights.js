@@ -4,6 +4,7 @@ import { prisma } from '../db.js'
 
 const createSchema = z.object({
   weightKg: z.number().positive(),
+  bodyFatPercent: z.number().min(0).max(100).optional(),
   loggedAt: z.coerce.date().optional(),
   note: z.string().optional(),
 })

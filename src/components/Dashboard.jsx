@@ -3,7 +3,8 @@ import { api } from '../lib/api'
 import { isPasskeyCancellation, registerPasskey } from '../lib/webauthn'
 import MacroStatsCard from './MacroStatsCard'
 import WeightChart from './WeightChart'
-import GymStreak from './GymStreak'
+import RoutineCard from './RoutineCard'
+import TrainingLogCard from './TrainingLogCard'
 
 function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString(undefined, {
@@ -17,6 +18,7 @@ function Dashboard({ user, onLogout }) {
   const [passkeys, setPasskeys] = useState(null)
   const [passkeyPending, setPasskeyPending] = useState(false)
   const [passkeyError, setPasskeyError] = useState(null)
+  const [splitVersion, setSplitVersion] = useState(0)
 
   const loadPasskeys = () => {
     api('/api/passkeys')
@@ -87,7 +89,8 @@ function Dashboard({ user, onLogout }) {
           </div>
 
           <WeightChart />
-          <GymStreak />
+          <RoutineCard onSplitChanged={() => setSplitVersion((v) => v + 1)} />
+          <TrainingLogCard refreshKey={splitVersion} />
 
           <div className="rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
             <h2 className="text-sm font-semibold text-third">Passkeys</h2>

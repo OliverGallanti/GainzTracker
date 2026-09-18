@@ -32,7 +32,7 @@ export default async function authRoutes(app) {
       code_challenge_method: 'S256',
     })
 
-    reply.redirect(authorizationUrl.href)
+    return reply.redirect(authorizationUrl.href)
   })
 
   app.get('/google/callback', async (request, reply) => {
@@ -107,7 +107,7 @@ export default async function authRoutes(app) {
     request.session.set('userId', user.id)
     await request.session.save()
 
-    reply.redirect(config.FRONTEND_URL)
+    return reply.redirect(config.FRONTEND_URL)
   })
 
   app.post('/logout', async (request, reply) => {
@@ -118,6 +118,6 @@ export default async function authRoutes(app) {
       path: sessionCookieOptions.path,
       domain: sessionCookieOptions.domain,
     })
-    reply.code(204).send()
+    return reply.code(204).send()
   })
 }
