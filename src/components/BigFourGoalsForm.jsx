@@ -1,20 +1,18 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
-import { BIG_FOUR_LIFTS, GOAL_FIELD } from '../lib/lifts'
+import { BIG_FOUR_LIFTS } from '../lib/lifts'
 import { useSubmit } from '../lib/useSubmit'
 
-function BigFourGoalsForm({ meGoals, onSaved, onCancel }) {
-  const [form, setForm] = useState({
-    deadliftGoalKg: meGoals?.deadliftGoalKg ?? '',
-    squatGoalKg: meGoals?.squatGoalKg ?? '',
-    benchPressGoalKg: meGoals?.benchPressGoalKg ?? '',
-    overheadPressGoalKg: meGoals?.overheadPressGoalKg ?? '',
-  })
+// `goals` is { [liftName]: kg } — a lift with no goal has no key.
+function BigFourGoalsForm({ goals, onSaved, onCancel }) {
+  const [form, setForm] = useState(() =>
+    Object.fromEntries(BIG_FOUR_LIFTS.map((name) => [name, goals?.[name] ?? ''])),
+  )
 
   const { submit, saving, error } = useSubmit(async () => {
     // Empty fields are dropped rather than nulled, so a goal can be changed
     // but not cleared. Pre-existing behavior, preserved deliberately.
-    await api('/api/me', {
+    await api('/api/lift-goals', {
       method: 'PUT',
       body: JSON.stringify(
         Object.fromEntries(
@@ -36,8 +34,8 @@ function BigFourGoalsForm({ meGoals, onSaved, onCancel }) {
             type="number"
             min="1"
             step="any"
-            value={form[GOAL_FIELD[name]]}
-            onChange={(e) => setForm({ ...form, [GOAL_FIELD[name]]: e.target.value })}
+            value={form[name]}
+            onChange={(e) => setForm({ ...form, [name]: e.target.value })}
             className="w-24 rounded-lg border border-secondary/40 bg-main px-2 py-1 text-right text-third outline-none focus:border-secondary"
           />
         </label>

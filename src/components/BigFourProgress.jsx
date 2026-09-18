@@ -1,19 +1,26 @@
-import { useState } from 'react'
-import { BIG_FOUR_LIFTS, GOAL_FIELD } from '../lib/lifts'
+import { BIG_FOUR_LIFTS } from '../lib/lifts'
 import { getStrengthReferenceLines, getStrengthTier } from '../lib/strength'
 import { StatLineChart } from './StatLineChart'
 
-// Which lift is selected and whether the standard lines show are display-only
-// concerns, so they stay here rather than in the card.
-function BigFourProgress({ sets, meGoals, bodyweight, sex, onEditGoals }) {
-  const [selectedLift, setSelectedLift] = useState(BIG_FOUR_LIFTS[0])
-  const [showStandards, setShowStandards] = useState(true)
-
+// `selectedLift` and `showStandards` are controlled by the card, NOT held here:
+// this panel unmounts whenever a form is open, so state kept here would reset
+// to Deadlift / checked every time the user logs a lift or edits a goal.
+function BigFourProgress({
+  sets,
+  goals,
+  bodyweight,
+  sex,
+  selectedLift,
+  onSelectLift,
+  showStandards,
+  onShowStandardsChange,
+  onEditGoals,
+}) {
   const liftEntries = sets
     .filter((s) => s.exerciseName === selectedLift)
     .slice()
     .reverse() // sets are newest-first; the chart wants oldest-first
-  const selectedGoal = meGoals?.[GOAL_FIELD[selectedLift]]
+  const selectedGoal = goals?.[selectedLift]
   const selectedTier = getStrengthTier(selectedLift, liftEntries.at(-1)?.weightKg, bodyweight, sex)
   const selectedTierLines = getStrengthReferenceLines(selectedLift, bodyweight, sex)
 
@@ -24,7 +31,7 @@ function BigFourProgress({ sets, meGoals, bodyweight, sex, onEditGoals }) {
           <button
             key={name}
             type="button"
-            onClick={() => setSelectedLift(name)}
+            onClick={() => onSelectLift(name)}
             className={`rounded-md px-2 py-1 text-xs font-medium transition ${
               selectedLift === name ? 'bg-third text-main' : 'text-third/60 hover:text-third'
             }`}
@@ -61,7 +68,7 @@ function BigFourProgress({ sets, meGoals, bodyweight, sex, onEditGoals }) {
               <input
                 type="checkbox"
                 checked={showStandards}
-                onChange={(e) => setShowStandards(e.target.checked)}
+                onChange={(e) => onShowStandardsChange(e.target.checked)}
                 className="accent-third"
               />
               Show strength-standard lines

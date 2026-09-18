@@ -15,12 +15,11 @@ const RANGE_OPTIONS = [
   { key: 'all', label: 'All', days: null },
 ]
 
-// Range and chart-mode are display-only, so they live here rather than in the
-// card — nothing outside this panel depends on which window is showing.
-// `entries` must be sorted oldest-first.
-function WeightCharts({ entries, weightGoal, bodyFatGoal }) {
-  const [chartMode, setChartMode] = useState('weight') // 'weight' | 'bodyFat' | 'both'
-  const [range, setRange] = useState('1y')
+// `chartMode` ('weight' | 'bodyFat' | 'both') and `range` are controlled by the
+// card, NOT held here: this panel unmounts whenever a form is open, so state
+// kept here would silently reset to its defaults every time the user logs a
+// weight. `entries` must be sorted oldest-first.
+function WeightCharts({ entries, weightGoal, bodyFatGoal, chartMode, onChartModeChange, range, onRangeChange }) {
   // Pinned once per mount: reading the clock during render would let the
   // cutoff drift between renders for the same selected range.
   const [now] = useState(() => Date.now())
@@ -57,7 +56,7 @@ function WeightCharts({ entries, weightGoal, bodyFatGoal }) {
             <button
               key={r.key}
               type="button"
-              onClick={() => setRange(r.key)}
+              onClick={() => onRangeChange(r.key)}
               className={`rounded-md px-2 py-1 text-xs font-medium transition ${
                 range === r.key ? 'bg-third text-main' : 'text-third/60 hover:text-third'
               }`}
@@ -73,7 +72,7 @@ function WeightCharts({ entries, weightGoal, bodyFatGoal }) {
               <button
                 key={m.key}
                 type="button"
-                onClick={() => setChartMode(m.key)}
+                onClick={() => onChartModeChange(m.key)}
                 className={`rounded-md px-2 py-1 text-xs font-medium transition ${
                   chartMode === m.key ? 'bg-third text-main' : 'text-third/60 hover:text-third'
                 }`}

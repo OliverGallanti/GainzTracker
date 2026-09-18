@@ -9,6 +9,11 @@ import WeightGoalsForm from './WeightGoalsForm'
 function WeightChart() {
   const [mode, setMode] = useState('view') // 'view' | 'logWeight' | 'editHeight' | 'editGoals'
 
+  // Held here, not in <WeightCharts>: that panel unmounts while a form is open,
+  // which would reset the user's chosen window every time they log a weight.
+  const [chartMode, setChartMode] = useState('weight') // 'weight' | 'bodyFat' | 'both'
+  const [range, setRange] = useState('1y')
+
   const me = useMe()
   const weights = useWeights()
 
@@ -121,7 +126,15 @@ function WeightChart() {
       )}
 
       {!isLoading && mode === 'view' && !isEmpty && (
-        <WeightCharts entries={entries} weightGoal={weightGoal} bodyFatGoal={bodyFatGoal} />
+        <WeightCharts
+          entries={entries}
+          weightGoal={weightGoal}
+          bodyFatGoal={bodyFatGoal}
+          chartMode={chartMode}
+          onChartModeChange={setChartMode}
+          range={range}
+          onRangeChange={setRange}
+        />
       )}
 
       {mode === 'logWeight' && (

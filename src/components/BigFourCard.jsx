@@ -21,31 +21,40 @@ function BigFourCard() {
   const [mode, setMode] = useState('view') // 'view' | 'log' | 'editGoals'
   const [showHelp, setShowHelp] = useState(false)
 
+  // Display state for the panels below. Held here rather than in the panels
+  // because they unmount whenever a form is open, which would reset the
+  // selection every time the user logs a lift or edits a goal.
+  const [selectedLift, setSelectedLift] = useState(BIG_FOUR_LIFTS[0])
+  const [showStandards, setShowStandards] = useState(true)
+  const [logsExpanded, setLogsExpanded] = useState(false)
+
   const lifts = useLoad(() => api('/api/workout-sets'))
+  const goalsResource = useLoad(() => api('/api/lift-goals')) // { [liftName]: kg }
   const me = useMe()
   const weights = useWeights()
 
   const sets = lifts.data ?? null
+  const goals = goalsResource.data // undefined while loading; {} once loaded with none set
   const sex = me.data ? me.data.sex ?? null : undefined // null = unset, undefined = loading
-  const meGoals = me.data
   // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
   const bodyweight = weights.data ? (weights.data.length ? weights.data[0].weightKg : null) : undefined
 
-  const loadError = lifts.error || me.error || weights.error
+  const loadError = lifts.error || goalsResource.error || me.error || weights.error
   const retry = () => {
     lifts.reload()
+    goalsResource.reload()
     me.reload()
     weights.reload()
   }
 
-  // Logging a lift only touches the lift log; goals only touch the profile.
+  // Each write invalidates only the resource it changed.
   const handleLiftSaved = () => {
     setMode('view')
     lifts.reload()
   }
   const handleGoalsSaved = () => {
     setMode('view')
-    me.reload()
+    goalsResource.reload()
   }
 
   const handleRemove = async (id) => {
@@ -53,7 +62,8 @@ function BigFourCard() {
     lifts.reload()
   }
 
-  const isLoading = sets === null || sex === undefined || bodyweight === undefined
+  const isLoading =
+    sets === null || goals === undefined || sex === undefined || bodyweight === undefined
 
   // The API already returns sets newest-first, so the first match per lift
   // is its most recent entry — the "current" number the ranking and the
@@ -138,13 +148,22 @@ function BigFourCard() {
 
           <BigFourProgress
             sets={sets}
-            meGoals={meGoals}
+            goals={goals}
             bodyweight={bodyweight}
             sex={sex}
+            selectedLift={selectedLift}
+            onSelectLift={setSelectedLift}
+            showStandards={showStandards}
+            onShowStandardsChange={setShowStandards}
             onEditGoals={() => setMode('editGoals')}
           />
 
-          <BigFourLogList entries={loggedEntries} onRemove={handleRemove} />
+          <BigFourLogList
+            entries={loggedEntries}
+            expanded={logsExpanded}
+            onToggle={() => setLogsExpanded((v) => !v)}
+            onRemove={handleRemove}
+          />
         </>
       )}
 
@@ -152,7 +171,7 @@ function BigFourCard() {
 
       {mode === 'editGoals' && (
         <BigFourGoalsForm
-          meGoals={meGoals}
+          goals={goals}
           onSaved={handleGoalsSaved}
           onCancel={() => setMode('view')}
         />

@@ -13,10 +13,6 @@ const userSelect = {
   sex: true,
   age: true,
   activityLevel: true,
-  deadliftGoalKg: true,
-  squatGoalKg: true,
-  benchPressGoalKg: true,
-  overheadPressGoalKg: true,
 }
 
 // Must match the keys in src/lib/tdee.js's ACTIVITY_LEVELS on the client.
@@ -33,10 +29,6 @@ const updateSchema = z
     sex: z.enum(['male', 'female']).optional(),
     age: z.number().int().positive().max(120).optional(),
     activityLevel: z.enum(ACTIVITY_LEVEL_KEYS).optional(),
-    deadliftGoalKg: z.number().positive().optional(),
-    squatGoalKg: z.number().positive().optional(),
-    benchPressGoalKg: z.number().positive().optional(),
-    overheadPressGoalKg: z.number().positive().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'No fields to update' })
 
