@@ -49,9 +49,17 @@ function BigFourCard() {
   const [savingGoals, setSavingGoals] = useState(false)
   const [goalsError, setGoalsError] = useState(null)
 
-  const load = () => {
-    api('/api/workout-sets').then(setSets)
-    api('/api/me').then((me) => {
+  const [loadError, setLoadError] = useState(false)
+
+  const load = async () => {
+    setLoadError(false)
+    try {
+      const [fetchedSets, me, weights] = await Promise.all([
+        api('/api/workout-sets'),
+        api('/api/me'),
+        api('/api/weights'),
+      ])
+      setSets(fetchedSets)
       setSex(me.sex ?? null)
       setMeGoals({
         deadliftGoalKg: me.deadliftGoalKg,
@@ -59,9 +67,11 @@ function BigFourCard() {
         benchPressGoalKg: me.benchPressGoalKg,
         overheadPressGoalKg: me.overheadPressGoalKg,
       })
-    })
-    // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
-    api('/api/weights').then((data) => setBodyweight(data.length ? data[0].weightKg : null))
+      // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
+      setBodyweight(weights.length ? weights[0].weightKg : null)
+    } catch {
+      setLoadError(true)
+    }
   }
 
   useEffect(() => {
@@ -190,7 +200,16 @@ function BigFourCard() {
         </p>
       )}
 
-      {isLoading && <p className="text-xs text-third/60">Loading…</p>}
+      {isLoading && !loadError && <p className="text-xs text-third/60">Loading…</p>}
+
+      {loadError && (
+        <p className="text-xs text-red-400">
+          Could not load your Big 4 data —{' '}
+          <button type="button" onClick={load} className="underline hover:no-underline">
+            retry
+          </button>
+        </p>
+      )}
 
       {!isLoading && mode === 'view' && (
         <>

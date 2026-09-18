@@ -12,8 +12,12 @@ function Dashboard({ user, onLogout }) {
   const [view, setView] = useState('dashboard') // 'dashboard' | 'profile'
   const [profile, setProfile] = useState(undefined) // undefined = loading
 
+  // A failed load just leaves `profile` undefined, which hides the
+  // completeness badge — no error UI needed for a purely decorative hint.
   const loadProfile = () => {
-    api('/api/me').then((me) => setProfile({ sex: me.sex, age: me.age, activityLevel: me.activityLevel }))
+    api('/api/me')
+      .then((me) => setProfile({ sex: me.sex, age: me.age, activityLevel: me.activityLevel }))
+      .catch(() => setProfile(undefined))
   }
 
   useEffect(() => {

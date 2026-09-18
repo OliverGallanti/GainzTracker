@@ -10,8 +10,15 @@ function RoutineCard({ onSplitChanged }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  const load = () => {
-    api('/api/workout-splits').then(setSplits)
+  const [loadError, setLoadError] = useState(false)
+
+  const load = async () => {
+    setLoadError(false)
+    try {
+      setSplits(await api('/api/workout-splits'))
+    } catch {
+      setLoadError(true)
+    }
   }
 
   useEffect(() => {
@@ -105,7 +112,16 @@ function RoutineCard({ onSplitChanged }) {
         )}
       </div>
 
-      {isLoading && <p className="text-xs text-third/60">Loading…</p>}
+      {isLoading && !loadError && <p className="text-xs text-third/60">Loading…</p>}
+
+      {loadError && (
+        <p className="text-xs text-red-400">
+          Could not load your routine —{' '}
+          <button type="button" onClick={load} className="underline hover:no-underline">
+            retry
+          </button>
+        </p>
+      )}
 
       {!isLoading && mode === 'view' && !activeSplit && (
         <div className="text-center">

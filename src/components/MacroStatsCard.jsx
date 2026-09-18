@@ -56,17 +56,26 @@ function MacroStatsCard() {
   const [savingMeal, setSavingMeal] = useState(false)
   const [mealError, setMealError] = useState(null)
 
-  const load = () => {
-    api('/api/macro-goal').then(setGoal)
+  const [loadError, setLoadError] = useState(false)
 
-    const since = startOfLocalDay().toISOString()
-    api(`/api/meals?since=${encodeURIComponent(since)}`).then(setMeals)
-
-    api('/api/me').then((me) =>
-      setTdeeProfile({ heightCm: me.heightCm, sex: me.sex, age: me.age, activityLevel: me.activityLevel }),
-    )
-    // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
-    api('/api/weights').then((data) => setBodyweight(data.length ? data[0].weightKg : null))
+  const load = async () => {
+    setLoadError(false)
+    try {
+      const since = startOfLocalDay().toISOString()
+      const [fetchedGoal, fetchedMeals, me, weights] = await Promise.all([
+        api('/api/macro-goal'),
+        api(`/api/meals?since=${encodeURIComponent(since)}`),
+        api('/api/me'),
+        api('/api/weights'),
+      ])
+      setGoal(fetchedGoal)
+      setMeals(fetchedMeals)
+      setTdeeProfile({ heightCm: me.heightCm, sex: me.sex, age: me.age, activityLevel: me.activityLevel })
+      // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
+      setBodyweight(weights.length ? weights[0].weightKg : null)
+    } catch {
+      setLoadError(true)
+    }
   }
 
   useEffect(() => {
@@ -198,7 +207,16 @@ function MacroStatsCard() {
         )}
       </div>
 
-      {isLoading && <p className="text-xs text-third/60">Loading…</p>}
+      {isLoading && !loadError && <p className="text-xs text-third/60">Loading…</p>}
+
+      {loadError && (
+        <p className="text-xs text-red-400">
+          Could not load your macros —{' '}
+          <button type="button" onClick={load} className="underline hover:no-underline">
+            retry
+          </button>
+        </p>
+      )}
 
       {!isLoading && mode === 'view' && !goal && (
         <div className="text-center">

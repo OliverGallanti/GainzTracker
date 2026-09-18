@@ -17,17 +17,18 @@ function TrainingLogCard({ refreshKey }) {
   const [logging, setLogging] = useState(false)
   const [error, setError] = useState(null)
   const [editingLog, setEditingLog] = useState(null)
+  const [loadError, setLoadError] = useState(false)
 
-  const load = () => {
-    api('/api/workout-splits').then((splits) => {
+  const load = async () => {
+    setLoadError(false)
+    try {
+      const splits = await api('/api/workout-splits')
       const active = splits.find((s) => s.active) ?? null
       setSplit(active)
-      if (active) {
-        api(`/api/workout-splits/${active.id}/logs`).then(setLogs)
-      } else {
-        setLogs(null)
-      }
-    })
+      setLogs(active ? await api(`/api/workout-splits/${active.id}/logs`) : null)
+    } catch {
+      setLoadError(true)
+    }
   }
 
   useEffect(() => {
@@ -83,7 +84,16 @@ function TrainingLogCard({ refreshKey }) {
     <div className="w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
       <h2 className="mb-4 text-sm font-semibold text-third">Training log</h2>
 
-      {isLoading && <p className="text-xs text-third/60">Loading…</p>}
+      {isLoading && !loadError && <p className="text-xs text-third/60">Loading…</p>}
+
+      {loadError && (
+        <p className="text-xs text-red-400">
+          Could not load your training log —{' '}
+          <button type="button" onClick={load} className="underline hover:no-underline">
+            retry
+          </button>
+        </p>
+      )}
 
       {!isLoading && (
         <>

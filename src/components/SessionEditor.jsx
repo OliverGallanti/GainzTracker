@@ -12,21 +12,30 @@ function SessionEditor({ log, onClose }) {
   const [durationMinutes, setDurationMinutes] = useState(log.durationMinutes ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [loadError, setLoadError] = useState(false)
 
-  useEffect(() => {
-    api(`/api/workout-sets?splitLogId=${log.id}`).then((sets) => {
-      setRows(
-        sets.length > 0
-          ? sets.map((s) => ({
-              id: s.id,
-              exerciseName: s.exerciseName,
-              weightKg: s.weightKg ?? '',
-              reps: s.reps ?? '',
-            }))
-          : [emptyRow()],
-      )
-    })
-  }, [log.id])
+  const loadRows = () => {
+    setLoadError(false)
+    api(`/api/workout-sets?splitLogId=${log.id}`)
+      .then((sets) => {
+        setRows(
+          sets.length > 0
+            ? sets.map((s) => ({
+                id: s.id,
+                exerciseName: s.exerciseName,
+                weightKg: s.weightKg ?? '',
+                reps: s.reps ?? '',
+              }))
+            : [emptyRow()],
+        )
+      })
+      // Saving is delete-then-recreate, so an editor that failed to read the
+      // existing rows would wipe them on save. Block saving instead of
+      // rendering a blank form over data we never actually loaded.
+      .catch(() => setLoadError(true))
+  }
+
+  useEffect(loadRows, [log.id])
 
   const updateRow = (index, field, value) => {
     setRows(rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
@@ -86,7 +95,23 @@ function SessionEditor({ log, onClose }) {
       onSubmit={handleSave}
       className="mt-4 flex flex-col gap-3 rounded-lg border border-secondary/25 p-3"
     >
-      {rows === null ? (
+      {loadError ? (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-red-400">
+            Could not load this session —{' '}
+            <button type="button" onClick={loadRows} className="underline hover:no-underline">
+              retry
+            </button>
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs font-medium text-third/60 transition hover:text-third"
+          >
+            Close
+          </button>
+        </div>
+      ) : rows === null ? (
         <p className="text-xs text-third/60">Loading…</p>
       ) : (
         <>

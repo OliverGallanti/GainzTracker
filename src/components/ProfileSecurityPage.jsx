@@ -18,6 +18,7 @@ function ProfileSecurityPage({ user, onBack }) {
   const [passkeys, setPasskeys] = useState(null)
   const [passkeyPending, setPasskeyPending] = useState(false)
   const [passkeyError, setPasskeyError] = useState(null)
+  const [passkeyListError, setPasskeyListError] = useState(false)
 
   const [sex, setSex] = useState(undefined) // undefined = loading, null = unset
   const [savingSex, setSavingSex] = useState(false)
@@ -29,20 +30,32 @@ function ProfileSecurityPage({ user, onBack }) {
   const [activityLevel, setActivityLevel] = useState(undefined)
   const [savingActivity, setSavingActivity] = useState(false)
 
+  const [loadError, setLoadError] = useState(false)
+
+  // Distinguished from an empty list on purpose — "no passkeys registered"
+  // and "we couldn't check" mean very different things on a security screen.
   const loadPasskeys = () => {
+    setPasskeyListError(false)
     api('/api/passkeys')
       .then(setPasskeys)
-      .catch(() => setPasskeys([]))
+      .catch(() => setPasskeyListError(true))
+  }
+
+  const loadProfile = () => {
+    setLoadError(false)
+    api('/api/me')
+      .then((me) => {
+        setSex(me.sex ?? null)
+        setAge(me.age ?? null)
+        setAgeDraft(me.age ?? '')
+        setActivityLevel(me.activityLevel ?? null)
+      })
+      .catch(() => setLoadError(true))
   }
 
   useEffect(() => {
     loadPasskeys()
-    api('/api/me').then((me) => {
-      setSex(me.sex ?? null)
-      setAge(me.age ?? null)
-      setAgeDraft(me.age ?? '')
-      setActivityLevel(me.activityLevel ?? null)
-    })
+    loadProfile()
   }, [])
 
   const handleSaveSex = async (value) => {
@@ -125,6 +138,15 @@ function ProfileSecurityPage({ user, onBack }) {
           depends on it.
         </p>
 
+        {loadError && (
+          <p className="mt-2 text-xs text-red-400">
+            Could not load your profile details —{' '}
+            <button type="button" onClick={loadProfile} className="underline hover:no-underline">
+              retry
+            </button>
+          </p>
+        )}
+
         <div className="mt-3 flex items-center gap-2">
           <span className="text-xs text-third/60">Sex</span>
           {['male', 'female'].map((value) => (
@@ -189,7 +211,17 @@ function ProfileSecurityPage({ user, onBack }) {
         </p>
 
         <ul className="mt-4 flex flex-col gap-2">
-          {passkeys === null && <li className="text-xs text-third/60">Loading…</li>}
+          {passkeys === null && !passkeyListError && (
+            <li className="text-xs text-third/60">Loading…</li>
+          )}
+          {passkeyListError && (
+            <li className="text-xs text-red-400">
+              Could not load your passkeys —{' '}
+              <button type="button" onClick={loadPasskeys} className="underline hover:no-underline">
+                retry
+              </button>
+            </li>
+          )}
           {passkeys?.length === 0 && (
             <li className="text-xs text-third/60">No passkeys registered yet.</li>
           )}

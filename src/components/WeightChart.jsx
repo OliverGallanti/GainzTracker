@@ -47,15 +47,19 @@ function WeightChart() {
   const [savingGoals, setSavingGoals] = useState(false)
   const [goalsError, setGoalsError] = useState(null)
 
-  const load = () => {
-    api('/api/weights').then((data) => {
+  const [loadError, setLoadError] = useState(false)
+
+  const load = async () => {
+    setLoadError(false)
+    try {
+      const [data, me] = await Promise.all([api('/api/weights'), api('/api/me')])
       setEntries([...data].sort((a, b) => new Date(a.loggedAt) - new Date(b.loggedAt)))
-    })
-    api('/api/me').then((me) => {
       setHeight(me.heightCm)
       setWeightGoal(me.weightGoalKg)
       setBodyFatGoal(me.bodyFatGoalPercent)
-    })
+    } catch {
+      setLoadError(true)
+    }
   }
 
   useEffect(() => {
@@ -184,7 +188,16 @@ function WeightChart() {
         )}
       </div>
 
-      {isLoading && <p className="text-xs text-third/60">Loading…</p>}
+      {isLoading && !loadError && <p className="text-xs text-third/60">Loading…</p>}
+
+      {loadError && (
+        <p className="text-xs text-red-400">
+          Could not load your weight data —{' '}
+          <button type="button" onClick={load} className="underline hover:no-underline">
+            retry
+          </button>
+        </p>
+      )}
 
       {!isLoading && mode === 'view' && (
         <div className="mb-4 flex flex-col gap-1 text-xs">
