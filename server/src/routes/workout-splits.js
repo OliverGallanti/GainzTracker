@@ -7,15 +7,23 @@ const createSplitSchema = z.object({
   days: z.array(z.string().min(1)).min(1),
 })
 
+// `dayIndex` is the user's pick from the split's days, in any order — there is
+// no forced rotation. `dayStart`/`dayEnd` bound the local calendar day being
+// logged (the client knows its own timezone); `loggedAt` places the log inside
+// it, so past days can be filled in.
 const createLogSchema = z.object({
   completed: z.boolean(),
+  dayIndex: z.number().int().min(0),
   dayStart: z.coerce.date(),
   dayEnd: z.coerce.date(),
+  loggedAt: z.coerce.date(),
 })
 
 const updateLogSchema = z
   .object({
     durationMinutes: z.number().int().positive().optional(),
+    completed: z.boolean().optional(),
+    dayIndex: z.number().int().min(0).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'No fields to update' })
 
@@ -85,19 +93,21 @@ export default async function workoutSplitRoutes(app) {
       return reply.notFound()
     }
 
-    const { completed, dayStart, dayEnd } = parsed.data
+    const { completed, dayIndex, dayStart, dayEnd, loggedAt } = parsed.data
 
-    const alreadyLoggedToday = await prisma.splitLog.count({
-      where: { splitId: split.id, loggedAt: { gte: dayStart, lt: dayEnd } },
-    })
-    if (alreadyLoggedToday > 0) {
-      return reply.conflict('Already logged a session for today')
+    if (dayIndex >= split.days.length) {
+      return reply.badRequest('dayIndex is not a day of this split')
+    }
+    if (loggedAt < dayStart || loggedAt >= dayEnd) {
+      return reply.badRequest('loggedAt must fall within the day being logged')
     }
 
-    const existingLogCount = await prisma.splitLog.count({
-      where: { splitId: split.id },
+    const alreadyLogged = await prisma.splitLog.count({
+      where: { splitId: split.id, loggedAt: { gte: dayStart, lt: dayEnd } },
     })
-    const dayIndex = existingLogCount % split.days.length
+    if (alreadyLogged > 0) {
+      return reply.conflict('Already logged a session for that day')
+    }
 
     const log = await prisma.splitLog.create({
       data: {
@@ -105,6 +115,7 @@ export default async function workoutSplitRoutes(app) {
         splitId: split.id,
         dayIndex,
         completed,
+        loggedAt,
       },
     })
     return reply.code(201).send(log)
@@ -114,6 +125,19 @@ export default async function workoutSplitRoutes(app) {
     const parsed = updateLogSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.badRequest(parsed.error.message)
+    }
+
+    if (parsed.data.dayIndex !== undefined) {
+      const split = await prisma.workoutSplit.findFirst({
+        where: { id: request.params.id, userId: request.session.userId },
+        select: { days: true },
+      })
+      if (!split) {
+        return reply.notFound()
+      }
+      if (parsed.data.dayIndex >= split.days.length) {
+        return reply.badRequest('dayIndex is not a day of this split')
+      }
     }
 
     const { count } = await prisma.splitLog.updateMany({

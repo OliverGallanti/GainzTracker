@@ -26,7 +26,7 @@ function BigFourCard() {
   // selection every time the user logs a lift or edits a goal.
   const [selectedLift, setSelectedLift] = useState(BIG_FOUR_LIFTS[0])
   const [showStandards, setShowStandards] = useState(true)
-  const [logsExpanded, setLogsExpanded] = useState(false)
+  const [logsExpanded, setLogsExpanded] = useState(true) // the side panel has room; the list scrolls
 
   const lifts = useLoad(() => api('/api/workout-sets'))
   const goalsResource = useLoad(() => api('/api/lift-goals')) // { [liftName]: kg }
@@ -76,7 +76,7 @@ function BigFourCard() {
   const loggedEntries = sets?.filter((s) => BIG_FOUR_LIFTS.includes(s.exerciseName)) ?? []
 
   return (
-    <div className="w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+    <div className="glow-card col-span-full w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <h2 className="text-sm font-semibold text-third">Big 4</h2>
@@ -120,22 +120,31 @@ function BigFourCard() {
 
       {!isLoading && mode === 'view' && (
         <>
-          <ol className="flex flex-col gap-2">
+          {/* The ranking doubles as the lift picker for the chart below. */}
+          <ol className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {ranked.map(({ name, entry, tier }, i) => (
-              <li
-                key={name}
-                className="flex items-center justify-between rounded-lg border border-secondary/25 px-3 py-2 text-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`text-xs font-semibold ${entry ? 'text-third' : 'text-third/40'}`}>
-                    {entry ? `#${i + 1}` : '—'}
+              <li key={name} className="flex">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLift(name)}
+                  aria-pressed={selectedLift === name}
+                  className={`flex w-full flex-col gap-1 rounded-xl border px-4 py-3 text-left transition ${
+                    selectedLift === name
+                      ? 'border-third/70 bg-third/10'
+                      : 'border-secondary/25 hover:border-secondary'
+                  }`}
+                >
+                  <span className="flex items-center justify-between text-xs">
+                    <span className={`font-semibold ${entry ? 'text-third' : 'text-third/40'}`}>
+                      {entry ? `#${i + 1}` : '—'}
+                    </span>
+                    {tier && <span title={tier.label}>{tier.icon}</span>}
                   </span>
-                  <span className={entry ? 'text-third' : 'text-third/60'}>{name}</span>
-                  {tier && <span title={tier.label}>{tier.icon}</span>}
-                </div>
-                <span className={entry ? 'font-medium text-third' : 'text-xs text-third/60'}>
-                  {entry ? `${entry.weightKg}kg${entry.reps ? ` × ${entry.reps}` : ''}` : 'Not logged yet'}
-                </span>
+                  <span className={`text-sm ${entry ? 'text-third' : 'text-third/60'}`}>{name}</span>
+                  <span className={entry ? 'text-lg font-semibold text-third' : 'text-xs text-third/60'}>
+                    {entry ? `${entry.weightKg}kg${entry.reps ? ` × ${entry.reps}` : ''}` : 'Not logged yet'}
+                  </span>
+                </button>
               </li>
             ))}
           </ol>
@@ -146,24 +155,27 @@ function BigFourCard() {
             </p>
           )}
 
-          <BigFourProgress
-            sets={sets}
-            goals={goals}
-            bodyweight={bodyweight}
-            sex={sex}
-            selectedLift={selectedLift}
-            onSelectLift={setSelectedLift}
-            showStandards={showStandards}
-            onShowStandardsChange={setShowStandards}
-            onEditGoals={() => setMode('editGoals')}
-          />
+          <div className="mt-5 grid gap-x-8 gap-y-5 border-t border-secondary/25 pt-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <BigFourProgress
+                sets={sets}
+                goals={goals}
+                bodyweight={bodyweight}
+                sex={sex}
+                selectedLift={selectedLift}
+                showStandards={showStandards}
+                onShowStandardsChange={setShowStandards}
+                onEditGoals={() => setMode('editGoals')}
+              />
+            </div>
 
-          <BigFourLogList
-            entries={loggedEntries}
-            expanded={logsExpanded}
-            onToggle={() => setLogsExpanded((v) => !v)}
-            onRemove={handleRemove}
-          />
+            <BigFourLogList
+              entries={loggedEntries}
+              expanded={logsExpanded}
+              onToggle={() => setLogsExpanded((v) => !v)}
+              onRemove={handleRemove}
+            />
+          </div>
         </>
       )}
 

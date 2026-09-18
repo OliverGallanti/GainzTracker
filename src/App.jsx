@@ -25,6 +25,19 @@ function App() {
     checkAuth()
   }, [checkAuth])
 
+  // Feeds the cursor position, relative to each card, to the .glow-card CSS.
+  useEffect(() => {
+    const onMove = (e) => {
+      for (const card of document.querySelectorAll('.glow-card')) {
+        const rect = card.getBoundingClientRect()
+        card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`)
+        card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`)
+      }
+    }
+    document.addEventListener('mousemove', onMove)
+    return () => document.removeEventListener('mousemove', onMove)
+  }, [])
+
   return (
     <div className="app-background min-h-dvh">
       {authStatus === 'authed' && (

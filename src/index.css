@@ -4,7 +4,7 @@
   --color-main: #053345;
   --color-secondary: #808f85;
   --color-third: #dce0d9;
-  --color-card: #16495d;
+  --color-card: #03161f;
 }
 
 @layer base {
@@ -17,16 +17,56 @@
   }
 }
 
-/* Shared app background: a faint wireframe grid over a soft radial highlight,
-   masked so both fade out toward the viewport edges instead of cutting off
-   with a hard border. Plain CSS (not @apply) because mask-image needs
-   multi-stop gradients Tailwind's utilities don't express. */
+/* Cursor glow on cards. ::after is a radial highlight masked down to the 1px
+   border ring, so it only lights the edges (and nearby cards' edges too, since
+   it follows the cursor everywhere). ::before is a faint spotlight over the
+   card body, shown only on the hovered card. --mouse-x/y are set in App.jsx. */
+.glow-card {
+  position: relative;
+}
+
+.glow-card::before,
+.glow-card::after {
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 300ms;
+}
+
+.glow-card::before {
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(
+    600px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
+    rgba(255, 255, 255, 0.06),
+    transparent 40%
+  );
+}
+
+.glow-card:hover::before {
+  opacity: 1;
+}
+
+.glow-card::after {
+  inset: -1px; /* cover the border box */
+  padding: 1px; /* ring thickness */
+  background: radial-gradient(
+    500px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
+    rgba(220, 224, 217, 0.6),
+    transparent 40%
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+}
+
+/* Shared app background: the brand teal (--color-main) as the midpoint of a
+   diagonal gradient, lighter top-left to darker bottom-right. Fixed so it
+   spans the viewport rather than stretching over a tall page. */
 .app-background {
-  background-image:
-    linear-gradient(rgba(220, 224, 217, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(220, 224, 217, 0.07) 1px, transparent 1px),
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(128, 143, 133, 0.25), transparent 70%);
-  background-size: 40px 40px, 40px 40px, 100% 100%;
-  mask-image: radial-gradient(ellipse 100% 80% at 50% 35%, black 25%, transparent 85%);
-  -webkit-mask-image: radial-gradient(ellipse 100% 80% at 50% 35%, black 25%, transparent 85%);
+  background-image: linear-gradient(135deg, #0b5d7a 0%, var(--color-main) 45%, #04293a 100%);
+  background-attachment: fixed;
 }

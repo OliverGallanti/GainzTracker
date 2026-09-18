@@ -79,7 +79,7 @@ function ProfileSecurityPage({ user, onBack }) {
         ← Back to dashboard
       </button>
 
-      <div className="rounded-2xl border border-secondary/40 bg-card/90 p-6 text-center shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+      <div className="glow-card rounded-2xl border border-secondary/40 bg-card/90 p-6 text-center shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
         {user.avatarUrl && (
           <img
             src={user.avatarUrl}
@@ -91,7 +91,7 @@ function ProfileSecurityPage({ user, onBack }) {
         <p className="mt-1 text-sm text-third/60">{user.email}</p>
       </div>
 
-      <div className="rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+      <div className="glow-card rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
         <h2 className="text-sm font-semibold text-third">Profile details</h2>
         <p className="mt-1 text-xs text-third/60">
           Optional - powers the Big 4 strength-level rating and the TDEE calorie estimate, nothing else
@@ -168,7 +168,7 @@ function ProfileSecurityPage({ user, onBack }) {
         )}
       </div>
 
-      <div className="rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+      <div className="glow-card rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
         <h2 className="text-sm font-semibold text-third">Passkeys</h2>
         <p className="mt-1 text-xs text-third/60">
           Sign in without Google using your device's fingerprint, face, or PIN.

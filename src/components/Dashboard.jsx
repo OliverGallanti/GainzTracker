@@ -3,14 +3,12 @@ import { api } from '../lib/api'
 import { useMe } from '../lib/sharedData'
 import MacroStatsCard from './MacroStatsCard'
 import WeightChart from './WeightChart'
-import RoutineCard from './RoutineCard'
 import TrainingLogCard from './TrainingLogCard'
 import BigFourCard from './BigFourCard'
 import ProfileSecurityPage from './ProfileSecurityPage'
 import SharedDataProvider from './SharedDataProvider'
 
 function DashboardShell({ user, onLogout }) {
-  const [splitVersion, setSplitVersion] = useState(0)
   const [view, setView] = useState('dashboard') // 'dashboard' | 'profile'
   const me = useMe()
 
@@ -44,11 +42,11 @@ function DashboardShell({ user, onLogout }) {
         {view === 'profile' ? (
           <ProfileSecurityPage user={user} onBack={() => setView('dashboard')} />
         ) : (
-          <div className="grid w-full max-w-sm grid-cols-1 gap-6 text-left sm:max-w-md md:max-w-2xl lg:max-w-5xl lg:grid-cols-2">
+          <div className="grid w-full max-w-sm grid-cols-1 gap-6 text-left sm:max-w-md md:max-w-3xl md:grid-cols-2 xl:max-w-7xl xl:grid-cols-3">
             <button
               type="button"
               onClick={() => setView('profile')}
-              className="relative flex items-center justify-between gap-3 rounded-2xl border border-secondary/40 bg-card/90 p-4 text-left shadow-2xl shadow-black/40 backdrop-blur transition hover:border-secondary lg:col-span-2"
+              className="glow-card relative flex items-center justify-between gap-3 rounded-2xl border border-secondary/40 bg-card/90 p-4 text-left shadow-2xl shadow-black/40 backdrop-blur transition hover:border-secondary col-span-full"
             >
               {profileIncomplete && (
                 <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5" title="Your profile isn't complete yet">
@@ -74,8 +72,7 @@ function DashboardShell({ user, onLogout }) {
 
             <MacroStatsCard />
             <WeightChart />
-            <RoutineCard onSplitChanged={() => setSplitVersion((v) => v + 1)} />
-            <TrainingLogCard refreshKey={splitVersion} />
+            <TrainingLogCard />
             <BigFourCard />
           </div>
         )}

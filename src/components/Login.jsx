@@ -26,7 +26,7 @@ function Login({ onAuthenticated }) {
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12 sm:px-6">
-      <div className="w-full max-w-sm rounded-2xl border border-secondary/40 bg-card/90 p-6 shadow-2xl shadow-black/40 backdrop-blur sm:max-w-md sm:p-8">
+      <div className="glow-card w-full max-w-sm rounded-2xl border border-secondary/40 bg-card/90 p-6 shadow-2xl shadow-black/40 backdrop-blur sm:max-w-md sm:p-8">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold tracking-tight text-third sm:text-3xl">
             Gainz<span className="text-third/60">.Tracker</span>

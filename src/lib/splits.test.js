@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { computeAdherenceStreak, nextDayIndex } from './splits'
+import { computeAdherenceStreak, suggestedDayIndex, uniqueDays } from './splits'
 
-// The API returns logs newest-first, which is what both helpers assume.
+// The API returns logs newest-first, which is what these helpers assume.
 const log = (completed) => ({ completed })
 
 describe('computeAdherenceStreak', () => {
@@ -23,29 +23,37 @@ describe('computeAdherenceStreak', () => {
   })
 })
 
-describe('nextDayIndex', () => {
+describe('suggestedDayIndex', () => {
   const days = ['Push', 'Pull', 'Legs']
 
   it('starts at the first day when nothing is logged', () => {
-    expect(nextDayIndex(days, [])).toBe(0)
+    expect(suggestedDayIndex(days, [])).toBe(0)
   })
 
-  it('advances one slot per log', () => {
-    expect(nextDayIndex(days, [log(true)])).toBe(1)
-    expect(nextDayIndex(days, [log(true), log(true)])).toBe(2)
-  })
-
-  it('wraps back to the start after a full cycle', () => {
-    expect(nextDayIndex(days, [log(true), log(true), log(true)])).toBe(0)
-    expect(nextDayIndex(days, Array(7).fill(log(true)))).toBe(1)
-  })
-
-  it('advances on skipped days too, so a dreaded day cannot be dodged', () => {
-    expect(nextDayIndex(days, [log(false)])).toBe(1)
-    expect(nextDayIndex(days, [log(false), log(false)])).toBe(2)
+  it('suggests the day after the most recent log, whatever the log order was', () => {
+    expect(suggestedDayIndex(days, [{ dayIndex: 0 }])).toBe(1)
+    expect(suggestedDayIndex(days, [{ dayIndex: 2 }, { dayIndex: 0 }])).toBe(0) // wraps
+    expect(suggestedDayIndex(days, [{ dayIndex: 0 }, { dayIndex: 2 }])).toBe(1) // picked out of order
   })
 
   it('handles a single-day split', () => {
-    expect(nextDayIndex(['Full body'], [log(true), log(true)])).toBe(0)
+    expect(suggestedDayIndex(['Full body'], [{ dayIndex: 0 }])).toBe(0)
+  })
+})
+
+describe('uniqueDays', () => {
+  it('lists each label once, at its first index', () => {
+    expect(uniqueDays(['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs'])).toEqual([
+      { label: 'Push', index: 0 },
+      { label: 'Pull', index: 1 },
+      { label: 'Legs', index: 2 },
+    ])
+  })
+
+  it('keeps a split with no repeats as is', () => {
+    expect(uniqueDays(['A', 'B'])).toEqual([
+      { label: 'A', index: 0 },
+      { label: 'B', index: 1 },
+    ])
   })
 })

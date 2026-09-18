@@ -65,7 +65,7 @@ function MacroStatsCard() {
   const tdee = me.data ? computeTdee(bmr, me.data.activityLevel) : null
 
   return (
-    <div className="w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+    <div className="glow-card w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-third">Today's macros</h2>
         {mode === 'view' && (

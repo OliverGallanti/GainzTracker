@@ -10,7 +10,7 @@ function BigFourLogList({ entries, expanded, onToggle, onRemove }) {
   if (entries.length === 0) return null
 
   return (
-    <div className="mt-5 border-t border-secondary/25 pt-4">
+    <div className="lg:border-l lg:border-secondary/25 lg:pl-8">
       <button
         type="button"
         onClick={onToggle}
@@ -22,7 +22,7 @@ function BigFourLogList({ entries, expanded, onToggle, onRemove }) {
       </button>
 
       {expanded && (
-        <ul className="mt-3 flex flex-col gap-2">
+        <ul className="mt-3 flex max-h-72 flex-col gap-2 overflow-y-auto">
           {entries.map((s) => (
             <li
               key={s.id}
