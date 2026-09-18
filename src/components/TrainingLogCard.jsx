@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
 import { computeAdherenceStreak, suggestedDayIndex } from '../lib/splits'
@@ -9,18 +9,25 @@ import TrainingCalendar from './TrainingCalendar'
 import SessionEditor from './SessionEditor'
 import RoutineEditor from './RoutineEditor'
 
-function todayBounds() {
-  const dayStart = startOfLocalDay()
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
-  return { dayStart, dayEnd }
-}
-
 // Routine (which split you follow) and training log (did you follow it) live in
 // one card: the log is meaningless without the routine, and the routine alone
 // is only a name and a list of days.
 function TrainingLogCard() {
   const [editingLog, setEditingLog] = useState(null)
   const [editingRoutine, setEditingRoutine] = useState(false)
+
+  // The day the logger below acts on. null = today; the calendar sets it when a
+  // past day is picked, and a click anywhere outside this card puts it back.
+  const [selectedDate, setSelectedDate] = useState(null)
+  const cardRef = useRef(null)
+  useEffect(() => {
+    if (!selectedDate) return
+    const onOutsideClick = (e) => {
+      if (!cardRef.current?.contains(e.target)) setSelectedDate(null)
+    }
+    document.addEventListener('mousedown', onOutsideClick)
+    return () => document.removeEventListener('mousedown', onOutsideClick)
+  }, [selectedDate])
 
   // The logs depend on which split is active, so this is one dependent load.
   const { data, error: loadError, reload } = useLoad(async () => {
@@ -47,7 +54,7 @@ function TrainingLogCard() {
     mutate(async () => {
       const dayStart = startOfLocalDay(date)
       const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
-      const isToday = dayStart.getTime() === todayBounds().dayStart.getTime()
+      const isToday = date.toDateString() === new Date().toDateString()
       const noon = new Date(dayStart.getTime() + 12 * 60 * 60 * 1000)
       const created = await api(`/api/workout-splits/${split.id}/logs`, {
         method: 'POST',
@@ -89,15 +96,12 @@ function TrainingLogCard() {
   const streak = logs ? computeAdherenceStreak(logs) : 0
   const suggestedIndex = split && logs ? suggestedDayIndex(split.days, logs) : 0
 
-  const { dayStart, dayEnd } = todayBounds()
-  const loggedToday =
-    logs?.some((log) => {
-      const loggedAt = new Date(log.loggedAt)
-      return loggedAt >= dayStart && loggedAt < dayEnd
-    }) ?? false
+  const target = selectedDate ?? new Date()
+  const targetIsToday = !selectedDate
+  const targetLogged = logs?.some((log) => new Date(log.loggedAt).toDateString() === target.toDateString()) ?? false
 
   return (
-    <div className="glow-card w-full md:col-span-2 xl:col-span-1 rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+    <div ref={cardRef} className="glow-card w-full md:col-span-2 xl:col-span-1 rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-third">Training log</h2>
         {showLog && (
@@ -148,7 +152,11 @@ function TrainingLogCard() {
           </p>
 
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs text-third/60">What are you training today?</p>
+            <p className="text-xs text-third/60">
+              {targetIsToday
+                ? 'What are you training today?'
+                : `What did you train on ${target.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}?`}
+            </p>
             <div className="text-right">
               <p className="text-2xl font-bold text-third">
                 {streak}
@@ -163,13 +171,13 @@ function TrainingLogCard() {
           <DayLogForm
             days={split.days}
             suggestedIndex={suggestedIndex}
-            disabled={busy || loggedToday}
-            onLog={(dayIndex, completed) => logDay(new Date(), dayIndex, completed)}
+            disabled={busy || targetLogged}
+            onLog={(dayIndex, completed) => logDay(target, dayIndex, completed)}
           />
 
-          {loggedToday && (
+          {targetLogged && (
             <p className="mt-2 text-center text-xs text-third/60">
-              Already logged for today — pick today in the calendar below to change it.
+              Already logged for {targetIsToday ? 'today' : 'that day'} — change it in the calendar below.
             </p>
           )}
 
@@ -188,9 +196,9 @@ function TrainingLogCard() {
           <TrainingCalendar
             logs={logs}
             days={split.days}
-            suggestedIndex={suggestedIndex}
+            selectedDate={target}
+            onSelectDate={setSelectedDate}
             busy={busy}
-            onLogDay={logDay}
             onUpdate={updateLog}
             onRemove={removeLog}
             onSessionChange={reload}
