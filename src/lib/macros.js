@@ -34,13 +34,15 @@ export function groupByMeal(meals, mealNames) {
   return groups.map((g) => ({ ...g, totals: sumToday(g.entries) }))
 }
 
-// A saved food holds one serving; logging N servings multiplies it. Macros stay
-// null when the saved food never had them, and are rounded to a tenth of a gram.
+// A saved food holds one serving; logging N servings multiplies it. (A scanned
+// product is the same thing per 100 g, with grams / 100 as the multiplier.) Values
+// stay null when the food never had them, and are rounded: calories to whole,
+// macros to a tenth of a gram.
 const round1 = (n) => Math.round(n * 10) / 10
 export function scaleFood(food, servings) {
   const scale = (value) => (value == null ? null : round1(value * servings))
   return {
-    calories: Math.round(food.calories * servings),
+    calories: food.calories == null ? null : Math.round(food.calories * servings),
     proteinG: scale(food.proteinG),
     fatG: scale(food.fatG),
     carbsG: scale(food.carbsG),

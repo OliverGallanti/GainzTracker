@@ -15,6 +15,7 @@ import macroGoalRoutes from './routes/macro-goal.js'
 import workoutSplitRoutes from './routes/workout-splits.js'
 import liftGoalRoutes from './routes/lift-goals.js'
 import savedFoodRoutes from './routes/saved-foods.js'
+import productRoutes from './routes/products.js'
 
 export function buildApp() {
   // Behind a TLS-terminating proxy, request.protocol reads as http unless the
@@ -38,6 +39,7 @@ export function buildApp() {
   app.register(workoutSplitRoutes, { prefix: '/api' })
   app.register(liftGoalRoutes, { prefix: '/api' })
   app.register(savedFoodRoutes, { prefix: '/api' })
+  app.register(productRoutes, { prefix: '/api' })
 
   return app
 }

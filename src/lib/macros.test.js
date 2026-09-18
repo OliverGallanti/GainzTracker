@@ -88,4 +88,13 @@ describe('scaleFood', () => {
   it('keeps a macro the food never had as null, not 0', () => {
     expect(scaleFood(chili, 3).carbsG).toBeNull()
   })
+
+  it('keeps missing calories null too, as a product with no energy listed has', () => {
+    expect(scaleFood({ calories: null, proteinG: 10, fatG: null, carbsG: null }, 2).calories).toBeNull()
+  })
+
+  it('scales a per-100g product to the grams eaten', () => {
+    const per100g = { calories: 539, proteinG: 6.3, fatG: 30.9, carbsG: 57.5 }
+    expect(scaleFood(per100g, 15 / 100)).toEqual({ calories: 81, proteinG: 0.9, fatG: 4.6, carbsG: 8.6 })
+  })
 })

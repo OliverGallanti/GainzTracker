@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../lib/api'
 import { scaleFood } from '../lib/macros'
 import { useSubmit } from '../lib/useSubmit'
+import ProductLookup from './ProductLookup'
 
 const emptyForm = { description: '', calories: '', proteinG: '', fatG: '', carbsG: '' }
 const FIELD_LABELS = { proteinG: 'Protein (g)', fatG: 'Fat (g)', carbsG: 'Carbs (g)' }
@@ -9,34 +10,55 @@ const inputClass =
   'rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary'
 
 // `savedFoods` are one-serving foods the user kept for reuse: picking one fills
-// the form (times the servings), which can still be edited before adding.
+// the form (times the servings), which can still be edited before adding. A
+// scanned product works the same way, scaled by the grams eaten instead.
 function MealForm({ mealNames, defaultMeal, savedFoods, onSaved, onCancel, onSavedFoodsChanged }) {
   const [form, setForm] = useState(emptyForm)
   const [mealName, setMealName] = useState(defaultMeal ?? '') // '' = no slot ("Other")
   const [picked, setPicked] = useState(null) // the saved food the form was filled from
   const [servings, setServings] = useState('1')
+  const [product, setProduct] = useState(null) // the scanned product the form was filled from
+  const [grams, setGrams] = useState('')
   const [saveForLater, setSaveForLater] = useState(false)
 
-  const fillFrom = (food, count) => {
+  // Missing values (a food that never had a macro, a product with no energy listed)
+  // leave that field empty rather than writing a 0 nobody measured.
+  const fillFrom = (name, food, count) => {
     const scaled = scaleFood(food, count)
+    const text = (value) => (value == null ? '' : String(value))
     setForm({
-      description: food.name,
-      calories: String(scaled.calories),
-      proteinG: scaled.proteinG == null ? '' : String(scaled.proteinG),
-      fatG: scaled.fatG == null ? '' : String(scaled.fatG),
-      carbsG: scaled.carbsG == null ? '' : String(scaled.carbsG),
+      description: name,
+      calories: text(scaled.calories),
+      proteinG: text(scaled.proteinG),
+      fatG: text(scaled.fatG),
+      carbsG: text(scaled.carbsG),
     })
   }
 
   const pickFood = (food) => {
     setPicked(food)
+    setProduct(null)
     setServings('1')
-    fillFrom(food, 1)
+    fillFrom(food.name, food, 1)
+  }
+
+  // Start from the label's serving size when it has one, otherwise 100 g.
+  const pickProduct = (found) => {
+    const start = found.servingG ?? 100
+    setProduct(found)
+    setPicked(null)
+    setGrams(String(start))
+    fillFrom(found.name, found.per100g, start / 100)
+  }
+
+  const changeGrams = (value) => {
+    setGrams(value)
+    if (product && Number(value) > 0) fillFrom(product.name, product.per100g, Number(value) / 100)
   }
 
   const changeServings = (value) => {
     setServings(value)
-    if (picked && Number(value) > 0) fillFrom(picked, Number(value))
+    if (picked && Number(value) > 0) fillFrom(picked.name, picked, Number(value))
   }
 
   const macros = () => ({
@@ -49,7 +71,7 @@ function MealForm({ mealNames, defaultMeal, savedFoods, onSaved, onCancel, onSav
   const { submit, saving, error } = useSubmit(async () => {
     // Saved first: it's an idempotent upsert, so if logging the meal then fails
     // and the user retries, nothing ends up duplicated.
-    if (saveForLater && !picked) {
+    if (saveForLater && !picked) { // a saved food is already saved
       await api('/api/saved-foods', {
         method: 'POST',
         body: JSON.stringify({ name: form.description.trim(), ...macros() }),
@@ -109,6 +131,8 @@ function MealForm({ mealNames, defaultMeal, savedFoods, onSaved, onCancel, onSav
         </div>
       )}
 
+      <ProductLookup onFound={pickProduct} />
+
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-third">Meal</span>
         <select value={mealName} onChange={(e) => setMealName(e.target.value)} className={inputClass}>
@@ -132,6 +156,38 @@ function MealForm({ mealNames, defaultMeal, savedFoods, onSaved, onCancel, onSav
           className={inputClass}
         />
       </label>
+
+      {product && (
+        <div className="flex flex-col gap-1">
+          <label className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-third">
+              Amount eaten (g)
+              {product.brand && <span className="text-third/60"> · {product.brand}</span>}
+            </span>
+            <input
+              type="number"
+              min="1"
+              step="any"
+              value={grams}
+              onChange={(e) => changeGrams(e.target.value)}
+              className={`w-20 text-right ${inputClass}`}
+            />
+          </label>
+          <p className="text-xs text-third/60">
+            {product.servingSize ? `Label serving: ${product.servingSize}. ` : ''}
+            Values from{' '}
+            <a
+              href={`https://world.openfoodfacts.org/product/${product.barcode}`}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary"
+            >
+              Open Food Facts
+            </a>
+            , which is community-edited — check them against the pack.
+          </p>
+        </div>
+      )}
 
       {picked && (
         <label className="flex items-center justify-between gap-3 text-sm">
