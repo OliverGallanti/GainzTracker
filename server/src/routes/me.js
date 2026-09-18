@@ -10,6 +10,11 @@ const userSelect = {
   heightCm: true,
   weightGoalKg: true,
   bodyFatGoalPercent: true,
+  sex: true,
+  deadliftGoalKg: true,
+  squatGoalKg: true,
+  benchPressGoalKg: true,
+  overheadPressGoalKg: true,
 }
 
 // A general profile-update endpoint: every field is optional and only the
@@ -20,6 +25,11 @@ const updateSchema = z
     heightCm: z.number().positive().optional(),
     weightGoalKg: z.number().positive().optional(),
     bodyFatGoalPercent: z.number().min(0).max(100).optional(),
+    sex: z.enum(['male', 'female']).optional(),
+    deadliftGoalKg: z.number().positive().optional(),
+    squatGoalKg: z.number().positive().optional(),
+    benchPressGoalKg: z.number().positive().optional(),
+    overheadPressGoalKg: z.number().positive().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'No fields to update' })
 

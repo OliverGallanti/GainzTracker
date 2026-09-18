@@ -1,27 +1,6 @@
 import { useEffect, useState } from 'react'
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import { api } from '../lib/api'
-
-// Chart chrome mapped to the app's theme tokens (index.css) rather than
-// Recharts' bright defaults — a single series needs no legend (the card title
-// already says what's plotted), so the only color decision is the line itself
-// (third, the app's primary-ink accent) against recessive gridlines. Resolved
-// to plain hex (not CSS var references) since Recharts renders these as SVG
-// attributes, which don't resolve var() the way DOM/CSS properties do.
-const GRID_COLOR = '#244a55' // secondary blended ~25% into main — matches border-secondary/25
-const AXIS_COLOR = '#869b9e' // third blended ~60% into main — matches text-third/60
-const LINE_COLOR = '#dce0d9' // third
-const TOOLTIP_BG = '#16495d' // card, solid (not the card's translucent bg)
-const TOOLTIP_BORDER = '#40656d' // secondary blended ~40% into card — matches border-secondary/40
+import { StatLineChart } from './StatLineChart'
 
 const CHART_MODES = [
   { key: 'weight', label: 'Weight' },
@@ -29,100 +8,22 @@ const CHART_MODES = [
   { key: 'both', label: 'Both' },
 ]
 
+const RANGE_OPTIONS = [
+  { key: 'month', label: '1M', days: 30 },
+  { key: '3m', label: '3M', days: 90 },
+  { key: '6m', label: '6M', days: 182 },
+  { key: '1y', label: '1Y', days: 365 },
+  { key: 'all', label: 'All', days: null },
+]
+
 const emptyWeightForm = { weightKg: '', bodyFatPercent: '' }
 const emptyHeightForm = { heightCm: '' }
 const emptyGoalsForm = { weightGoalKg: '', bodyFatGoalPercent: '' }
-
-function formatDateTick(iso) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
 
 function computeBmi(weightKg, heightCm) {
   if (!weightKg || !heightCm) return null
   const heightM = heightCm / 100
   return weightKg / (heightM * heightM)
-}
-
-function TooltipContent({ active, payload, label, unit = 'kg', decimals = 1 }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div
-      className="rounded-lg border px-3 py-2 text-xs shadow-lg"
-      style={{ backgroundColor: TOOLTIP_BG, borderColor: TOOLTIP_BORDER }}
-    >
-      <p className="text-third/60">{formatDateTick(label)}</p>
-      <p className="font-semibold text-third">
-        {payload[0].value.toFixed(decimals)} {unit}
-      </p>
-    </div>
-  )
-}
-
-// Weight and body fat are plotted as two separate charts, never one chart
-// with two y-axes — a dual-axis chart with different units/scales misstates
-// how the two series relate, so "Both" mode stacks two independent panels
-// instead (each still just one series, one axis). They stay comparable "at a
-// glance" by sharing a real time-scaled x-axis (a numeric domain in ms, not
-// Recharts' default category axis, which spaces points evenly by array index
-// — that would silently misalign the two panels the moment one series has a
-// reading the other doesn't, e.g. a weigh-in with no body-fat reading).
-function BodyStatChart({ data, dataKey, unit, goal, xDomain, decimals = 1 }) {
-  // The default 'dataMin'/'dataMax' domain only looks at plotted points, so a
-  // goal reference line outside that range would render off-screen — e.g. a
-  // 75kg goal against 80-84kg of actual entries. Compute the domain from both
-  // the data AND the goal so the reference line is always on-screen.
-  const values = data.map((d) => d[dataKey]).filter((v) => v != null)
-  const allValues = goal != null ? [...values, goal] : values
-  const min = Math.min(...allValues)
-  const max = Math.max(...allValues)
-  const padding = Math.max((max - min) * 0.1, 1)
-  const yDomain = [Math.floor(min - padding), Math.ceil(max + padding)]
-
-  return (
-    <div className="h-40 sm:h-56">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid stroke={GRID_COLOR} strokeDasharray="0" vertical={false} />
-          <XAxis
-            dataKey={(d) => new Date(d.loggedAt).getTime()}
-            type="number"
-            domain={xDomain ?? ['dataMin', 'dataMax']}
-            tickFormatter={formatDateTick}
-            stroke={AXIS_COLOR}
-            tick={{ fill: AXIS_COLOR, fontSize: 11 }}
-            tickLine={false}
-            axisLine={{ stroke: GRID_COLOR }}
-            minTickGap={32}
-          />
-          <YAxis
-            stroke={AXIS_COLOR}
-            tick={{ fill: AXIS_COLOR, fontSize: 11 }}
-            tickLine={false}
-            axisLine={false}
-            width={40}
-            domain={yDomain}
-          />
-          <Tooltip content={<TooltipContent unit={unit} decimals={decimals} />} cursor={{ stroke: GRID_COLOR }} />
-          {goal != null && (
-            <ReferenceLine
-              y={goal}
-              stroke={AXIS_COLOR}
-              strokeDasharray="4 4"
-              label={{ value: 'Goal', position: 'insideTopRight', fill: AXIS_COLOR, fontSize: 10 }}
-            />
-          )}
-          <Line
-            type="monotone"
-            dataKey={dataKey}
-            stroke={LINE_COLOR}
-            strokeWidth={2}
-            dot={{ r: 4, fill: LINE_COLOR, stroke: TOOLTIP_BG, strokeWidth: 2 }}
-            activeDot={{ r: 6, fill: LINE_COLOR, stroke: TOOLTIP_BG, strokeWidth: 2 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  )
 }
 
 function WeightChart() {
@@ -132,6 +33,7 @@ function WeightChart() {
   const [bodyFatGoal, setBodyFatGoal] = useState(undefined)
   const [mode, setMode] = useState('view') // 'view' | 'logWeight' | 'editHeight' | 'editGoals'
   const [chartMode, setChartMode] = useState('weight') // 'weight' | 'bodyFat' | 'both'
+  const [range, setRange] = useState('1y')
 
   const [weightForm, setWeightForm] = useState(emptyWeightForm)
   const [savingWeight, setSavingWeight] = useState(false)
@@ -245,15 +147,25 @@ function WeightChart() {
   const bmi = latestEntry ? computeBmi(latestEntry.weightKg, height) : null
   const bodyFatEntries = entries ? entries.filter((e) => e.bodyFatPercent != null) : []
   const hasBodyFatData = bodyFatEntries.length > 0
+
+  // The range picker only zooms the charts — latest weight/BMI/goals above
+  // always reflect the full history, not whatever window is currently shown.
+  const rangeDays = RANGE_OPTIONS.find((r) => r.key === range)?.days
+  const rangeCutoff = rangeDays ? Date.now() - rangeDays * 24 * 60 * 60 * 1000 : null
+  const inRange = (e) => !rangeCutoff || new Date(e.loggedAt).getTime() >= rangeCutoff
+  const rangedEntries = entries ? entries.filter(inRange) : []
+  const rangedBodyFatEntries = bodyFatEntries.filter(inRange)
+  const rangeIsEmpty = !isEmpty && rangedEntries.length === 0
+
   // Only forced when both panels are shown together — a solo chart is free to
-  // fit its own natural range. Computed from the full entries array (weight
+  // fit its own natural range. Computed from the ranged weight entries (weight
   // is logged on every entry) so it covers both series even if body fat was
   // only measured on a subset of weigh-ins.
   const sharedXDomain =
-    chartMode === 'both' && entries?.length
+    chartMode === 'both' && rangedEntries.length
       ? [
-          new Date(entries[0].loggedAt).getTime(),
-          new Date(entries[entries.length - 1].loggedAt).getTime(),
+          new Date(rangedEntries[0].loggedAt).getTime(),
+          new Date(rangedEntries[rangedEntries.length - 1].loggedAt).getTime(),
         ]
       : undefined
 
@@ -328,40 +240,67 @@ function WeightChart() {
 
       {!isLoading && mode === 'view' && !isEmpty && (
         <div>
-          {hasBodyFatData && (
-            <div className="mb-3 flex justify-end gap-1">
-              {CHART_MODES.map((m) => (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-1">
+              {RANGE_OPTIONS.map((r) => (
                 <button
-                  key={m.key}
+                  key={r.key}
                   type="button"
-                  onClick={() => setChartMode(m.key)}
+                  onClick={() => setRange(r.key)}
                   className={`rounded-md px-2 py-1 text-xs font-medium transition ${
-                    chartMode === m.key ? 'bg-third text-main' : 'text-third/60 hover:text-third'
+                    range === r.key ? 'bg-third text-main' : 'text-third/60 hover:text-third'
                   }`}
                 >
-                  {m.label}
+                  {r.label}
                 </button>
               ))}
             </div>
-          )}
 
-          {(chartMode === 'weight' || chartMode === 'both' || !hasBodyFatData) && (
+            {hasBodyFatData && (
+              <div className="flex gap-1">
+                {CHART_MODES.map((m) => (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => setChartMode(m.key)}
+                    className={`rounded-md px-2 py-1 text-xs font-medium transition ${
+                      chartMode === m.key ? 'bg-third text-main' : 'text-third/60 hover:text-third'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {rangeIsEmpty && <p className="text-xs text-third/60">No entries in this range.</p>}
+
+          {!rangeIsEmpty && (chartMode === 'weight' || chartMode === 'both' || !hasBodyFatData) && (
             <div>
               {chartMode === 'both' && <p className="mb-1 text-xs text-third/60">Weight (kg)</p>}
-              <BodyStatChart data={entries} dataKey="weightKg" unit="kg" goal={weightGoal} xDomain={sharedXDomain} />
+              <StatLineChart
+                data={rangedEntries.map((e) => ({ loggedAt: e.loggedAt, value: e.weightKg }))}
+                unit="kg"
+                goal={weightGoal}
+                xDomain={sharedXDomain}
+              />
             </div>
           )}
 
-          {hasBodyFatData && (chartMode === 'bodyFat' || chartMode === 'both') && (
+          {!rangeIsEmpty && hasBodyFatData && (chartMode === 'bodyFat' || chartMode === 'both') && (
             <div className={chartMode === 'both' ? 'mt-5' : ''}>
               {chartMode === 'both' && <p className="mb-1 text-xs text-third/60">Body fat (%)</p>}
-              <BodyStatChart
-                data={bodyFatEntries}
-                dataKey="bodyFatPercent"
-                unit="%"
-                goal={bodyFatGoal}
-                xDomain={sharedXDomain}
-              />
+              {rangedBodyFatEntries.length === 0 ? (
+                <p className="text-xs text-third/60">No body fat entries in this range.</p>
+              ) : (
+                <StatLineChart
+                  data={rangedBodyFatEntries.map((e) => ({ loggedAt: e.loggedAt, value: e.bodyFatPercent }))}
+                  unit="%"
+                  goal={bodyFatGoal}
+                  xDomain={sharedXDomain}
+                />
+              )}
             </div>
           )}
         </div>
