@@ -17,3 +17,32 @@ export function sumToday(meals) {
 export function formatMacro(value, unit) {
   return value == null ? null : `${Math.round(value)}${unit}`
 }
+
+export const OTHER_MEAL = 'Other'
+
+// Today's meals grouped under the user's meal slots, in slot order, each with its
+// own totals. An empty slot is kept (so it can offer "add"); "Other" collects
+// meals with no slot or a slot since renamed away, and only exists if non-empty.
+export function groupByMeal(meals, mealNames) {
+  const groups = mealNames.map((name) => ({ name, entries: [] }))
+  const other = { name: OTHER_MEAL, entries: [] }
+  for (const meal of meals) {
+    const group = groups.find((g) => g.name === meal.mealName)
+    ;(group ?? other).entries.push(meal)
+  }
+  if (other.entries.length) groups.push(other)
+  return groups.map((g) => ({ ...g, totals: sumToday(g.entries) }))
+}
+
+// A saved food holds one serving; logging N servings multiplies it. Macros stay
+// null when the saved food never had them, and are rounded to a tenth of a gram.
+const round1 = (n) => Math.round(n * 10) / 10
+export function scaleFood(food, servings) {
+  const scale = (value) => (value == null ? null : round1(value * servings))
+  return {
+    calories: Math.round(food.calories * servings),
+    proteinG: scale(food.proteinG),
+    fatG: scale(food.fatG),
+    carbsG: scale(food.carbsG),
+  }
+}

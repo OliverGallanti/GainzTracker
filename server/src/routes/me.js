@@ -13,6 +13,7 @@ const userSelect = {
   sex: true,
   age: true,
   activityLevel: true,
+  mealNames: true,
 }
 
 // Must match the keys in src/lib/tdee.js's ACTIVITY_LEVELS on the client.
@@ -29,6 +30,14 @@ const updateSchema = z
     sex: z.enum(['male', 'female']).optional(),
     age: z.number().int().positive().max(120).optional(),
     activityLevel: z.enum(ACTIVITY_LEVEL_KEYS).optional(),
+    // The whole ordered list replaces the old one. Names are matched by
+    // MacroEntry.mealName, so they must be unique within the list.
+    mealNames: z
+      .array(z.string().trim().min(1).max(30))
+      .min(1)
+      .max(8)
+      .refine((names) => new Set(names).size === names.length, { message: 'Meal names must be unique' })
+      .optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'No fields to update' })
 

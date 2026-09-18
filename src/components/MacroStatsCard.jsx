@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
 import { computeBmr, computeTdee } from '../lib/tdee'
-import { formatMacro, sumToday } from '../lib/macros'
+import { OTHER_MEAL, groupByMeal, sumToday } from '../lib/macros'
 import { useMe, useWeights } from '../lib/sharedData'
 import { useLoad } from '../lib/useLoad'
 import LifeBar from './LifeBar'
 import MacroTargetsForm from './MacroTargetsForm'
 import MealForm from './MealForm'
+import MealList from './MealList'
+import MealSlotsForm from './MealSlotsForm'
 
 const UNITS = [
   { key: 'g', label: 'g' },
@@ -16,17 +18,19 @@ const UNITS = [
 ]
 
 function MacroStatsCard() {
-  const [mode, setMode] = useState('view') // 'view' | 'editTargets' | 'logFood'
+  const [mode, setMode] = useState('view') // 'view' | 'editTargets' | 'logFood' | 'editMeals'
+  const [logMeal, setLogMeal] = useState(undefined) // the meal slot the food form opens on
   const [unit, setUnit] = useState('g') // 'g' | 'cal' | 'percent' — display only, never affects fill
 
-  // The card's own data: the macro target and today's meals.
+  // The card's own data: the macro target, today's meals, and saved foods.
   const own = useLoad(async () => {
     const since = startOfLocalDay().toISOString()
-    const [goal, meals] = await Promise.all([
+    const [goal, meals, savedFoods] = await Promise.all([
       api('/api/macro-goal'),
       api(`/api/meals?since=${encodeURIComponent(since)}`),
+      api('/api/saved-foods'),
     ])
-    return { goal, meals }
+    return { goal, meals, savedFoods }
   })
 
   // Only read for the TDEE calculator inside the targets form.
@@ -35,6 +39,7 @@ function MacroStatsCard() {
 
   const goal = own.data?.goal // null = no target set yet
   const meals = own.data?.meals
+  const mealNames = me.data?.mealNames ?? []
 
   // All four were fetched together before, so loading/error stay all-or-nothing.
   const isLoading = own.data === undefined || me.data === undefined || weights.data === undefined
@@ -50,12 +55,27 @@ function MacroStatsCard() {
     own.reload()
   }
 
+  const handleMealsSaved = () => {
+    setMode('view')
+    me.reload()
+    own.reload() // foods under a renamed or removed meal regroup
+  }
+
+  const openLogFood = (mealName) => {
+    setLogMeal(mealName)
+    setMode('logFood')
+  }
+
   const handleRemoveMeal = async (id) => {
     await api(`/api/meals/${id}`, { method: 'DELETE' })
     own.reload()
   }
 
   const todayTotals = meals ? sumToday(meals) : null
+  const groups = meals ? groupByMeal(meals, mealNames) : []
+  // "Log food" opens on the first meal with nothing in it yet — usually the next one to eat.
+  const nextMeal =
+    groups.find((g) => g.entries.length === 0 && g.name !== OTHER_MEAL)?.name ?? mealNames[0]
 
   // Already sorted loggedAt desc by the API, so [0] is the latest weigh-in.
   const bodyweight = weights.data?.length ? weights.data[0].weightKg : null
@@ -72,10 +92,17 @@ function MacroStatsCard() {
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setMode('logFood')}
+              onClick={() => openLogFood(nextMeal)}
               className="text-xs font-medium text-third/60 transition hover:text-third"
             >
               Log food
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('editMeals')}
+              className="text-xs font-medium text-third/60 transition hover:text-third"
+            >
+              Meals
             </button>
             {goal && (
               <button
@@ -164,37 +191,10 @@ function MacroStatsCard() {
         </div>
       )}
 
-      {!isLoading && mode === 'view' && meals.length > 0 && (
-        <ul className={`flex flex-col gap-2 ${goal ? 'mt-5' : ''}`}>
-          {meals.map((meal) => {
-            const macros = [
-              formatMacro(meal.proteinG, 'g P'),
-              formatMacro(meal.fatG, 'g F'),
-              formatMacro(meal.carbsG, 'g C'),
-            ].filter(Boolean)
-
-            return (
-              <li
-                key={meal.id}
-                className="flex items-center justify-between rounded-lg border border-secondary/25 px-3 py-2 text-sm"
-              >
-                <div>
-                  <p className="text-third">{meal.description}</p>
-                  <p className="text-xs text-third/60">
-                    {meal.calories} cal{macros.length > 0 ? ` · ${macros.join(' · ')}` : ''}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveMeal(meal.id)}
-                  className="text-xs font-medium text-third/60 transition hover:text-red-400"
-                >
-                  Remove
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+      {!isLoading && mode === 'view' && (
+        <div className={goal ? 'mt-5' : ''}>
+          <MealList groups={groups} onAdd={openLogFood} onRemove={handleRemoveMeal} />
+        </div>
       )}
 
       {mode === 'editTargets' && (
@@ -206,7 +206,20 @@ function MacroStatsCard() {
         />
       )}
 
-      {mode === 'logFood' && <MealForm onSaved={handleSaved} onCancel={() => setMode('view')} />}
+      {mode === 'logFood' && (
+        <MealForm
+          mealNames={mealNames}
+          defaultMeal={logMeal}
+          savedFoods={own.data.savedFoods}
+          onSaved={handleSaved}
+          onSavedFoodsChanged={own.reload}
+          onCancel={() => setMode('view')}
+        />
+      )}
+
+      {mode === 'editMeals' && (
+        <MealSlotsForm mealNames={mealNames} onSaved={handleMealsSaved} onCancel={() => setMode('view')} />
+      )}
     </div>
   )
 }

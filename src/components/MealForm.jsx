@@ -1,29 +1,126 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { scaleFood } from '../lib/macros'
 import { useSubmit } from '../lib/useSubmit'
 
 const emptyForm = { description: '', calories: '', proteinG: '', fatG: '', carbsG: '' }
 const FIELD_LABELS = { proteinG: 'Protein (g)', fatG: 'Fat (g)', carbsG: 'Carbs (g)' }
+const inputClass =
+  'rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary'
 
-function MealForm({ onSaved, onCancel }) {
+// `savedFoods` are one-serving foods the user kept for reuse: picking one fills
+// the form (times the servings), which can still be edited before adding.
+function MealForm({ mealNames, defaultMeal, savedFoods, onSaved, onCancel, onSavedFoodsChanged }) {
   const [form, setForm] = useState(emptyForm)
+  const [mealName, setMealName] = useState(defaultMeal ?? '') // '' = no slot ("Other")
+  const [picked, setPicked] = useState(null) // the saved food the form was filled from
+  const [servings, setServings] = useState('1')
+  const [saveForLater, setSaveForLater] = useState(false)
+
+  const fillFrom = (food, count) => {
+    const scaled = scaleFood(food, count)
+    setForm({
+      description: food.name,
+      calories: String(scaled.calories),
+      proteinG: scaled.proteinG == null ? '' : String(scaled.proteinG),
+      fatG: scaled.fatG == null ? '' : String(scaled.fatG),
+      carbsG: scaled.carbsG == null ? '' : String(scaled.carbsG),
+    })
+  }
+
+  const pickFood = (food) => {
+    setPicked(food)
+    setServings('1')
+    fillFrom(food, 1)
+  }
+
+  const changeServings = (value) => {
+    setServings(value)
+    if (picked && Number(value) > 0) fillFrom(picked, Number(value))
+  }
+
+  const macros = () => ({
+    calories: Number(form.calories),
+    ...(form.proteinG ? { proteinG: Number(form.proteinG) } : {}),
+    ...(form.fatG ? { fatG: Number(form.fatG) } : {}),
+    ...(form.carbsG ? { carbsG: Number(form.carbsG) } : {}),
+  })
 
   const { submit, saving, error } = useSubmit(async () => {
+    // Saved first: it's an idempotent upsert, so if logging the meal then fails
+    // and the user retries, nothing ends up duplicated.
+    if (saveForLater && !picked) {
+      await api('/api/saved-foods', {
+        method: 'POST',
+        body: JSON.stringify({ name: form.description.trim(), ...macros() }),
+      })
+      onSavedFoodsChanged()
+    }
     await api('/api/meals', {
       method: 'POST',
       body: JSON.stringify({
         description: form.description,
-        calories: Number(form.calories),
-        ...(form.proteinG ? { proteinG: Number(form.proteinG) } : {}),
-        ...(form.fatG ? { fatG: Number(form.fatG) } : {}),
-        ...(form.carbsG ? { carbsG: Number(form.carbsG) } : {}),
+        ...macros(),
+        ...(mealName ? { mealName } : {}),
       }),
     })
     onSaved()
   }, 'Could not log that meal — please check the values and try again')
 
+  const { submit: removeSavedFood, error: removeError } = useSubmit(async (food) => {
+    await api(`/api/saved-foods/${food.id}`, { method: 'DELETE' })
+    if (picked?.id === food.id) setPicked(null)
+    onSavedFoodsChanged()
+  }, 'Could not remove that saved food — please try again')
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
+      {savedFoods.length > 0 && (
+        <div>
+          <span className="text-xs text-third/60">Saved foods</span>
+          <ul className="mt-1 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+            {savedFoods.map((food) => (
+              <li
+                key={food.id}
+                className={`flex items-center rounded-lg border text-sm ${
+                  picked?.id === food.id ? 'border-third/70 bg-third/10' : 'border-secondary/25'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => pickFood(food)}
+                  aria-pressed={picked?.id === food.id}
+                  className="px-2.5 py-1 text-third transition hover:text-third/80"
+                >
+                  {food.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeSavedFood(food)}
+                  aria-label={`Remove saved food ${food.name}`}
+                  className="pr-2 text-third/40 transition hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+          {removeError && <p className="mt-1 text-xs text-red-400">{removeError}</p>}
+        </div>
+      )}
+
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-third">Meal</span>
+        <select value={mealName} onChange={(e) => setMealName(e.target.value)} className={inputClass}>
+          {mealNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+          <option value="">Other</option>
+        </select>
+      </label>
+
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-third">Description</span>
         <input
@@ -32,9 +129,23 @@ function MealForm({ onSaved, onCancel }) {
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           placeholder="Chicken + rice"
-          className="rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
+          className={inputClass}
         />
       </label>
+
+      {picked && (
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-third">Servings of {picked.name}</span>
+          <input
+            type="number"
+            min="0.1"
+            step="any"
+            value={servings}
+            onChange={(e) => changeServings(e.target.value)}
+            className={`w-20 text-right ${inputClass}`}
+          />
+        </label>
+      )}
 
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-third">Calories</span>
@@ -45,7 +156,7 @@ function MealForm({ onSaved, onCancel }) {
           required
           value={form.calories}
           onChange={(e) => setForm({ ...form, calories: e.target.value })}
-          className="rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
+          className={inputClass}
         />
       </label>
 
@@ -60,11 +171,23 @@ function MealForm({ onSaved, onCancel }) {
               value={form[field]}
               onChange={(e) => setForm({ ...form, [field]: e.target.value })}
               placeholder="0"
-              className="rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
+              className={inputClass}
             />
           </label>
         ))}
       </div>
+
+      {!picked && (
+        <label className="flex items-center gap-1.5 text-xs text-third/60">
+          <input
+            type="checkbox"
+            checked={saveForLater}
+            onChange={(e) => setSaveForLater(e.target.checked)}
+            className="accent-third"
+          />
+          Save for reuse (macros are for one serving)
+        </label>
+      )}
 
       <div className="mt-1 flex gap-2">
         <button

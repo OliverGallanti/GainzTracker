@@ -19,6 +19,7 @@ model User {
   sex                String? // 'male' | 'female' — app-validated, not a DB enum; only used for the Big 4 strength-standard lookup, everything else works without it
   age                   Int? // years — a plain number, not birthDate; drifts by a year at most, fine for a TDEE estimate
   activityLevel         String? // one of ACTIVITY_LEVELS' keys in src/lib/tdee.js, app-validated like `sex`
+  mealNames             String[] @default(["Breakfast", "Lunch", "Dinner"]) // the user's own meal slots for the day, in order — a preference list like WorkoutSplit.days
   // DEPRECATED — superseded by LiftGoal. Nothing reads or writes these any more;
   // they're kept only so the migration can be rolled back, and are dropped in a
   // separate, later migration once the switch has been verified.
@@ -39,6 +40,7 @@ model User {
   macroGoal       MacroGoal?
   workoutSplits   WorkoutSplit[]
   splitLogs       SplitLog[]
+  savedFoods      SavedFood[]
 }
 
 // A per-lift target weight, one row per (user, lift). Keyed by the same
@@ -156,9 +158,30 @@ model MacroEntry {
   proteinG    Float?
   carbsG      Float?
   fatG        Float?
+  // Which of User.mealNames this was eaten as. Stored as the name itself, not a
+  // reference: null (or a name the user has since renamed away) simply shows
+  // under "Other", and the card only displays today, so nothing is orphaned for long.
+  mealName    String?
   loggedAt    DateTime @default(now())
 
   @@index([userId, loggedAt])
+}
+
+// A food or recipe the user saved to log again: macros for ONE serving, so
+// logging it is a servings multiplier. One row per name — saving the same name
+// again updates it. Deliberately not ingredient-based (see server/README.md).
+model SavedFood {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  calories  Int
+  proteinG  Float?
+  carbsG    Float?
+  fatG      Float?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name])
 }
 
 // Exercise list kept as JSON for v1 ([{ name, targetSets, targetReps, order }]) —

@@ -8,6 +8,7 @@ const createSchema = z.object({
   proteinG: z.number().nonnegative().optional(),
   carbsG: z.number().nonnegative().optional(),
   fatG: z.number().nonnegative().optional(),
+  mealName: z.string().trim().min(1).max(30).optional(),
   loggedAt: z.coerce.date().optional(),
 })
 

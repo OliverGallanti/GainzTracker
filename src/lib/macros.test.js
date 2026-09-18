@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMacro, sumToday } from './macros'
+import { formatMacro, groupByMeal, scaleFood, sumToday } from './macros'
 
 describe('sumToday', () => {
   it('adds up every logged macro and the calories', () => {
@@ -39,5 +39,53 @@ describe('formatMacro', () => {
 
   it('still formats a real zero', () => {
     expect(formatMacro(0, 'g F')).toBe('0g F')
+  })
+})
+
+describe('groupByMeal', () => {
+  const meal = (mealName, calories) => ({ mealName, calories })
+  const slots = ['Breakfast', 'Lunch', 'Dinner']
+
+  it('groups under each slot in slot order, with per-slot totals', () => {
+    const groups = groupByMeal([meal('Lunch', 500), meal('Breakfast', 300), meal('Lunch', 100)], slots)
+    expect(groups.map((g) => g.name)).toEqual(['Breakfast', 'Lunch', 'Dinner'])
+    expect(groups.map((g) => g.totals.calories)).toEqual([300, 600, 0])
+    expect(groups[1].entries).toHaveLength(2)
+  })
+
+  it('keeps empty slots so they can offer "add"', () => {
+    expect(groupByMeal([], slots).map((g) => g.entries.length)).toEqual([0, 0, 0])
+  })
+
+  it('puts meals with no slot, or a slot that no longer exists, under Other', () => {
+    const groups = groupByMeal([meal(null, 100), meal('Brunch', 200), meal('Dinner', 50)], slots)
+    expect(groups.at(-1).name).toBe('Other')
+    expect(groups.at(-1).totals.calories).toBe(300)
+    expect(groups[2].totals.calories).toBe(50)
+  })
+
+  it('has no Other group when everything fits a slot', () => {
+    expect(groupByMeal([meal('Lunch', 1)], slots).some((g) => g.name === 'Other')).toBe(false)
+  })
+})
+
+describe('scaleFood', () => {
+  const chili = { calories: 400, proteinG: 30, fatG: 12.5, carbsG: null }
+
+  it('multiplies one serving', () => {
+    expect(scaleFood(chili, 2)).toEqual({ calories: 800, proteinG: 60, fatG: 25, carbsG: null })
+  })
+
+  it('handles fractional servings, rounding calories to whole and macros to a tenth', () => {
+    expect(scaleFood({ calories: 333, proteinG: 10.3, fatG: 1, carbsG: 7 }, 1.5)).toEqual({
+      calories: 500, // 499.5 rounds up
+      proteinG: 15.5,
+      fatG: 1.5,
+      carbsG: 10.5,
+    })
+  })
+
+  it('keeps a macro the food never had as null, not 0', () => {
+    expect(scaleFood(chili, 3).carbsG).toBeNull()
   })
 })
