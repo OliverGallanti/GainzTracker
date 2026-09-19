@@ -192,7 +192,7 @@ function MacroStatsCard() {
       )}
 
       {!isLoading && mode === 'view' && (
-        <div className={goal ? 'mt-5' : ''}>
+        <div className="mt-5">
           <MealList groups={groups} onAdd={openLogFood} onRemove={handleRemoveMeal} />
         </div>
       )}

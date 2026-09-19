@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { missingProfileFields } from '../lib/onboarding'
 import { useMe } from '../lib/sharedData'
 import { ACTIVITY_LEVELS } from '../lib/tdee'
 import { useLoad } from '../lib/useLoad'
@@ -45,9 +46,7 @@ function ProfileSecurityPage({ user, onBack }) {
   const profileSaveError = sexSubmit.error ?? ageSubmit.error ?? activitySubmit.error
 
   // What's still blank. Only meaningful once the profile has loaded.
-  const missing = me.data
-    ? [!sex && 'sex', !age && 'age', !activityLevel && 'activity level'].filter(Boolean)
-    : []
+  const missing = me.data ? missingProfileFields(me.data) : []
   const ageChanged = Boolean(ageValue) && Number(ageValue) !== age
 
   // A failed load is kept distinct from an empty list on purpose — "no passkeys

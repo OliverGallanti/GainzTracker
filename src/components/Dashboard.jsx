@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { missingProfileFields } from '../lib/onboarding'
 import { useMe } from '../lib/sharedData'
+import GettingStarted from './GettingStarted'
 import MacroStatsCard from './MacroStatsCard'
 import WeightChart from './WeightChart'
 import TrainingLogCard from './TrainingLogCard'
@@ -16,7 +18,7 @@ function DashboardShell({ user, onLogout }) {
   // set (height/goals live on their own cards) — the only things
   // "incomplete" can coherently mean here. A failed or pending load leaves
   // `me.data` undefined, which hides the badge: no error UI for a decorative hint.
-  const profileIncomplete = me.data != null && (!me.data.sex || !me.data.age || !me.data.activityLevel)
+  const profileIncomplete = me.data != null && missingProfileFields(me.data).length > 0
 
   const handleLogout = async () => {
     await api('/auth/logout', { method: 'POST' })
@@ -70,6 +72,7 @@ function DashboardShell({ user, onLogout }) {
               <span className="shrink-0 text-xs font-medium text-third/60">Profile &amp; security →</span>
             </button>
 
+            <GettingStarted onOpenProfile={() => setView('profile')} />
             <MacroStatsCard />
             <WeightChart />
             <TrainingLogCard />

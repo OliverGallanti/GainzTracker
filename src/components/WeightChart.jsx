@@ -48,7 +48,7 @@ function WeightChart() {
   const bmi = latestEntry ? computeBmi(latestEntry.weightKg, height) : null
 
   return (
-    <div className="glow-card w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
+    <div id="weight-card" className="glow-card w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-third">Weight</h2>
         {mode === 'view' && (
