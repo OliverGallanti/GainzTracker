@@ -15,9 +15,9 @@ function ProductLookup({ onFound }) {
   const { submit: lookup, saving, error } = useSubmit(async (barcode) => {
     if (!BARCODE.test(barcode)) throw new ValidationError('A barcode is 8 to 14 digits')
     const product = await api(`/api/products/${barcode}`)
-    if (!product) throw new ValidationError('No product found for that barcode — enter it manually')
+    if (!product) throw new ValidationError('No product found for that barcode: enter it manually')
     onFound(product)
-  }, 'Could not reach the food database — please try again')
+  }, 'Could not reach the food database: please try again')
 
   const handleDetected = (barcode) => {
     setScanning(false)

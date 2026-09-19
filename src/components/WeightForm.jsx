@@ -14,7 +14,7 @@ function WeightForm({ onSaved, onCancel }) {
       }),
     })
     onSaved()
-  }, 'Could not log that weight — please check the values and try again')
+  }, 'Could not log that weight: please check the values and try again')
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">

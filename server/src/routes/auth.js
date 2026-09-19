@@ -40,12 +40,12 @@ export default async function authRoutes(app) {
     reply.clearCookie(OAUTH_STATE_COOKIE, { path: '/' })
 
     if (!rawCookie) {
-      return reply.badRequest('Missing OAuth state — please try signing in again')
+      return reply.badRequest('Missing OAuth state: please try signing in again')
     }
 
     const unsigned = request.unsignCookie(rawCookie)
     if (!unsigned.valid) {
-      return reply.badRequest('Invalid OAuth state — please try signing in again')
+      return reply.badRequest('Invalid OAuth state: please try signing in again')
     }
 
     let expectedState
@@ -53,7 +53,7 @@ export default async function authRoutes(app) {
     try {
       ({ state: expectedState, codeVerifier } = JSON.parse(unsigned.value))
     } catch {
-      return reply.badRequest('Invalid OAuth state — please try signing in again')
+      return reply.badRequest('Invalid OAuth state: please try signing in again')
     }
 
     const oidcConfig = await getGoogleOidcConfig()
@@ -67,7 +67,7 @@ export default async function authRoutes(app) {
       })
     } catch (err) {
       request.log.error(err, 'Google OAuth code exchange failed')
-      return reply.badRequest('Sign-in failed — please try again')
+      return reply.badRequest('Sign-in failed: please try again')
     }
 
     const claims = tokens.claims()

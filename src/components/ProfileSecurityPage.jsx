@@ -62,7 +62,7 @@ function ProfileSecurityPage({ user, onBack }) {
       throw err
     }
     passkeys.reload()
-  }, 'Could not add that passkey — please try again')
+  }, 'Could not add that passkey: please try again')
 
   const handleRemovePasskey = async (id) => {
     await api(`/api/passkeys/${id}`, { method: 'DELETE' })
@@ -100,7 +100,7 @@ function ProfileSecurityPage({ user, onBack }) {
 
         {me.error && (
           <p className="mt-2 text-xs text-red-400">
-            Could not load your profile details —{' '}
+            Could not load your profile details:{' '}
             <button type="button" onClick={me.reload} className="underline hover:no-underline">
               retry
             </button>
@@ -164,7 +164,7 @@ function ProfileSecurityPage({ user, onBack }) {
         </div>
 
         {profileSaveError && (
-          <p className="mt-2 text-xs text-red-400">{profileSaveError} — please try again</p>
+          <p className="mt-2 text-xs text-red-400">{profileSaveError}: please try again</p>
         )}
       </div>
 
@@ -180,7 +180,7 @@ function ProfileSecurityPage({ user, onBack }) {
           )}
           {passkeys.error && (
             <li className="text-xs text-red-400">
-              Could not load your passkeys —{' '}
+              Could not load your passkeys:{' '}
               <button type="button" onClick={passkeys.reload} className="underline hover:no-underline">
                 retry
               </button>

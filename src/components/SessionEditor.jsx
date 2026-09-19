@@ -77,7 +77,7 @@ function SessionEditor({ log, onClose }) {
     }
 
     onClose()
-  }, 'Could not save this session — please check the values and try again')
+  }, 'Could not save this session: please check the values and try again')
 
   return (
     <form
@@ -87,7 +87,7 @@ function SessionEditor({ log, onClose }) {
       {loadError ? (
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-red-400">
-            Could not load this session —{' '}
+            Could not load this session:{' '}
             <button type="button" onClick={existing.reload} className="underline hover:no-underline">
               retry
             </button>

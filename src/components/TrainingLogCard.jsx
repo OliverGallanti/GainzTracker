@@ -47,7 +47,7 @@ function TrainingLogCard() {
   const { submit: mutate, saving: busy, error } = useSubmit(async (change) => {
     await change()
     reload()
-  }, 'Could not save that change — please try again')
+  }, 'Could not save that change: please try again')
 
   // `date` is the calendar day being logged: today, or a past day being filled in.
   const logDay = (date, dayIndex, completed) =>
@@ -119,7 +119,7 @@ function TrainingLogCard() {
 
       {loadError && (
         <p className="text-xs text-red-400">
-          Could not load your training log —{' '}
+          Could not load your training log:{' '}
           <button type="button" onClick={reload} className="underline hover:no-underline">
             retry
           </button>

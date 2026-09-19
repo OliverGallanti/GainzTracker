@@ -12,7 +12,7 @@ function MealSlotsForm({ mealNames, onSaved, onCancel }) {
     if (new Set(cleaned).size !== cleaned.length) throw new ValidationError('Meal names must be different')
     await api('/api/me', { method: 'PUT', body: JSON.stringify({ mealNames: cleaned }) })
     onSaved()
-  }, 'Could not save your meals — please try again')
+  }, 'Could not save your meals: please try again')
 
   const update = (index, value) => setNames(names.map((n, i) => (i === index ? value : n)))
   const remove = (index) => setNames(names.filter((_, i) => i !== index))

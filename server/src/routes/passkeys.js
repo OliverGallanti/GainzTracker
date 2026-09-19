@@ -64,7 +64,7 @@ export default async function passkeyRoutes(app) {
   app.post('/registration/verify', { onRequest: requireAuth }, async (request, reply) => {
     const expectedChallenge = readChallengeCookie(request, reply, REGISTRATION_CHALLENGE_COOKIE)
     if (!expectedChallenge) {
-      return reply.badRequest('Missing or invalid registration challenge — please try again')
+      return reply.badRequest('Missing or invalid registration challenge: please try again')
     }
 
     let verification
@@ -77,11 +77,11 @@ export default async function passkeyRoutes(app) {
       })
     } catch (err) {
       request.log.warn(err, 'Passkey registration verification threw')
-      return reply.badRequest('Could not verify passkey — please try again')
+      return reply.badRequest('Could not verify passkey: please try again')
     }
 
     if (!verification.verified || !verification.registrationInfo) {
-      return reply.badRequest('Could not verify passkey — please try again')
+      return reply.badRequest('Could not verify passkey: please try again')
     }
 
     const { credential } = verification.registrationInfo
@@ -124,7 +124,7 @@ export default async function passkeyRoutes(app) {
   app.post('/authentication/verify', async (request, reply) => {
     const expectedChallenge = readChallengeCookie(request, reply, AUTHENTICATION_CHALLENGE_COOKIE)
     if (!expectedChallenge) {
-      return reply.badRequest('Missing or invalid authentication challenge — please try again')
+      return reply.badRequest('Missing or invalid authentication challenge: please try again')
     }
 
     const credentialId = request.body?.id

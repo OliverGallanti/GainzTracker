@@ -111,7 +111,7 @@ function BigFourCard() {
 
       {loadError && (
         <p className="text-xs text-red-400">
-          Could not load your Big 4 data —{' '}
+          Could not load your Big 4 data:{' '}
           <button type="button" onClick={retry} className="underline hover:no-underline">
             retry
           </button>

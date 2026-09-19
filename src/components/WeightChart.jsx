@@ -66,7 +66,7 @@ function WeightChart() {
 
       {loadError && (
         <p className="text-xs text-red-400">
-          Could not load your weight data —{' '}
+          Could not load your weight data:{' '}
           <button type="button" onClick={retry} className="underline hover:no-underline">
             retry
           </button>

@@ -19,7 +19,7 @@ function WeightGoalsForm({ weightGoal, bodyFatGoal, onSaved, onCancel }) {
       }),
     })
     onSaved()
-  }, 'Could not save your goals — please check the values and try again')
+  }, 'Could not save your goals: please check the values and try again')
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">

@@ -18,7 +18,7 @@ function RoutineEditor({ onSaved, onCancel }) {
       body: JSON.stringify({ name: name.trim() || 'My routine', days: cleanedDays }),
     })
     onSaved()
-  }, 'Could not save that routine — please check the values and try again')
+  }, 'Could not save that routine: please check the values and try again')
 
   const pickTemplate = (template) => {
     setName(template.name)

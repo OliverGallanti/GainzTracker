@@ -121,7 +121,7 @@ function MacroStatsCard() {
 
       {loadError && (
         <p className="text-xs text-red-400">
-          Could not load your macros —{' '}
+          Could not load your macros:{' '}
           <button type="button" onClick={retry} className="underline hover:no-underline">
             retry
           </button>
