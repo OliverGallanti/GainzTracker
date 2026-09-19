@@ -4,6 +4,7 @@ import { useMe, useWeights } from '../lib/sharedData'
 import WeightCharts from './WeightCharts'
 import WeightForm from './WeightForm'
 import HeightForm from './HeightForm'
+import MeasurementsForm from './MeasurementsForm'
 import WeightGoalsForm from './WeightGoalsForm'
 
 function WeightChart() {
@@ -36,6 +37,10 @@ function WeightChart() {
     setMode('view')
     weights.reload()
   }
+  const handleMeasurementsSaved = () => {
+    weights.reload()
+    me.reload()
+  }
   const handleProfileSaved = () => {
     setMode('view')
     me.reload()
@@ -51,7 +56,7 @@ function WeightChart() {
     <div id="weight-card" className="glow-card w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-third">Weight</h2>
-        {mode === 'view' && (
+        {mode === 'view' && !isEmpty && (
           <button
             type="button"
             onClick={() => setMode('logWeight')}
@@ -73,7 +78,7 @@ function WeightChart() {
         </p>
       )}
 
-      {!isLoading && mode === 'view' && (
+      {!isLoading && mode === 'view' && !isEmpty && (
         <div className="mb-4 flex flex-col gap-1 text-xs">
           <div className="flex flex-wrap gap-x-5 gap-y-1">
             <div>
@@ -122,7 +127,12 @@ function WeightChart() {
       )}
 
       {!isLoading && mode === 'view' && isEmpty && (
-        <p className="text-xs text-third/60">No weight entries logged yet.</p>
+        <MeasurementsForm
+          height={height}
+          weightGoal={weightGoal}
+          bodyFatGoal={bodyFatGoal}
+          onSaved={handleMeasurementsSaved}
+        />
       )}
 
       {!isLoading && mode === 'view' && !isEmpty && (
