@@ -44,6 +44,12 @@ function ProfileSecurityPage({ user, onBack }) {
   )
   const profileSaveError = sexSubmit.error ?? ageSubmit.error ?? activitySubmit.error
 
+  // What's still blank. Only meaningful once the profile has loaded.
+  const missing = me.data
+    ? [!sex && 'sex', !age && 'age', !activityLevel && 'activity level'].filter(Boolean)
+    : []
+  const ageChanged = Boolean(ageValue) && Number(ageValue) !== age
+
   // A failed load is kept distinct from an empty list on purpose — "no passkeys
   // registered" and "we couldn't check" mean very different things on a
   // security screen.
@@ -94,9 +100,18 @@ function ProfileSecurityPage({ user, onBack }) {
       <div className="glow-card rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
         <h2 className="text-sm font-semibold text-third">Profile details</h2>
         <p className="mt-1 text-xs text-third/60">
-          Optional - powers the Big 4 strength-level rating and the TDEE calorie estimate, nothing else
-          depends on it.
+          Powers the Big 4 strength-level rating and the TDEE calorie estimate. Nothing else depends on it.
         </p>
+
+        {missing.length > 0 && (
+          <p
+            role="status"
+            className="mt-3 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-300"
+          >
+            Missing info: {missing.join(', ')}. Without it the calorie estimate and strength ratings can't be
+            calculated.
+          </p>
+        )}
 
         {me.error && (
           <p className="mt-2 text-xs text-red-400">
@@ -133,14 +148,19 @@ function ProfileSecurityPage({ user, onBack }) {
             step="1"
             value={ageValue}
             onChange={(e) => setAgeDraft(e.target.value)}
-            className="w-16 rounded-md border border-secondary/40 bg-main px-2 py-1 text-third outline-none focus:border-secondary"
+            className="w-20 rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-sm text-third outline-none focus:border-secondary"
           />
+          {/* Filled while there's something to save, outlined once it's saved. */}
           <button
             type="submit"
-            disabled={ageSubmit.saving || !ageValue || Number(ageValue) === age}
-            className="text-third underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary disabled:opacity-40"
+            disabled={ageSubmit.saving || !ageChanged}
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition disabled:opacity-50 active:scale-[0.98] ${
+              ageChanged
+                ? 'bg-third text-main hover:bg-third/90'
+                : 'border border-secondary/40 text-third/60'
+            }`}
           >
-            Save
+            {ageSubmit.saving ? 'Saving…' : ageChanged ? 'Save age' : 'Saved'}
           </button>
         </form>
 
