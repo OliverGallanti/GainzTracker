@@ -3,9 +3,12 @@
 # Postgres is deleted after 30 days. See "Deploying" in README.md.
 services:
   - type: web
-    name: gainztracker
+    # The name becomes the public URL (https://<name>.onrender.com) and must be unique
+    # across all of Render, so it isn't just "gainztracker".
+    name: gainztracker-oliver
     runtime: node
     plan: free
+    region: frankfurt # closest Render region to Neon's London (eu-west-2)
     # `--include=dev` because NODE_ENV=production would otherwise skip the build
     # tools (Vite, Prisma CLI). Migrations run at build time, so a bad migration
     # fails the deploy instead of taking the running app down.
