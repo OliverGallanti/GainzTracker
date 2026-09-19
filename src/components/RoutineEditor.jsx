@@ -9,13 +9,17 @@ function RoutineEditor({ onSaved, onCancel }) {
   const [step, setStep] = useState('pick') // 'pick' | 'build'
   const [name, setName] = useState('')
   const [days, setDays] = useState([])
+  const [perWeek, setPerWeek] = useState(null) // null until touched: then it follows the number of days listed
+
+  const filledDays = days.filter((d) => d.trim()).length
+  const daysPerWeek = perWeek ?? Math.min(7, Math.max(1, filledDays))
 
   const { submit, saving, error } = useSubmit(async () => {
     const cleanedDays = days.map((d) => d.trim()).filter(Boolean)
     if (cleanedDays.length === 0) throw new ValidationError('Add at least one day')
     await api('/api/workout-splits', {
       method: 'POST',
-      body: JSON.stringify({ name: name.trim() || 'My routine', days: cleanedDays }),
+      body: JSON.stringify({ name: name.trim() || 'My routine', days: cleanedDays, daysPerWeek }),
     })
     onSaved()
   }, 'Could not save that routine: please check the values and try again')
@@ -95,6 +99,24 @@ function RoutineEditor({ onSaved, onCancel }) {
           onChange={(e) => setName(e.target.value)}
           className="rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
         />
+      </label>
+
+      <label className="flex items-center justify-between gap-3 text-sm">
+        <span className="text-third">
+          Days per week to count as a good week
+          <span className="block text-xs text-third/60">Keeps your weekly streak going.</span>
+        </span>
+        <select
+          value={daysPerWeek}
+          onChange={(e) => setPerWeek(Number(e.target.value))}
+          className="rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
+        >
+          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       </label>
 
       <div className="flex flex-col gap-2">

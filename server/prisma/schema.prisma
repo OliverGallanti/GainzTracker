@@ -67,6 +67,9 @@ model WorkoutSplit {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
   days      String[] // e.g. ["Push","Pull","Legs","Push","Pull","Legs"]
+  // Days per week that make a good week for the weekly streak. Null (routines made
+  // before this existed) means "as many as `days` lists", worked out client-side.
+  daysPerWeek Int?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 

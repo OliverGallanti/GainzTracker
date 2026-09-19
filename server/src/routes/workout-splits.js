@@ -2,10 +2,17 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.js'
 import { prisma } from '../db.js'
 
+// How many completed days make a good week (the weekly streak's threshold). Optional:
+// without it the client uses the number of days the routine lists.
+const daysPerWeekSchema = z.number().int().min(1).max(7)
+
 const createSplitSchema = z.object({
   name: z.string().min(1),
   days: z.array(z.string().min(1)).min(1),
+  daysPerWeek: daysPerWeekSchema.optional(),
 })
+
+const updateSplitSchema = z.object({ daysPerWeek: daysPerWeekSchema })
 
 // `dayIndex` is the user's pick from the split's days, in any order — there is
 // no forced rotation. `dayStart`/`dayEnd` bound the local calendar day being
@@ -53,6 +60,22 @@ export default async function workoutSplitRoutes(app) {
       }),
     ])
     return reply.code(201).send(split)
+  })
+
+  app.patch('/workout-splits/:id', async (request, reply) => {
+    const parsed = updateSplitSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.badRequest(parsed.error.message)
+    }
+
+    const { count } = await prisma.workoutSplit.updateMany({
+      where: { id: request.params.id, userId: request.session.userId },
+      data: parsed.data,
+    })
+    if (count === 0) {
+      return reply.notFound()
+    }
+    return reply.code(204).send()
   })
 
   app.delete('/workout-splits/:id', async (request, reply) => {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Repeat } from 'lucide-react'
+import { Check, Repeat } from 'lucide-react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
-import { computeAdherenceStreak, suggestedDayIndex } from '../lib/splits'
+import { computeWeeklyStreak, suggestedDayIndex, weeklyGoal } from '../lib/splits'
 import { useLoad } from '../lib/useLoad'
 import { useSubmit } from '../lib/useSubmit'
 import DayLogForm from './DayLogForm'
@@ -30,12 +30,15 @@ function TrainingLogCard() {
     return () => document.removeEventListener('mousedown', onOutsideClick)
   }, [selectedDate])
 
-  // The logs depend on which split is active, so this is one dependent load.
+  // The logs depend on which split is active, so this is one dependent load. The
+  // weekly streak counts days across every routine (switching routine mid-week
+  // shouldn't wipe it), so all splits' logs are fetched; the calendar and day
+  // logger only use the active split's.
   const { data, error: loadError, reload } = useLoad(async () => {
     const splits = await api('/api/workout-splits')
     const split = splits.find((s) => s.active) ?? null
-    const logs = split ? await api(`/api/workout-splits/${split.id}/logs`) : null
-    return { splits, split, logs }
+    const logsBySplit = await Promise.all(splits.map((s) => api(`/api/workout-splits/${s.id}/logs`)))
+    return { splits, split, logs: split ? logsBySplit[splits.indexOf(split)] : null, allLogs: logsBySplit.flat() }
   })
 
   const splits = data?.splits ?? []
@@ -81,6 +84,11 @@ function TrainingLogCard() {
   const removeLog = (logId) =>
     mutate(() => api(`/api/workout-splits/${split.id}/logs/${logId}`, { method: 'DELETE' }))
 
+  const changeWeeklyGoal = (daysPerWeek) =>
+    mutate(() =>
+      api(`/api/workout-splits/${split.id}`, { method: 'PATCH', body: JSON.stringify({ daysPerWeek }) }),
+    )
+
   const handleDeleteSplit = async (id) => {
     await api(`/api/workout-splits/${id}`, { method: 'DELETE' })
     reload()
@@ -94,7 +102,9 @@ function TrainingLogCard() {
   const isLoading = data === undefined
   const showLog = !isLoading && !editingRoutine && split
 
-  const streak = logs ? computeAdherenceStreak(logs) : 0
+  const goal = split ? weeklyGoal(split) : 1
+  const { streak, thisWeekDays } = computeWeeklyStreak(data?.allLogs ?? [], goal)
+  const goalMet = thisWeekDays >= goal
   const suggestedIndex = split && logs ? suggestedDayIndex(split.days, logs) : 0
 
   const target = selectedDate ?? new Date()
@@ -149,9 +159,25 @@ function TrainingLogCard() {
 
       {showLog && (
         <>
-          <p className="mb-4 text-xs text-third/60">
+          <p className="text-xs text-third/60">
             <span className="font-medium text-third">{split.name}</span> · {split.days.join(' → ')}
           </p>
+          <label className="mt-2 mb-4 flex items-center gap-2 text-xs text-third/60">
+            Weekly goal
+            <select
+              value={goal}
+              onChange={(e) => changeWeeklyGoal(Number(e.target.value))}
+              disabled={busy}
+              className="rounded-md border border-secondary/40 bg-main px-1.5 py-0.5 text-third outline-none focus:border-secondary"
+            >
+              {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                <option key={n} value={n}>
+                  {n} {n === 1 ? 'day' : 'days'}
+                </option>
+              ))}
+            </select>
+            a week
+          </label>
 
           <div className="mb-3 flex items-center justify-between">
             <p className="text-xs text-third/60">
@@ -163,10 +189,14 @@ function TrainingLogCard() {
               <p className="text-2xl font-bold text-third">
                 {streak}
                 <span className="ml-1 text-sm font-normal text-third/60">
-                  {streak === 1 ? 'day' : 'days'}
+                  {streak === 1 ? 'week' : 'weeks'}
                 </span>
               </p>
               <p className="text-xs text-third/60">streak</p>
+              <p className="mt-1 flex items-center justify-end gap-1 text-xs text-third/60">
+                {goalMet && <Check size={12} className="text-third" />}
+                {thisWeekDays} of {goal} this week
+              </p>
             </div>
           </div>
 
