@@ -1,18 +1,15 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { ADULT_AGE, PROTEIN_RANGE_TEXT, suggestMacros, tdeePresets } from '../lib/macroSplit'
 import { useSubmit } from '../lib/useSubmit'
-
-const TDEE_GOALS = [
-  { label: 'Cut', delta: -500 },
-  { label: 'Maintain', delta: 0 },
-  { label: 'Bulk', delta: 300 },
-]
 
 const FIELD_LABELS = { proteinG: 'Protein (g)', fatG: 'Fat (g)', carbsG: 'Carbs (g)' }
 
 // Owns its own draft state: it only mounts when the card enters edit mode, so
 // seeding from `goal` at mount reproduces the old "startEditTargets" behavior.
-function MacroTargetsForm({ goal, tdee, onSaved, onCancel }) {
+// Reads top to bottom in the order a newcomer needs things: how many calories,
+// then how to split them.
+function MacroTargetsForm({ goal, tdee, bodyweight, sex, age, onSaved, onCancel }) {
   const [form, setForm] = useState({
     proteinG: goal?.proteinG ?? '',
     fatG: goal?.fatG ?? '',
@@ -22,6 +19,8 @@ function MacroTargetsForm({ goal, tdee, onSaved, onCancel }) {
   // A saved calorieTarget is treated as a deliberate value, not a stale
   // suggestion — only start auto-computing once the macros actually change.
   const [calorieTargetTouched, setCalorieTargetTouched] = useState(Boolean(goal?.calorieTarget))
+  const [presetKey, setPresetKey] = useState('maintain') // the last calorie preset chosen; picks the protein level
+  const [suggested, setSuggested] = useState(null) // what the last suggestion was based on, to explain it
 
   const { submit, saving, error } = useSubmit(async () => {
     await api('/api/macro-goal', {
@@ -50,30 +49,73 @@ function MacroTargetsForm({ goal, tdee, onSaved, onCancel }) {
     setForm(next)
   }
 
-  const applyTdeeGoal = (delta) => {
+  const applyPreset = (preset) => {
     setCalorieTargetTouched(true)
-    setForm((f) => ({ ...f, calorieTarget: String(tdee + delta) }))
+    setPresetKey(preset.key)
+    setForm((f) => ({ ...f, calorieTarget: String(preset.calories) }))
   }
 
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-3">
-      {['proteinG', 'fatG', 'carbsG'].map((field) => (
-        <label key={field} className="flex items-center justify-between gap-3 text-sm">
-          <span className="capitalize text-third">{FIELD_LABELS[field]}</span>
-          <input
-            type="number"
-            min="1"
-            step="any"
-            required
-            value={form[field]}
-            onChange={(e) => updateField(field, e.target.value)}
-            className="w-24 rounded-lg border border-secondary/40 bg-main px-2 py-1 text-right text-third outline-none focus:border-secondary"
-          />
-        </label>
-      ))}
+  const isMinor = age != null && age < ADULT_AGE
+  const presets = tdee == null ? [] : tdeePresets(tdee, sex, age)
+  const calories = Number(form.calorieTarget)
+  const canSuggest = !isMinor && bodyweight != null && calories > 0
 
-      <div className="border-t border-secondary/25 pt-3">
-        <label className="flex items-center justify-between gap-3 text-sm">
+  // Fills the fields; nothing is saved until the user presses Save.
+  const applySuggestion = () => {
+    const split = suggestMacros({ calories, weightKg: bodyweight, goal: presetKey })
+    if (!split) return
+    setCalorieTargetTouched(true)
+    setForm({
+      ...form,
+      proteinG: String(split.proteinG),
+      fatG: String(split.fatG),
+      carbsG: String(split.carbsG),
+    })
+    setSuggested({ proteinPerKg: split.proteinPerKg, weightKg: bodyweight })
+  }
+
+  const suggestHint = isMinor
+    ? 'Suggestions are for adults. If you are under 18, ask a doctor or dietitian for targets.'
+    : bodyweight == null
+      ? 'Log your weight to get a suggestion.'
+      : !(calories > 0)
+        ? 'Choose or enter a calorie target first.'
+        : null
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div>
+        <p className="text-xs font-medium text-third">1. Daily calories</p>
+        {tdee == null ? (
+          <p className="mt-1 text-xs text-third/60">
+            Set your sex, age, and activity level in Profile &amp; security, and log your weight and
+            height, to get a calorie estimate. Or enter a target yourself below.
+          </p>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-third/60">
+              Estimated maintenance: <span className="text-third">{tdee} cal/day</span>
+            </p>
+            <div className={`mt-2 grid gap-2 ${presets.length === 1 ? 'grid-cols-1' : 'grid-cols-3'}`}>
+              {presets.map((preset) => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  onClick={() => applyPreset(preset)}
+                  disabled={!preset.available}
+                  className="rounded-lg border border-secondary/40 px-2 py-1.5 text-center text-xs text-third transition hover:border-secondary active:scale-[0.98] disabled:opacity-40"
+                >
+                  <span className="block font-medium">{preset.label}</span>
+                  <span className="block text-third/60">
+                    {preset.available ? `${preset.calories} cal` : 'not advised'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <label className="mt-3 flex items-center justify-between gap-3 text-sm">
           <span className="text-third">Total calories (optional)</span>
           <input
             type="number"
@@ -95,39 +137,53 @@ function MacroTargetsForm({ goal, tdee, onSaved, onCancel }) {
       </div>
 
       <div className="border-t border-secondary/25 pt-3">
-        <p className="text-xs font-medium text-third">TDEE calculator</p>
-        {tdee == null ? (
-          <p className="mt-1 text-xs text-third/60">
-            Set your sex, age, and activity level in Profile &amp; security, and log your weight and
-            height, to estimate your calories.
+        <p className="text-xs font-medium text-third">2. Protein, fat and carbs</p>
+        <p className="mt-1 text-xs text-third/60">
+          1 g of protein = 4 cal, 1 g of carbs = 4 cal, 1 g of fat = 9 cal. A common protein range for
+          people who lift is {PROTEIN_RANGE_TEXT}, toward the higher end when cutting.
+        </p>
+
+        <button
+          type="button"
+          onClick={applySuggestion}
+          disabled={!canSuggest}
+          className="mt-2 w-full rounded-lg border border-secondary/40 px-3 py-2 text-xs font-medium text-third transition hover:border-secondary active:scale-[0.98] disabled:opacity-40"
+        >
+          Suggest protein, fat and carbs
+        </button>
+        {suggestHint && <p className="mt-1 text-xs text-third/60">{suggestHint}</p>}
+        {suggested && (
+          <p role="status" className="mt-1 text-xs text-third/60">
+            Filled in: protein {suggested.proteinPerKg} g per kg of your {suggested.weightKg} kg, fat about
+            25% of calories, and carbs for the rest. Change any of it before saving.
           </p>
-        ) : (
-          <>
-            <p className="mt-1 text-xs text-third/60">
-              Estimated maintenance: <span className="text-third">{tdee} cal/day</span>
-            </p>
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              {TDEE_GOALS.map(({ label, delta }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => applyTdeeGoal(delta)}
-                  className="rounded-lg border border-secondary/40 px-2 py-1.5 text-center text-xs text-third transition hover:border-secondary active:scale-[0.98]"
-                >
-                  <span className="block font-medium">{label}</span>
-                  <span className="block text-third/60">{tdee + delta} cal</span>
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-[10px] text-third/60">
-              Estimate only (Mifflin-St Jeor) — not medical advice. Adjust based on real-world
-              results.
-            </p>
-          </>
         )}
+
+        <div className="mt-3 flex flex-col gap-3">
+          {['proteinG', 'fatG', 'carbsG'].map((field) => (
+            <label key={field} className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-third">{FIELD_LABELS[field]}</span>
+              <input
+                type="number"
+                min="1"
+                step="any"
+                required
+                value={form[field]}
+                onChange={(e) => updateField(field, e.target.value)}
+                className="w-24 rounded-lg border border-secondary/40 bg-main px-2 py-1 text-right text-third outline-none focus:border-secondary"
+              />
+            </label>
+          ))}
+        </div>
       </div>
 
-      <div className="mt-1 flex gap-2">
+      <p className="text-[11px] leading-snug text-third/60">
+        General guidance for healthy adults, not medical advice. Calorie estimate uses the Mifflin-St Jeor
+        formula; adjust based on real-world results. If you are pregnant, have a medical condition, or have a
+        history of disordered eating, talk to a doctor or dietitian first.
+      </p>
+
+      <div className="flex gap-2">
         <button
           type="submit"
           disabled={saving}

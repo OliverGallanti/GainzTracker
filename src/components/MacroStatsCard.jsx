@@ -201,6 +201,9 @@ function MacroStatsCard() {
         <MacroTargetsForm
           goal={goal}
           tdee={tdee}
+          bodyweight={bodyweight}
+          sex={me.data?.sex}
+          age={me.data?.age}
           onSaved={handleSaved}
           onCancel={() => setMode('view')}
         />
