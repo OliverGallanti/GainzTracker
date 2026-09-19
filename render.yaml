@@ -4,8 +4,8 @@
 services:
   - type: web
     # The name becomes the public URL (https://<name>.onrender.com) and must be unique
-    # across all of Render, so it isn't just "gainztracker".
-    name: gainztracker-oliver
+    # across all of Render; if it is taken, Render appends a suffix to the address.
+    name: gainz-tracker
     runtime: node
     plan: free
     region: frankfurt # closest Render region to Neon's London (eu-west-2)
