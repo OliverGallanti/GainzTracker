@@ -35,6 +35,11 @@ const CREDITS = [
   },
 ]
 
+const AUTHOR_LINKS = [
+  { name: 'Portfolio', url: 'https://olivergallanti.vercel.app/' },
+  { name: 'LinkedIn', url: 'https://www.linkedin.com/in/olivergallanti/' },
+]
+
 const linkClass = 'underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary'
 
 function Footer() {
@@ -42,7 +47,16 @@ function Footer() {
 
   return (
     <footer className="mt-auto px-4 py-6 text-center text-xs text-third/60 sm:px-6">
-      Made by Oliver Gallanti ·{' '}
+      Made by Oliver Gallanti
+      {AUTHOR_LINKS.map((link) => (
+        <span key={link.name}>
+          {' · '}
+          <a href={link.url} target="_blank" rel="noreferrer" className={linkClass}>
+            {link.name}
+          </a>
+        </span>
+      ))}
+      {' · '}
       <button type="button" onClick={() => dialogRef.current.showModal()} className={linkClass}>
         Credits
       </button>
