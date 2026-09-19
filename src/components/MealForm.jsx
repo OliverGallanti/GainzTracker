@@ -87,13 +87,13 @@ function MealForm({ mealNames, defaultMeal, savedFoods, onSaved, onCancel, onSav
       }),
     })
     onSaved()
-  }, 'Could not log that meal — please check the values and try again')
+  }, 'Could not log that meal: please check the values and try again')
 
   const { submit: removeSavedFood, error: removeError } = useSubmit(async (food) => {
     await api(`/api/saved-foods/${food.id}`, { method: 'DELETE' })
     if (picked?.id === food.id) setPicked(null)
     onSavedFoodsChanged()
-  }, 'Could not remove that saved food — please try again')
+  }, 'Could not remove that saved food: please try again')
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">

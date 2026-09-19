@@ -1,0 +1,34 @@
+# Render Blueprint: one free web service that serves the API and the built client
+# from a single origin. The database is external (Neon) — Render's own free
+# Postgres is deleted after 30 days. See "Deploying" in README.md.
+services:
+  - type: web
+    name: gainztracker
+    runtime: node
+    plan: free
+    # `--include=dev` because NODE_ENV=production would otherwise skip the build
+    # tools (Vite, Prisma CLI). Migrations run at build time, so a bad migration
+    # fails the deploy instead of taking the running app down.
+    buildCommand: >-
+      npm ci --include=dev && npm run build &&
+      cd server && npm ci --include=dev && npx prisma generate && npx prisma migrate deploy
+    startCommand: node server/src/server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true # changing it later signs everyone out
+      # Set these in the Render dashboard (values are never committed):
+      - key: DATABASE_URL # Neon *direct* connection string — see README
+        sync: false
+      - key: FRONTEND_URL # https://<your-service>.onrender.com, no trailing slash
+        sync: false
+      - key: GOOGLE_REDIRECT_URI # <FRONTEND_URL>/auth/google/callback
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

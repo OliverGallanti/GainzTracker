@@ -3,7 +3,7 @@ import { api } from '../lib/api'
 import { BIG_FOUR_LIFTS } from '../lib/lifts'
 import { useSubmit } from '../lib/useSubmit'
 
-// `goals` is { [liftName]: kg } — a lift with no goal has no key.
+// `goals` is { [liftName]: kg } a lift with no goal has no key.
 function BigFourGoalsForm({ goals, onSaved, onCancel }) {
   const [form, setForm] = useState(() =>
     Object.fromEntries(BIG_FOUR_LIFTS.map((name) => [name, goals?.[name] ?? ''])),
@@ -23,7 +23,7 @@ function BigFourGoalsForm({ goals, onSaved, onCancel }) {
       ),
     })
     onSaved()
-  }, 'Could not save your goals — please check the values and try again')
+  }, 'Could not save your goals: please check the values and try again')
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">

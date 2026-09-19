@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
+import Footer from './components/Footer'
 
 function App() {
   const [authStatus, setAuthStatus] = useState('loading')
@@ -39,11 +40,12 @@ function App() {
   }, [])
 
   return (
-    <div className="app-background min-h-dvh">
+    <div className="app-background flex min-h-dvh flex-col">
       {authStatus === 'authed' && (
         <Dashboard user={user} onLogout={() => setAuthStatus('anon')} />
       )}
       {authStatus === 'anon' && <Login onAuthenticated={checkAuth} />}
+      <Footer />
     </div>
   )
 }

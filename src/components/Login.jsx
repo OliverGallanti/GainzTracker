@@ -17,7 +17,7 @@ function Login({ onAuthenticated }) {
       onAuthenticated()
     } catch (err) {
       if (!isPasskeyCancellation(err)) {
-        setPasskeyError('Could not sign in with that passkey — please try again')
+        setPasskeyError('Could not sign in with that passkey: please try again')
       }
     } finally {
       setPasskeyPending(false)
@@ -25,7 +25,7 @@ function Login({ onAuthenticated }) {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-4 py-12 sm:px-6">
+    <main className="flex flex-1 flex-col items-center justify-center px-4 py-12 sm:px-6">
       <div className="glow-card w-full max-w-sm rounded-2xl border border-secondary/40 bg-card/90 p-6 shadow-2xl shadow-black/40 backdrop-blur sm:max-w-md sm:p-8">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold tracking-tight text-third sm:text-3xl">

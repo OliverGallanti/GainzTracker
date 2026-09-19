@@ -24,7 +24,7 @@ function DashboardShell({ user, onLogout }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between border-b border-secondary/40 bg-card/90 px-4 py-4 backdrop-blur sm:px-6">
         <span className="text-lg font-bold tracking-tight text-third">
           Gainz<span className="text-third/60">.Tracker</span>

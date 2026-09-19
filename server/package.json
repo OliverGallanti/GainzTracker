@@ -15,6 +15,7 @@
     "@fastify/cors": "^10.0.2",
     "@fastify/sensible": "^6.0.3",
     "@fastify/session": "^11.1.0",
+    "@fastify/static": "^10.1.4",
     "@prisma/client": "^6.3.1",
     "@simplewebauthn/server": "^14.0.2",
     "fastify": "^5.2.1",

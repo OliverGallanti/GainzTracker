@@ -34,7 +34,7 @@ function MacroTargetsForm({ goal, tdee, onSaved, onCancel }) {
       }),
     })
     onSaved()
-  }, 'Could not save your targets — please check the values and try again')
+  }, 'Could not save your targets: please check the values and try again')
 
   // Atwater factors (4 kcal/g protein & carbs, 9 kcal/g fat) — a live
   // suggestion, not a lock: it keeps recomputing until the calorie field
@@ -89,7 +89,7 @@ function MacroTargetsForm({ goal, tdee, onSaved, onCancel }) {
         </label>
         {!calorieTargetTouched && form.calorieTarget && (
           <p className="mt-1 text-right text-xs text-third/60">
-            Auto-calculated from protein/fat/carbs — edit to override
+            Auto-calculated from protein/fat/carbs: edit to override
           </p>
         )}
       </div>

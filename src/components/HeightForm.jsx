@@ -8,7 +8,7 @@ function HeightForm({ height, onSaved, onCancel }) {
   const { submit, saving, error } = useSubmit(async () => {
     await api('/api/me', { method: 'PUT', body: JSON.stringify({ heightCm: Number(heightCm) }) })
     onSaved()
-  }, 'Could not save your height — please check the value and try again')
+  }, 'Could not save your height: please check the value and try again')
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
