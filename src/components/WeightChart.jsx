@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Flag, Ruler, Scale } from 'lucide-react'
 import { computeBmi } from '../lib/body'
 import { useMe, useWeights } from '../lib/sharedData'
 import WeightCharts from './WeightCharts'
@@ -48,20 +49,22 @@ function WeightChart() {
 
   const isLoading = entries === null || me.data === undefined
   const isEmpty = entries?.length === 0
+  const hasGoals = Boolean(weightGoal || bodyFatGoal)
   const latestEntry = entries?.length ? entries[entries.length - 1] : null
   const latestBodyFat = entries ? [...entries].reverse().find((e) => e.bodyFatPercent != null) : null
   const bmi = latestEntry ? computeBmi(latestEntry.weightKg, height) : null
 
   return (
     <div id="weight-card" className="glow-card w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-third">Weight</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h2 className="card-title">Weight</h2>
         {mode === 'view' && !isEmpty && (
           <button
             type="button"
             onClick={() => setMode('logWeight')}
-            className="text-xs font-medium text-third/60 transition hover:text-third"
+            className="btn btn-secondary"
           >
+            <Scale size={14} />
             Log weight
           </button>
         )}
@@ -79,50 +82,53 @@ function WeightChart() {
       )}
 
       {!isLoading && mode === 'view' && !isEmpty && (
-        <div className="mb-4 flex flex-col gap-1 text-xs">
-          <div className="flex flex-wrap gap-x-5 gap-y-1">
-            <div>
-              <span className="text-third/60">Height </span>
-              <button
-                type="button"
-                onClick={() => setMode('editHeight')}
-                className="text-third underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary"
-              >
-                {height ? `${height} cm` : 'Set height'}
-              </button>
-            </div>
-            {latestBodyFat && (
-              <div>
-                <span className="text-third/60">Body fat </span>
-                <span className="text-third">{latestBodyFat.bodyFatPercent}%</span>
-              </div>
-            )}
-            {bmi != null && (
-              <div>
-                <span className="text-third/60">BMI </span>
-                <span className="text-third">{bmi.toFixed(1)}</span>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <span className="text-third/60">
-              Goals:{' '}
-              {weightGoal || bodyFatGoal ? (
-                <span className="text-third">
+        <div className="mb-4 flex flex-col gap-3 text-xs">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setMode('editHeight')}
+              aria-label={height ? `Edit height, currently ${height} cm` : 'Set height'}
+              className="btn btn-secondary"
+            >
+              <Ruler size={14} />
+              {height ? `${height} cm` : 'Set height'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('editGoals')}
+              aria-label={hasGoals ? 'Edit goals' : 'Set goals'}
+              className="btn btn-secondary"
+            >
+              <Flag size={14} />
+              {hasGoals ? (
+                <span>
+                  Goal:{' '}
                   {weightGoal ? `${weightGoal}kg` : null}
                   {weightGoal && bodyFatGoal ? ' · ' : null}
                   {bodyFatGoal ? `${bodyFatGoal}% BF` : null}
                 </span>
-              ) : null}
-            </span>
-            <button
-              type="button"
-              onClick={() => setMode('editGoals')}
-              className="text-third underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary"
-            >
-              {weightGoal || bodyFatGoal ? 'Edit goals' : 'Set goals'}
+              ) : (
+                'Set goals'
+              )}
             </button>
           </div>
+
+          {(latestBodyFat || bmi != null) && (
+            <div className="flex flex-wrap gap-x-5 gap-y-1">
+              {latestBodyFat && (
+                <div>
+                  <span className="text-third/60">Body fat </span>
+                  <span className="text-third">{latestBodyFat.bodyFatPercent}%</span>
+                </div>
+              )}
+              {bmi != null && (
+                <div>
+                  <span className="text-third/60">BMI </span>
+                  <span className="text-third">{bmi.toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

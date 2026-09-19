@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Dumbbell } from 'lucide-react'
 import { api } from '../lib/api'
 import { BIG_FOUR_LIFTS } from '../lib/lifts'
 import { useMe, useWeights } from '../lib/sharedData'
@@ -77,9 +78,9 @@ function BigFourCard() {
 
   return (
     <div className="glow-card col-span-full w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex items-center gap-1.5">
-          <h2 className="text-sm font-semibold text-third">Big 4</h2>
+          <h2 className="card-title">Big 4</h2>
           <button
             type="button"
             onClick={() => setShowHelp((v) => !v)}
@@ -94,8 +95,9 @@ function BigFourCard() {
           <button
             type="button"
             onClick={() => setMode('log')}
-            className="text-xs font-medium text-third/60 transition hover:text-third"
+            className="btn btn-secondary"
           >
+            <Dumbbell size={14} />
             Log lift
           </button>
         )}

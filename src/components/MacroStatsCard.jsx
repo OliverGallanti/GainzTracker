@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
 import { computeBmr, computeTdee } from '../lib/tdee'
+import { LayoutList, Target, Utensils } from 'lucide-react'
 import { OTHER_MEAL, groupByMeal, sumToday } from '../lib/macros'
 import { useMe, useWeights } from '../lib/sharedData'
 import { useLoad } from '../lib/useLoad'
@@ -86,30 +87,23 @@ function MacroStatsCard() {
 
   return (
     <div className="glow-card w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-third">Today's macros</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h2 className="card-title">Today's macros</h2>
         {mode === 'view' && (
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => openLogFood(nextMeal)}
-              className="text-xs font-medium text-third/60 transition hover:text-third"
-            >
-              Log food
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('editMeals')}
-              className="text-xs font-medium text-third/60 transition hover:text-third"
-            >
-              Meals
-            </button>
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-2">
+              <button type="button" onClick={() => openLogFood(nextMeal)} className="btn btn-secondary">
+                <Utensils size={14} />
+                Log food
+              </button>
+              <button type="button" onClick={() => setMode('editMeals')} className="btn btn-secondary">
+                <LayoutList size={14} />
+                Meals
+              </button>
+            </div>
             {goal && (
-              <button
-                type="button"
-                onClick={() => setMode('editTargets')}
-                className="text-xs font-medium text-third/60 transition hover:text-third"
-              >
+              <button type="button" onClick={() => setMode('editTargets')} className="btn btn-primary">
+                <Target size={14} />
                 Edit targets
               </button>
             )}

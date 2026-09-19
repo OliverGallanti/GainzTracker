@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Repeat } from 'lucide-react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '../lib/dates'
 import { computeAdherenceStreak, suggestedDayIndex } from '../lib/splits'
@@ -102,14 +103,15 @@ function TrainingLogCard() {
 
   return (
     <div ref={cardRef} className="glow-card w-full md:col-span-2 xl:col-span-1 rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-third">Training log</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h2 className="card-title">Training log</h2>
         {showLog && (
           <button
             type="button"
             onClick={() => setEditingRoutine(true)}
-            className="text-xs font-medium text-third/60 transition hover:text-third"
+            className="btn btn-secondary"
           >
+            <Repeat size={14} />
             Change routine
           </button>
         )}

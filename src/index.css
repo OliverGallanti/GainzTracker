@@ -17,6 +17,29 @@
   }
 }
 
+/* Card headers: the title has to read as a heading and the actions beside it as
+   buttons. Both used to be small grey text of nearly the same size, which on a
+   narrow screen made "Today's macros" and "Log food" hard to tell apart.
+   Buttons come in two levels: .btn-primary (filled) for the one action that
+   matters most in a card, .btn-secondary (outlined) for everyday ones. */
+@layer components {
+  .card-title {
+    @apply text-base font-semibold text-third;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition active:scale-[0.98];
+  }
+
+  .btn-primary {
+    @apply bg-third text-main hover:bg-third/90;
+  }
+
+  .btn-secondary {
+    @apply border border-secondary/40 text-third hover:border-secondary;
+  }
+}
+
 /* Cursor glow on cards. ::after is a radial highlight masked down to the 1px
    border ring, so it only lights the edges (and nearby cards' edges too, since
    it follows the cursor everywhere). ::before is a faint spotlight over the

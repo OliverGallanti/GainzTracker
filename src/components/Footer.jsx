@@ -20,6 +20,7 @@ const CREDITS = [
       { name: 'Vite', url: 'https://vite.dev' },
       { name: 'Tailwind CSS', url: 'https://tailwindcss.com' },
       { name: 'Recharts', url: 'https://recharts.org' },
+      { name: 'Lucide', url: 'https://lucide.dev', note: 'icons' },
       { name: 'ZXing', url: 'https://github.com/zxing-js/library', note: 'barcode scanning' },
     ],
   },

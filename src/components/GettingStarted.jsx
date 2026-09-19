@@ -25,7 +25,7 @@ function GettingStarted({ onOpenProfile }) {
       aria-labelledby="getting-started-title"
       className="glow-card col-span-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8"
     >
-      <h2 id="getting-started-title" className="text-sm font-semibold text-third">
+      <h2 id="getting-started-title" className="card-title">
         Getting started
       </h2>
       <p className="mt-1 text-xs text-third/60">

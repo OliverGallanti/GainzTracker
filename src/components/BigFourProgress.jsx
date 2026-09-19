@@ -1,3 +1,4 @@
+import { Pencil, Plus } from 'lucide-react'
 import { getStrengthReferenceLines, getStrengthTier } from '../lib/strength'
 import { StatLineChart } from './StatLineChart'
 
@@ -25,14 +26,11 @@ function BigFourProgress({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-xs">
-        <span className="text-third/60">
-          Goal: {selectedGoal ? `${selectedGoal}kg` : 'Not set'}{' '}
-          <button
-            type="button"
-            onClick={onEditGoals}
-            className="text-third underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary"
-          >
-            {selectedGoal ? 'Edit' : 'Set'}
+        <span className="flex items-center gap-2 text-third/60">
+          Goal: {selectedGoal ? `${selectedGoal}kg` : 'Not set'}
+          <button type="button" onClick={onEditGoals} className="btn btn-secondary">
+            {selectedGoal ? <Pencil size={14} /> : <Plus size={14} />}
+            {selectedGoal ? 'Edit goal' : 'Set goal'}
           </button>
         </span>
         {selectedTier && (
