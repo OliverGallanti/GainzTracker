@@ -6,7 +6,8 @@
   "workspaces": [
     "shared",
     "web",
-    "server"
+    "server",
+    "mobile"
   ],
   "scripts": {
     "dev:web": "npm run dev -w web",
@@ -28,6 +29,8 @@
     "vitest": "^5.0.1"
   },
   "overrides": {
-    "deepmerge-ts": "^8.0.2"
+    "deepmerge-ts": "^8.0.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   }
 }

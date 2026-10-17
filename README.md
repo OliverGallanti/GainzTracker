@@ -59,8 +59,20 @@ npm workspaces, one install and one lockfile at the root:
 - `web/`: the React app (Vite).
 - `shared/` (`@gainz/shared`): platform-free logic and the API types, imported as `@gainz/shared/<file>` (e.g. `@gainz/shared/macros`). Shipped as TypeScript source with no build step. Anything here must not touch the DOM, `fetch` or React, so a future mobile app can use it unchanged.
 - `server/`: the Fastify BFF.
+- `mobile/` (`@gainz/mobile`): the Android app (Expo SDK 58, React Native). See [Mobile app](#mobile-app).
 
-Run scripts from the root: `npm run lint`, `npm test` and `npm run typecheck` cover every workspace.
+Run scripts from the root: `npm run lint`, `npm test` and `npm run typecheck` cover every workspace. React is pinned to one exact version for the whole repo (root `overrides`): two copies in one React Native app crash at runtime, and Expo's loose peer ranges would otherwise pull in a second one.
+
+## Mobile app
+
+`mobile/` is an Expo app sharing `@gainz/shared` with the web app and calling the same server. It signs in with native Google Sign-In and a Bearer token (see "Mobile login" in [server/README.md](server/README.md)), keeps the token in the device keystore (`expo-secure-store`), and fetches with TanStack Query, which is what the planned offline cache builds on. Creates send a phone-made id so a retried request can't duplicate a row. So far it has sign-in and Today's macros (progress bars, foods by meal, log and remove food); targets and the other cards are still web-only.
+
+Google Sign-In needs native code, so the app runs in a development build, not Expo Go:
+
+- **Config:** `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (the server's *web* OAuth client id, which is what makes Google return an ID token). Cloud builds read them from `eas.json`; local builds from `mobile/.env.local` (gitignored; point the URL at your PC's LAN IP to use `npm run dev:server`).
+- **Google Cloud:** one OAuth client of type **Android** per signing key, with package `com.olivergallanti.gainztracker` and that key's SHA-1. Its id is never used in code; Google only checks it exists. Debug builds on this PC use the debug keystore (`cd mobile/android && ./gradlew signingReport`); EAS builds show theirs in `eas credentials`.
+- **Build:** locally with `npm run android -w mobile` (USB debugging on, phone plugged in), or in the cloud with `npx eas-cli build -p android --profile development` (or `preview` for a standalone APK). `mobile/android` is generated (`expo prebuild`) and gitignored.
+- No Google Sign-In config plugin: without options it expects Firebase's `google-services.json`, and its options only configure iOS. Android without Firebase needs none.
 
 ## Running locally
 

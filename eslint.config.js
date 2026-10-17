@@ -6,12 +6,18 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['**/dist', 'server']),
+  globalIgnores(['**/dist', 'server', 'mobile/android', 'mobile/.expo']),
   {
-    // The app (src) is TypeScript; same React rules as before, plus the TS-aware set.
+    // The web app and shared code: TypeScript, React rules, plus the TS-aware set.
     files: ['**/*.{ts,tsx}'],
+    ignores: ['mobile/**'],
     extends: [tseslint.configs.recommended, reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
     languageOptions: { globals: globals.browser },
+  },
+  {
+    // The mobile app: same rules minus react-refresh's Vite preset (Metro, not Vite).
+    files: ['mobile/**/*.{ts,tsx}'],
+    extends: [tseslint.configs.recommended, reactHooks.configs.flat.recommended],
   },
   {
     // Only config files are still JS.
