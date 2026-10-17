@@ -29,7 +29,7 @@ function MealList({ groups, onAdd, onMove, onRemove }) {
             e.preventDefault() // marks this section as a valid drop target
             if (over !== group.name) setOver(group.name)
           }}
-          onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setOver(null)}
+          onDragLeave={(e) => !e.currentTarget.contains(/** @type {Node | null} */ (e.relatedTarget)) && setOver(null)}
           onDrop={(e) => {
             e.preventDefault()
             drop(group.name)

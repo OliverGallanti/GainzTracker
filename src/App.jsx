@@ -29,7 +29,7 @@ function App() {
   // Feeds the cursor position, relative to each card, to the .glow-card CSS.
   useEffect(() => {
     const onMove = (e) => {
-      for (const card of document.querySelectorAll('.glow-card')) {
+      for (const card of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.glow-card'))) {
         const rect = card.getBoundingClientRect()
         card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`)
         card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`)

@@ -17,7 +17,8 @@ function formatDateTick(iso, showYear) {
   )
 }
 
-function TooltipContent({ active, payload, label, unit, decimals }) {
+// active, payload and label are injected by Recharts at render time.
+function TooltipContent({ active = false, payload = [], label = undefined, unit, decimals }) {
   if (!active || !payload?.length) return null
   return (
     <div
@@ -45,7 +46,7 @@ function TooltipContent({ active, payload, label, unit, decimals }) {
 // `data`: [{ loggedAt: ISOString, value: number }], ascending by loggedAt.
 // `referenceLines`: extra dashed lines besides `goal` (e.g. strength-standard
 // thresholds) — [{ label, value }], rendered lighter than the personal goal.
-export function StatLineChart({ data, unit, goal, referenceLines = [], xDomain, decimals = 1 }) {
+export function StatLineChart({ data, unit, goal, referenceLines = [], xDomain = undefined, decimals = 1 }) {
   // The default 'dataMin'/'dataMax' domain only looks at plotted points, so a
   // goal reference line outside that range would render off-screen. Compute
   // the domain from the data AND every reference value so all of them stay

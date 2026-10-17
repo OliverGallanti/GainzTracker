@@ -21,7 +21,7 @@ function WeightChart() {
 
   // The API returns newest-first; the charts and "latest" lookups want oldest-first.
   const entries = weights.data
-    ? [...weights.data].sort((a, b) => new Date(a.loggedAt) - new Date(b.loggedAt))
+    ? [...weights.data].sort((a, b) => Date.parse(a.loggedAt) - Date.parse(b.loggedAt))
     : null
   const height = me.data?.heightCm // null = unset
   const weightGoal = me.data?.weightGoalKg
