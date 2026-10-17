@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --env-file=.env src/server.js",
-    "start": "node --env-file=.env src/server.js",
+    "dev": "node --watch --env-file=.env src/server.ts",
+    "start": "node --env-file=.env src/server.ts",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "typecheck": "tsc"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -24,7 +25,9 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "prisma": "^6.3.1"
+    "@types/node": "^26.6.5",
+    "prisma": "^6.3.1",
+    "typescript": "~6.0.0"
   },
   "overrides": {
     "deepmerge-ts": "^8.0.2"

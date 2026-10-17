@@ -15,11 +15,11 @@ services:
     buildCommand: >-
       npm ci --include=dev && npm run build &&
       cd server && npm ci --include=dev && npx prisma generate && npx prisma migrate deploy
-    startCommand: node server/src/server.js
+    startCommand: node server/src/server.ts
     healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: "24" # runs the server's .ts files directly (built-in type stripping)
       - key: NODE_ENV
         value: production
       - key: SESSION_SECRET

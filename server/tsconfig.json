@@ -1,0 +1,20 @@
+{
+  // Node runs these .ts files directly (built-in type stripping), so there is no
+  // build step: tsc only checks. That's why imports keep their .ts extensions and
+  // only syntax Node can strip is allowed (no enums, no parameter properties).
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src"],
+  // Tests fake fetch with partial objects on purpose; Vitest still runs them.
+  "exclude": ["src/**/*.test.ts"]
+}

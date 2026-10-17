@@ -1,0 +1,9 @@
+{
+  // src/lib is real TypeScript and checked strictly. Components (.jsx) are
+  // still JS, checked loosely by tsconfig.json until they're converted.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "strict": true, "noImplicitAny": true },
+  "include": ["src/lib"],
+  // Tests feed deliberately partial or invalid inputs; tsconfig.json still checks them loosely.
+  "exclude": ["src/lib/**/*.test.ts"]
+}

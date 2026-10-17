@@ -1,0 +1,20 @@
+{
+  // Checks everything in src loosely (components are still JS). src/lib is
+  // also checked strictly by tsconfig.lib.json. Run: npm run typecheck
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    // Loose for now: untyped params are fine until a file is converted.
+    "strict": false,
+    "noImplicitAny": false
+  },
+  "include": ["src"]
+}
