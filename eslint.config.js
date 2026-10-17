@@ -6,7 +6,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['dist', 'server']),
+  globalIgnores(['**/dist', 'server']),
   {
     // The app (src) is TypeScript; same React rules as before, plus the TS-aware set.
     files: ['**/*.{ts,tsx}'],

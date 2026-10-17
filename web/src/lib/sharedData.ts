@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { Me, WeightEntry } from './types'
+import type { Me, WeightEntry } from '@gainz/shared/types'
 import type { LoadResult } from './useLoad'
 
 // Resources several cards read. Each is a useLoad result ({ data, error,

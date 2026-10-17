@@ -51,7 +51,7 @@ export function buildApp() {
   // sees a single origin: no CORS, first-party cookies, and the passkey origin
   // is simply the site itself. In dev, Vite serves the client and proxies here.
   if (isProduction) {
-    app.register(fastifyStatic, { root: fileURLToPath(new URL('../../dist', import.meta.url)) })
+    app.register(fastifyStatic, { root: fileURLToPath(new URL('../../web/dist', import.meta.url)) })
     // Client-side routes get the app shell. A path that looks like a file (has an
     // extension) or belongs to /api or /auth is a real 404 — in particular a stale
     // hashed asset after a deploy must not come back as HTML pretending to be JS.

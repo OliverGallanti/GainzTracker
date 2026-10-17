@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { SplitLog, WorkoutSet } from '../lib/types'
+import type { SplitLog, WorkoutSet } from '@gainz/shared/types'
 import { api } from '../lib/api'
 import { useLoad } from '../lib/useLoad'
 import { useSubmit } from '../lib/useSubmit'

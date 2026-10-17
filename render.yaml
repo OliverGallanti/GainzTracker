@@ -9,12 +9,13 @@ services:
     runtime: node
     plan: free
     region: frankfurt # closest Render region to Neon's London (eu-west-2)
+    # One `npm ci` at the root installs every workspace (web, shared, server).
     # `--include=dev` because NODE_ENV=production would otherwise skip the build
     # tools (Vite, Prisma CLI). Migrations run at build time, so a bad migration
     # fails the deploy instead of taking the running app down.
     buildCommand: >-
       npm ci --include=dev && npm run build &&
-      cd server && npm ci --include=dev && npx prisma generate && npx prisma migrate deploy
+      npm run prisma:generate -w server && npm run migrate:deploy -w server
     startCommand: node server/src/server.ts
     healthCheckPath: /healthz
     envVars:

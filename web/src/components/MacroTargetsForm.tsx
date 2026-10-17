@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { MacroGoal, Sex } from '../lib/types'
+import type { MacroGoal, Sex } from '@gainz/shared/types'
 import { api } from '../lib/api'
-import { ADULT_AGE, PROTEIN_RANGE_TEXT, suggestMacros, tdeePresets, type Goal } from '../lib/macroSplit'
+import { ADULT_AGE, PROTEIN_RANGE_TEXT, suggestMacros, tdeePresets, type Goal } from '@gainz/shared/macroSplit'
 import { useSubmit } from '../lib/useSubmit'
 
 const FIELD_LABELS = { proteinG: 'Protein (g)', fatG: 'Fat (g)', carbsG: 'Carbs (g)' }

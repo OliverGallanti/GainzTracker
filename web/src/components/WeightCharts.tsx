@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { WeightEntry } from '../lib/types'
+import type { WeightEntry } from '@gainz/shared/types'
 import { StatLineChart } from './StatLineChart'
 
 const CHART_MODES = [

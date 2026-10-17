@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { Product, SavedFood } from '../lib/types'
+import type { Product, SavedFood } from '@gainz/shared/types'
 import { api } from '../lib/api'
-import { scaleFood } from '../lib/macros'
+import { scaleFood } from '@gainz/shared/macros'
 import { useSubmit } from '../lib/useSubmit'
 import ProductLookup from './ProductLookup'
 

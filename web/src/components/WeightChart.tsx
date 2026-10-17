@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Flag, Ruler, Scale } from 'lucide-react'
-import { computeBmi } from '../lib/body'
+import { computeBmi } from '@gainz/shared/body'
 import { useMe, useWeights } from '../lib/sharedData'
 import WeightCharts from './WeightCharts'
 import WeightForm from './WeightForm'

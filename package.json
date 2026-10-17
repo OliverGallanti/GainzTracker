@@ -3,38 +3,31 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "shared",
+    "web",
+    "server"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev:web": "npm run dev -w web",
+    "dev:server": "npm run dev -w server",
+    "build": "npm run build -w web",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
-  },
-  "dependencies": {
-    "@simplewebauthn/browser": "^14.0.0",
-    "@tailwindcss/vite": "^4.2.2",
-    "@zxing/browser": "^0.2.1",
-    "@zxing/library": "^0.23.0",
-    "lucide-react": "^1.47.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "recharts": "^3.10.1",
-    "tailwindcss": "^4.2.2"
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "typescript": "~6.0.0",
     "typescript-eslint": "^8.71.2",
-    "vite": "^8.0.4",
     "vitest": "^5.0.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
   }
 }

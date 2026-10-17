@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { uniqueDays } from '../lib/splits'
+import { uniqueDays } from '@gainz/shared/splits'
 
 // Pick which of the split's days you did, then mark it done or skipped. Used for
 // today and for filling in past days. `suggestedIndex` only preselects a chip.

@@ -1,4 +1,4 @@
-import type { WorkoutSet } from '../lib/types'
+import type { WorkoutSet } from '@gainz/shared/types'
 
 function formatDate(isoString: string) {
   return new Date(isoString).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })

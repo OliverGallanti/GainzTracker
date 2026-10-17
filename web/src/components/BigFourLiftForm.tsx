@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
-import { BIG_FOUR_LIFTS } from '../lib/lifts'
+import { BIG_FOUR_LIFTS } from '@gainz/shared/lifts'
 import { useSubmit } from '../lib/useSubmit'
 
 function BigFourLiftForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {

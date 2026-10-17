@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
-import { SPLIT_TEMPLATES } from '../lib/templates'
+import { SPLIT_TEMPLATES } from '@gainz/shared/templates'
 import { useSubmit, ValidationError } from '../lib/useSubmit'
 
 // Template picker → day builder. Mounted only while the user is creating or

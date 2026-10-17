@@ -1,6 +1,6 @@
 import { Pencil, Plus } from 'lucide-react'
-import type { Sex, WorkoutSet } from '../lib/types'
-import { getStrengthReferenceLines, getStrengthTier } from '../lib/strength'
+import type { Sex, WorkoutSet } from '@gainz/shared/types'
+import { getStrengthReferenceLines, getStrengthTier } from '@gainz/shared/strength'
 import { StatLineChart } from './StatLineChart'
 
 // `selectedLift` (picked via the card's lift tiles) and `showStandards` are

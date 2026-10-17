@@ -1,0 +1,12 @@
+{
+  "name": "@gainz/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  }
+}

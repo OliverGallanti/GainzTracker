@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Me } from './lib/types'
+import type { Me } from '@gainz/shared/types'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import Footer from './components/Footer'

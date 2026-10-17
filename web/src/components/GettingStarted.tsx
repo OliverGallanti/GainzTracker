@@ -1,4 +1,4 @@
-import { onboardingSteps } from '../lib/onboarding'
+import { onboardingSteps } from '@gainz/shared/onboarding'
 import { useMe, useWeights } from '../lib/sharedData'
 
 const scrollToWeightCard = () =>

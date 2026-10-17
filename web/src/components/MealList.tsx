@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { OTHER_MEAL, formatMacro, type MealGroup } from '../lib/macros'
+import { OTHER_MEAL, formatMacro, type MealGroup } from '@gainz/shared/macros'
 
 const summary = ({ calories, proteinG, fatG, carbsG }: MealGroup['totals']) =>
   [`${Math.round(calories)} cal`, `${Math.round(proteinG)}g P`, `${Math.round(fatG)}g F`, `${Math.round(carbsG)}g C`].join(' · ')

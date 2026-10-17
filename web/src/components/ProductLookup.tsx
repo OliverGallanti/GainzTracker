@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Product } from '../lib/types'
+import type { Product } from '@gainz/shared/types'
 import { api } from '../lib/api'
 import { useSubmit, ValidationError } from '../lib/useSubmit'
 import BarcodeScanner from './BarcodeScanner'

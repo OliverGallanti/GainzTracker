@@ -1,5 +1,5 @@
 {
-  "name": "gainztracker-server",
+  "name": "@gainz/server",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,7 +9,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:generate": "prisma generate",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -26,10 +27,6 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
-    "prisma": "^6.3.1",
-    "typescript": "~6.0.0"
-  },
-  "overrides": {
-    "deepmerge-ts": "^8.0.2"
+    "prisma": "^6.3.1"
   }
 }

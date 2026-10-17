@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { SplitLog } from '../lib/types'
-import { startOfLocalDay } from '../lib/dates'
-import { uniqueDays } from '../lib/splits'
+import type { SplitLog } from '@gainz/shared/types'
+import { startOfLocalDay } from '@gainz/shared/dates'
+import { uniqueDays } from '@gainz/shared/splits'
 import SessionEditor from './SessionEditor'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
