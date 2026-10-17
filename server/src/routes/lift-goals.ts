@@ -28,7 +28,7 @@ export default async function liftGoalRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)
 
   app.get('/lift-goals', async (request) => {
-    return toMap(await prisma.liftGoal.findMany({ where: { userId: request.session.userId } }))
+    return toMap(await prisma.liftGoal.findMany({ where: { userId: request.userId } }))
   })
 
   app.put('/lift-goals', async (request, reply) => {
@@ -37,7 +37,7 @@ export default async function liftGoalRoutes(app: FastifyInstance) {
       return reply.badRequest(parsed.error.message)
     }
 
-    const userId = request.session.userId
+    const userId = request.userId
     // All-or-nothing: a request that sets four goals never lands two of them.
     await prisma.$transaction(
       Object.entries(parsed.data).map(([exerciseName, goalKg]) =>

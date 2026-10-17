@@ -25,6 +25,7 @@ export function buildApp() {
   // any secure cookie it considers to be on an insecure connection.
   const app = Fastify({ logger: true, trustProxy: isProduction })
 
+  app.decorateRequest('userId', '')
   app.register(sensible)
   app.register(cookiePlugin)
   app.register(corsPlugin)

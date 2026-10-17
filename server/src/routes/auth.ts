@@ -3,7 +3,12 @@ import * as client from 'openid-client'
 import { getGoogleOidcConfig } from '../auth/oidc-client.ts'
 import { SESSION_COOKIE_NAME, sessionCookieOptions } from '../auth/session-plugin.ts'
 import { config, isProduction } from '../config.ts'
-import { prisma } from '../db.ts'
+import { InvalidIdTokenError, verifyGoogleIdToken } from '../auth/google-id-token.ts'
+import { upsertGoogleUser } from '../auth/google-user.ts'
+import { bearerToken, issueToken, revokeToken } from '../auth/tokens.ts'
+import { z } from 'zod'
+
+const tokenLoginSchema = z.object({ idToken: z.string().min(1).max(4096) })
 
 const OAUTH_STATE_COOKIE = 'oauth_state'
 const OAUTH_STATE_MAX_AGE_SECONDS = 300
@@ -79,27 +84,15 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.badRequest('Your Google account needs a verified email address to sign in')
     }
 
-    const profile = {
+    const user = await upsertGoogleUser({
+      sub: claims.sub,
       email: claims.email,
       name: typeof claims.name === 'string' ? claims.name : null,
-      avatarUrl: typeof claims.picture === 'string' ? claims.picture : null,
-    }
-
-    let user
-    try {
-      user = await prisma.user.upsert({
-        where: { googleId: claims.sub },
-        update: profile,
-        create: { googleId: claims.sub, ...profile },
-      })
-    } catch (err) {
-      // An address can move between Google accounts, so a new sub can arrive
-      // carrying an email already held by another row.
-      if ((err as { code?: string }).code === 'P2002') {
-        request.log.warn({ googleId: claims.sub }, 'Sign-in blocked: email belongs to another account')
-        return reply.conflict('That email address is already linked to a different account')
-      }
-      throw err
+      picture: typeof claims.picture === 'string' ? claims.picture : null,
+    })
+    if (!user) {
+      request.log.warn({ googleId: claims.sub }, 'Sign-in blocked: email belongs to another account')
+      return reply.conflict('That email address is already linked to a different account')
     }
 
     // Issue a fresh session ID now that this session is being elevated to a
@@ -109,6 +102,39 @@ export default async function authRoutes(app: FastifyInstance) {
     await request.session.save()
 
     return reply.redirect(config.FRONTEND_URL)
+  })
+
+  // Mobile sign-in: the app gets an ID token from native Google Sign-In and trades
+  // it for a Bearer token here (a phone app can't use the browser redirect flow
+  // or rely on cookies). No session or cookie is created.
+  app.post('/google/token', async (request, reply) => {
+    const parsed = tokenLoginSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.badRequest(parsed.error.message)
+    }
+
+    let identity
+    try {
+      identity = await verifyGoogleIdToken(parsed.data.idToken, config.GOOGLE_CLIENT_ID)
+    } catch (err) {
+      if (err instanceof InvalidIdTokenError) return reply.unauthorized(err.message)
+      throw err
+    }
+
+    const user = await upsertGoogleUser(identity)
+    if (!user) {
+      return reply.conflict('That email address is already linked to a different account')
+    }
+
+    const { token, expiresAt } = await issueToken(user.id)
+    return reply.code(201).send({ token, expiresAt })
+  })
+
+  // Mobile sign-out. Always 204, so it can't be used to probe which tokens exist.
+  app.delete('/token', async (request, reply) => {
+    const token = bearerToken(request.headers.authorization)
+    if (token) await revokeToken(token)
+    return reply.code(204).send()
   })
 
   app.post('/logout', async (request, reply) => {

@@ -16,7 +16,7 @@ export default async function savedFoodRoutes(app: FastifyInstance) {
 
   app.get('/saved-foods', async (request) => {
     return prisma.savedFood.findMany({
-      where: { userId: request.session.userId },
+      where: { userId: request.userId },
       orderBy: { name: 'asc' },
     })
   })
@@ -30,7 +30,7 @@ export default async function savedFoodRoutes(app: FastifyInstance) {
       return reply.badRequest(parsed.error.message)
     }
 
-    const userId = request.session.userId
+    const userId = request.userId
     const { name, calories, proteinG = null, carbsG = null, fatG = null } = parsed.data
     const data = { calories, proteinG, carbsG, fatG }
     const food = await prisma.savedFood.upsert({
@@ -43,7 +43,7 @@ export default async function savedFoodRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>('/saved-foods/:id', async (request, reply) => {
     const { count } = await prisma.savedFood.deleteMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
     })
     if (count === 0) {
       return reply.notFound()

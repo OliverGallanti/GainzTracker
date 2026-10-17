@@ -16,7 +16,7 @@ export default async function macroGoalRoutes(app: FastifyInstance) {
   // 200 + null when unset, not 404 — matches how every other GET here treats
   // "nothing yet" as a normal empty state (/weights, /meals return []).
   app.get('/macro-goal', async (request) => {
-    return prisma.macroGoal.findUnique({ where: { userId: request.session.userId } })
+    return prisma.macroGoal.findUnique({ where: { userId: request.userId } })
   })
 
   app.put('/macro-goal', async (request, reply) => {
@@ -26,8 +26,8 @@ export default async function macroGoalRoutes(app: FastifyInstance) {
     }
 
     const goal = await prisma.macroGoal.upsert({
-      where: { userId: request.session.userId },
-      create: { ...parsed.data, userId: request.session.userId },
+      where: { userId: request.userId },
+      create: { ...parsed.data, userId: request.userId },
       update: parsed.data,
     })
     return reply.code(200).send(goal)

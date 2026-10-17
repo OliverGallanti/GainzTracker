@@ -7,7 +7,7 @@ export default async function passkeyCredentialRoutes(app: FastifyInstance) {
 
   app.get('/passkeys', async (request) => {
     return prisma.credential.findMany({
-      where: { userId: request.session.userId },
+      where: { userId: request.userId },
       select: { id: true, deviceLabel: true, createdAt: true, lastUsedAt: true },
       orderBy: { createdAt: 'desc' },
     })
@@ -15,7 +15,7 @@ export default async function passkeyCredentialRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>('/passkeys/:id', async (request, reply) => {
     const { count } = await prisma.credential.deleteMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
     })
     if (count === 0) {
       return reply.notFound()

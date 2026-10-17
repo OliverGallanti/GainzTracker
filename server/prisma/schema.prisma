@@ -32,6 +32,7 @@ model User {
 
   liftGoals       LiftGoal[]
   sessions        Session[]
+  authTokens      AuthToken[]
   weightEntries   WeightEntry[]
   macroEntries    MacroEntry[]
   workoutRoutines WorkoutRoutine[]
@@ -138,6 +139,20 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// Bearer tokens for clients that can't use the session cookie (the mobile app).
+// Only a SHA-256 hash of the token is stored, so a database leak can't be replayed
+// as logins. Revoked by deleting the row; there is no refresh: when one expires the
+// app signs in with Google again.
+model AuthToken {
+  id        String   @id // sha256(token), hex
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model WeightEntry {

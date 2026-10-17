@@ -45,7 +45,7 @@ const updateSchema = z
 export default async function meRoutes(app: FastifyInstance) {
   app.get('/me', { onRequest: requireAuth }, async (request, reply) => {
     const user = await prisma.user.findUnique({
-      where: { id: request.session.userId },
+      where: { id: request.userId },
       select: userSelect,
     })
 
@@ -63,7 +63,7 @@ export default async function meRoutes(app: FastifyInstance) {
     }
 
     const user = await prisma.user.update({
-      where: { id: request.session.userId },
+      where: { id: request.userId },
       data: parsed.data,
       select: userSelect,
     })

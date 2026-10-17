@@ -50,7 +50,17 @@ Also worth knowing: every request to `/auth/logout` (or any route) must **not** 
 
 ## Authorization model
 
-Every route under `/api/*` sits behind the `requireAuth` hook ([middleware/require-auth.js](src/middleware/require-auth.ts)), which checks `request.session.userId` and returns 401 if it's missing. Beyond that gate, every single Prisma query in every route handler is scoped with `where: { userId: request.session.userId, ... }`. The `userId` is **read only from the session, never from the request body or URL params** — a client cannot pass someone else's ID and access their data, because nothing in a route handler trusts client-supplied identity.
+Every route under `/api/*` sits behind the `requireAuth` hook ([middleware/require-auth.ts](src/middleware/require-auth.ts)), which resolves the user from the session cookie (browser) or an `Authorization: Bearer` token (mobile app), puts it on `request.userId`, and returns 401 if there is none. A request that sends a Bearer token is judged on that token alone: an invalid or expired one is a 401 even if a valid cookie came along too. Beyond that gate, every single Prisma query in every route handler is scoped with `where: { userId: request.userId, ... }`. The `userId` is **read only from the session or token, never from the request body or URL params** — a client cannot pass someone else's ID and access their data, because nothing in a route handler trusts client-supplied identity.
+
+### Mobile login (Bearer tokens)
+
+A phone app can't use the browser's OAuth redirect or rely on cookies, so it signs in with native Google Sign-In and trades the resulting ID token at `POST /auth/google/token` (`{ idToken }`) for a Bearer token (`{ token, expiresAt }`). The ID token is verified against Google's published keys with `jose`: signature, issuer, audience (the same `GOOGLE_CLIENT_ID` as the web login, because the app requests the token with the web client id) and expiry, plus the same verified-email rule as the browser login ([auth/google-id-token.ts](src/auth/google-id-token.ts), tested with a local signing key). Both logins share `upsertGoogleUser`.
+
+Tokens are 32 random bytes; only their SHA-256 hash is stored (`AuthToken`), they expire after 90 days with no refresh (the app signs in again), and `DELETE /auth/token` revokes one. Revoking is always a 204, so it can't be used to probe for valid tokens. No cookie or session is created for token requests.
+
+### Retry-safe creates (client-made ids)
+
+The mobile app will queue writes while offline and replay them later, which means the same create can arrive twice. `POST /meals`, `/weights`, `/workout-sets`, `/workouts`, `/workout-splits` and `/workout-splits/:id/logs` accept an optional `id` (a UUID the client generated). If a row with that id already exists and is the caller's, the route returns it with **200** instead of creating a duplicate; if it belongs to someone else, **409**. Without an `id` (the browser), the database default is used as before. For day logs the replay check runs before the one-log-per-day check, so a replayed log returns itself, while a *different* log for the same day is still refused. `PUT` routes (`/me`, `/macro-goal`, `/lift-goals`) and `POST /saved-foods` (upsert by name) were already safe to repeat.
 
 For single-record mutations (e.g. `DELETE /api/weights/:id`), the ownership check and the mutation are the same atomic query — `deleteMany({ where: { id, userId } })` — rather than "fetch the record, check who owns it, then delete." This means "doesn't exist" and "isn't yours" produce the same result (a 404), which avoids leaking whether a given ID belongs to someone else, and avoids a race between the check and the mutation.
 

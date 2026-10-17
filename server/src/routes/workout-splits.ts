@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
+import { clientId, repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
 
 // How many completed days make a good week (the weekly streak's threshold). Optional:
@@ -8,6 +9,7 @@ import { prisma } from '../db.ts'
 const daysPerWeekSchema = z.number().int().min(1).max(7)
 
 const createSplitSchema = z.object({
+  id: clientId,
   name: z.string().min(1),
   days: z.array(z.string().min(1)).min(1),
   daysPerWeek: daysPerWeekSchema.optional(),
@@ -20,6 +22,7 @@ const updateSplitSchema = z.object({ daysPerWeek: daysPerWeekSchema })
 // logged (the client knows its own timezone); `loggedAt` places the log inside
 // it, so past days can be filled in.
 const createLogSchema = z.object({
+  id: clientId,
   completed: z.boolean(),
   dayIndex: z.number().int().min(0),
   dayStart: z.coerce.date(),
@@ -40,7 +43,7 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
 
   app.get('/workout-splits', async (request) => {
     return prisma.workoutSplit.findMany({
-      where: { userId: request.session.userId },
+      where: { userId: request.userId },
       orderBy: { createdAt: 'desc' },
     })
   })
@@ -51,13 +54,18 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
       return reply.badRequest(parsed.error.message)
     }
 
+    if (parsed.data.id) {
+      const existing = await prisma.workoutSplit.findUnique({ where: { id: parsed.data.id } })
+      if (repliedWithExisting(reply, request.userId, existing)) return reply
+    }
+
     const [, split] = await prisma.$transaction([
       prisma.workoutSplit.updateMany({
-        where: { userId: request.session.userId, active: true },
+        where: { userId: request.userId, active: true },
         data: { active: false },
       }),
       prisma.workoutSplit.create({
-        data: { ...parsed.data, userId: request.session.userId, active: true },
+        data: { ...parsed.data, userId: request.userId, active: true },
       }),
     ])
     return reply.code(201).send(split)
@@ -70,7 +78,7 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
     }
 
     const { count } = await prisma.workoutSplit.updateMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
       data: parsed.data,
     })
     if (count === 0) {
@@ -81,7 +89,7 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>('/workout-splits/:id', async (request, reply) => {
     const { count } = await prisma.workoutSplit.deleteMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
     })
     if (count === 0) {
       return reply.notFound()
@@ -91,7 +99,7 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { id: string } }>('/workout-splits/:id/logs', async (request, reply) => {
     const split = await prisma.workoutSplit.findFirst({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
       select: { id: true },
     })
     if (!split) {
@@ -99,7 +107,7 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
     }
 
     return prisma.splitLog.findMany({
-      where: { splitId: request.params.id, userId: request.session.userId },
+      where: { splitId: request.params.id, userId: request.userId },
       orderBy: { loggedAt: 'desc' },
     })
   })
@@ -111,13 +119,17 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
     }
 
     const split = await prisma.workoutSplit.findFirst({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
     })
     if (!split) {
       return reply.notFound()
     }
 
-    const { completed, dayIndex, dayStart, dayEnd, loggedAt } = parsed.data
+    const { id, completed, dayIndex, dayStart, dayEnd, loggedAt } = parsed.data
+    if (id) {
+      const existing = await prisma.splitLog.findUnique({ where: { id } })
+      if (repliedWithExisting(reply, request.userId, existing)) return reply
+    }
 
     if (dayIndex >= split.days.length) {
       return reply.badRequest('dayIndex is not a day of this split')
@@ -135,7 +147,8 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
 
     const log = await prisma.splitLog.create({
       data: {
-        userId: request.session.userId,
+        id,
+        userId: request.userId,
         splitId: split.id,
         dayIndex,
         completed,
@@ -153,7 +166,7 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
 
     if (parsed.data.dayIndex !== undefined) {
       const split = await prisma.workoutSplit.findFirst({
-        where: { id: request.params.id, userId: request.session.userId },
+        where: { id: request.params.id, userId: request.userId },
         select: { days: true },
       })
       if (!split) {
@@ -168,7 +181,7 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
       where: {
         id: request.params.logId,
         splitId: request.params.id,
-        userId: request.session.userId,
+        userId: request.userId,
       },
       data: parsed.data,
     })
@@ -183,7 +196,7 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
       where: {
         id: request.params.logId,
         splitId: request.params.id,
-        userId: request.session.userId,
+        userId: request.userId,
       },
     })
     if (count === 0) {

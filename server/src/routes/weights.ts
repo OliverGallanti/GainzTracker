@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
+import { clientId, repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
 
 const createSchema = z.object({
+  id: clientId,
   weightKg: z.number().positive(),
   bodyFatPercent: z.number().min(0).max(100).optional(),
   loggedAt: z.coerce.date().optional(),
@@ -27,7 +29,7 @@ export default async function weightRoutes(app: FastifyInstance) {
 
     return prisma.weightEntry.findMany({
       where: {
-        userId: request.session.userId,
+        userId: request.userId,
         ...((since || until) && {
           loggedAt: { ...(since && { gte: since }), ...(until && { lte: until }) },
         }),
@@ -42,15 +44,20 @@ export default async function weightRoutes(app: FastifyInstance) {
       return reply.badRequest(parsed.error.message)
     }
 
+    if (parsed.data.id) {
+      const existing = await prisma.weightEntry.findUnique({ where: { id: parsed.data.id } })
+      if (repliedWithExisting(reply, request.userId, existing)) return reply
+    }
+
     const entry = await prisma.weightEntry.create({
-      data: { ...parsed.data, userId: request.session.userId },
+      data: { ...parsed.data, userId: request.userId },
     })
     return reply.code(201).send(entry)
   })
 
   app.delete<{ Params: { id: string } }>('/weights/:id', async (request, reply) => {
     const { count } = await prisma.weightEntry.deleteMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
     })
     if (count === 0) {
       return reply.notFound()

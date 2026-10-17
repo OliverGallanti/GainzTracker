@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
+import { clientId, repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
 
 const createSchema = z.object({
+  id: clientId,
   description: z.string().min(1),
   calories: z.number().int().nonnegative(),
   proteinG: z.number().nonnegative().optional(),
@@ -32,7 +34,7 @@ export default async function mealRoutes(app: FastifyInstance) {
 
     return prisma.macroEntry.findMany({
       where: {
-        userId: request.session.userId,
+        userId: request.userId,
         ...((since || until) && {
           loggedAt: { ...(since && { gte: since }), ...(until && { lte: until }) },
         }),
@@ -47,8 +49,13 @@ export default async function mealRoutes(app: FastifyInstance) {
       return reply.badRequest(parsed.error.message)
     }
 
+    if (parsed.data.id) {
+      const existing = await prisma.macroEntry.findUnique({ where: { id: parsed.data.id } })
+      if (repliedWithExisting(reply, request.userId, existing)) return reply
+    }
+
     const entry = await prisma.macroEntry.create({
-      data: { ...parsed.data, userId: request.session.userId },
+      data: { ...parsed.data, userId: request.userId },
     })
     return reply.code(201).send(entry)
   })
@@ -61,7 +68,7 @@ export default async function mealRoutes(app: FastifyInstance) {
     }
 
     const { count } = await prisma.macroEntry.updateMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
       data: parsed.data,
     })
     if (count === 0) {
@@ -72,7 +79,7 @@ export default async function mealRoutes(app: FastifyInstance) {
 
   app.delete<{ Params: { id: string } }>('/meals/:id', async (request, reply) => {
     const { count } = await prisma.macroEntry.deleteMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
     })
     if (count === 0) {
       return reply.notFound()

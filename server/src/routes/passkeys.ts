@@ -39,7 +39,7 @@ function readChallengeCookie(request: FastifyRequest, reply: FastifyReply, cooki
 
 export default async function passkeyRoutes(app: FastifyInstance) {
   app.post('/registration/options', { onRequest: requireAuth }, async (request, reply) => {
-    const user = await prisma.user.findUnique({ where: { id: request.session.userId } })
+    const user = await prisma.user.findUnique({ where: { id: request.userId } })
     if (!user) {
       return reply.unauthorized('Not authenticated')
     }
@@ -94,7 +94,7 @@ export default async function passkeyRoutes(app: FastifyInstance) {
       await prisma.credential.create({
         data: {
           id: credential.id,
-          userId: request.session.userId,
+          userId: request.userId,
           publicKey: Buffer.from(credential.publicKey),
           counter: BigInt(credential.counter),
           transports: credential.transports ?? [],

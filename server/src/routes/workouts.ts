@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
+import { clientId, repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
 
 const exerciseSchema = z.object({
@@ -11,12 +12,14 @@ const exerciseSchema = z.object({
 })
 
 const createRoutineSchema = z.object({
+  id: clientId,
   name: z.string().min(1),
   exercises: z.array(exerciseSchema),
   notes: z.string().optional(),
 })
 
 const createSetSchema = z.object({
+  id: clientId,
   routineId: z.string().optional(),
   splitLogId: z.string().optional(),
   exerciseName: z.string().min(1),
@@ -34,7 +37,7 @@ export default async function workoutRoutes(app: FastifyInstance) {
 
   app.get('/workouts', async (request) => {
     return prisma.workoutRoutine.findMany({
-      where: { userId: request.session.userId },
+      where: { userId: request.userId },
       orderBy: { createdAt: 'desc' },
     })
   })
@@ -45,15 +48,20 @@ export default async function workoutRoutes(app: FastifyInstance) {
       return reply.badRequest(parsed.error.message)
     }
 
+    if (parsed.data.id) {
+      const existing = await prisma.workoutRoutine.findUnique({ where: { id: parsed.data.id } })
+      if (repliedWithExisting(reply, request.userId, existing)) return reply
+    }
+
     const routine = await prisma.workoutRoutine.create({
-      data: { ...parsed.data, userId: request.session.userId },
+      data: { ...parsed.data, userId: request.userId },
     })
     return reply.code(201).send(routine)
   })
 
   app.delete<{ Params: { id: string } }>('/workouts/:id', async (request, reply) => {
     const { count } = await prisma.workoutRoutine.deleteMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
     })
     if (count === 0) {
       return reply.notFound()
@@ -69,7 +77,7 @@ export default async function workoutRoutes(app: FastifyInstance) {
 
     return prisma.workoutSet.findMany({
       where: {
-        userId: request.session.userId,
+        userId: request.userId,
         ...(parsedQuery.data.splitLogId && { splitLogId: parsedQuery.data.splitLogId }),
       },
       orderBy: { performedAt: 'desc' },
@@ -82,9 +90,14 @@ export default async function workoutRoutes(app: FastifyInstance) {
       return reply.badRequest(parsed.error.message)
     }
 
+    if (parsed.data.id) {
+      const existing = await prisma.workoutSet.findUnique({ where: { id: parsed.data.id } })
+      if (repliedWithExisting(reply, request.userId, existing)) return reply
+    }
+
     if (parsed.data.routineId) {
       const routine = await prisma.workoutRoutine.findFirst({
-        where: { id: parsed.data.routineId, userId: request.session.userId },
+        where: { id: parsed.data.routineId, userId: request.userId },
         select: { id: true },
       })
       if (!routine) {
@@ -94,7 +107,7 @@ export default async function workoutRoutes(app: FastifyInstance) {
 
     if (parsed.data.splitLogId) {
       const log = await prisma.splitLog.findFirst({
-        where: { id: parsed.data.splitLogId, userId: request.session.userId },
+        where: { id: parsed.data.splitLogId, userId: request.userId },
         select: { id: true },
       })
       if (!log) {
@@ -103,14 +116,14 @@ export default async function workoutRoutes(app: FastifyInstance) {
     }
 
     const set = await prisma.workoutSet.create({
-      data: { ...parsed.data, userId: request.session.userId },
+      data: { ...parsed.data, userId: request.userId },
     })
     return reply.code(201).send(set)
   })
 
   app.delete<{ Params: { id: string } }>('/workout-sets/:id', async (request, reply) => {
     const { count } = await prisma.workoutSet.deleteMany({
-      where: { id: request.params.id, userId: request.session.userId },
+      where: { id: request.params.id, userId: request.userId },
     })
     if (count === 0) {
       return reply.notFound()
