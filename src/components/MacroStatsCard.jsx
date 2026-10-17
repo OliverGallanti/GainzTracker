@@ -6,6 +6,7 @@ import { LayoutList, Target, Utensils } from 'lucide-react'
 import { OTHER_MEAL, groupByMeal, sumToday } from '../lib/macros'
 import { useMe, useWeights } from '../lib/sharedData'
 import { useLoad } from '../lib/useLoad'
+import { useSubmit } from '../lib/useSubmit'
 import LifeBar from './LifeBar'
 import MacroTargetsForm from './MacroTargetsForm'
 import MealForm from './MealForm'
@@ -66,6 +67,15 @@ function MacroStatsCard() {
     setLogMeal(mealName)
     setMode('logFood')
   }
+
+  // "Other" isn't a real slot: moving there clears the food's slot.
+  const { submit: moveMeal, error: moveError } = useSubmit(async (id, mealName) => {
+    await api(`/api/meals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ mealName: mealName === OTHER_MEAL ? null : mealName }),
+    })
+    own.reload()
+  }, 'Could not move that food: please try again')
 
   const handleRemoveMeal = async (id) => {
     await api(`/api/meals/${id}`, { method: 'DELETE' })
@@ -187,7 +197,8 @@ function MacroStatsCard() {
 
       {!isLoading && mode === 'view' && (
         <div className="mt-5">
-          <MealList groups={groups} onAdd={openLogFood} onRemove={handleRemoveMeal} />
+          <MealList groups={groups} onAdd={openLogFood} onMove={moveMeal} onRemove={handleRemoveMeal} />
+          {moveError && <p className="mt-2 text-xs text-red-400">{moveError}</p>}
         </div>
       )}
 

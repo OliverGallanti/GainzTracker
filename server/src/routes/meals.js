@@ -12,6 +12,8 @@ const createSchema = z.object({
   loggedAt: z.coerce.date().optional(),
 })
 
+const moveSchema = z.object({ mealName: z.string().trim().min(1).max(30).nullable() })
+
 const listQuerySchema = z.object({
   since: z.coerce.date().optional(),
   until: z.coerce.date().optional(),
@@ -48,6 +50,23 @@ export default async function mealRoutes(app) {
       data: { ...parsed.data, userId: request.session.userId },
     })
     return reply.code(201).send(entry)
+  })
+
+  // Move a food to another meal slot; null = "Other".
+  app.patch('/meals/:id', async (request, reply) => {
+    const parsed = moveSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.badRequest(parsed.error.message)
+    }
+
+    const { count } = await prisma.macroEntry.updateMany({
+      where: { id: request.params.id, userId: request.session.userId },
+      data: parsed.data,
+    })
+    if (count === 0) {
+      return reply.notFound()
+    }
+    return reply.code(204).send()
   })
 
   app.delete('/meals/:id', async (request, reply) => {
