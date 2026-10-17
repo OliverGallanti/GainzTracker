@@ -8,13 +8,14 @@ import tseslint from 'typescript-eslint'
 export default defineConfig([
   globalIgnores(['dist', 'server']),
   {
-    // src/lib is TypeScript; same React rules, plus the TS-aware recommended set.
-    files: ['**/*.ts'],
-    extends: [tseslint.configs.recommended, reactHooks.configs.flat.recommended],
+    // The app (src) is TypeScript; same React rules as before, plus the TS-aware set.
+    files: ['**/*.{ts,tsx}'],
+    extends: [tseslint.configs.recommended, reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['**/*.{js,jsx}'],
+    // Only config files are still JS.
+    files: ['**/*.js'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,

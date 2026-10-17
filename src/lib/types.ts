@@ -47,8 +47,46 @@ export interface WorkoutSplit {
 
 export interface SplitLog {
   id: string
+  splitId: string
   dayIndex: number
   completed: boolean
   loggedAt: string
   durationMinutes: number | null
+}
+
+export interface MacroGoal {
+  proteinG: number
+  fatG: number
+  carbsG: number
+  calorieTarget: number | null
+}
+
+export interface SavedFood extends Macros {
+  id: string
+  name: string
+}
+
+// GET /api/products/:barcode (Open Food Facts, normalized by the server).
+export interface Product {
+  barcode: string
+  name: string
+  brand: string | null
+  servingSize: string | null
+  servingG: number | null
+  per100g: { calories: number | null; proteinG: number | null; fatG: number | null; carbsG: number | null }
+}
+
+export interface WorkoutSet {
+  id: string
+  exerciseName: string
+  weightKg: number | null
+  reps: number | null
+  performedAt: string
+}
+
+export interface Passkey {
+  id: string
+  deviceLabel: string | null
+  createdAt: string
+  lastUsedAt: string | null
 }
