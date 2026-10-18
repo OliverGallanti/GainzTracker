@@ -82,6 +82,7 @@ export interface WorkoutSet {
   weightKg: number | null
   reps: number | null
   performedAt: string
+  splitLogId?: string | null // the training day it was logged in, if any
 }
 
 export interface Passkey {

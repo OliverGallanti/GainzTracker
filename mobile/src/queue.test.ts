@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, queuedItemId, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
+import { QUEUED, queuedItemId, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -149,6 +149,61 @@ describe('removes', () => {
     onlineManager.setOnline(true)
     await client.resumePausedMutations()
     expect(api.mock.calls.map(([path, o]) => `${o.method} ${path}`)).toEqual(['POST /api/meals', 'DELETE /api/meals/meal-1'])
+  })
+})
+
+describe('training', () => {
+  const split = { id: 's', name: 'PPL', days: ['Push', 'Pull', 'Legs'], daysPerWeek: 3, active: true }
+  const log = (id: string, loggedAt: string) => ({ id, splitId: 's', dayIndex: 0, completed: true, loggedAt, durationMinutes: null })
+
+  it('puts a filled-in past day in date order, and edits a logged day in place', async () => {
+    const client = makeClient()
+    client.setQueryData(['training'], { split, logs: [log('new', '2026-10-10T12:00:00.000Z'), log('old', '2026-10-01T12:00:00.000Z')], allLogs: [] })
+
+    void mutate<LogDayVars>(client, QUEUED.logDay, {
+      label: 'Push',
+      splitId: 's',
+      log: { id: 'mid', dayIndex: 1, completed: true, loggedAt: '2026-10-05T12:00:00.000Z' },
+      dayStart: '2026-10-05T00:00:00.000Z',
+      dayEnd: '2026-10-06T00:00:00.000Z',
+    })
+    void mutate<UpdateLogVars>(client, QUEUED.updateLog, { label: 'x', splitId: 's', logId: 'old', changes: { completed: false, durationMinutes: 45 } })
+    await flush()
+
+    const data = client.getQueryData<TrainingData>(['training'])!
+    expect(data.logs.map((l) => l.id)).toEqual(['new', 'mid', 'old'])
+    expect(data.logs[2]).toMatchObject({ completed: false, durationMinutes: 45 })
+  })
+
+  it('switches to a new routine straight away and sends it, then the goal change, in order', async () => {
+    const client = makeClient()
+    client.setQueryData(['training'], { split, logs: [log('a', '2026-10-10T12:00:00.000Z')], allLogs: [log('a', '2026-10-10T12:00:00.000Z')] })
+
+    const routine = { id: 'r2', name: 'Upper/Lower', days: ['Upper', 'Lower'], daysPerWeek: 4 }
+    void mutate<CreateSplitVars>(client, QUEUED.createSplit, { label: 'Routine', split: routine })
+    void mutate<UpdateSplitVars>(client, QUEUED.updateSplit, { label: 'Goal', splitId: 'r2', daysPerWeek: 2 })
+    await flush()
+
+    const data = client.getQueryData<TrainingData>(['training'])!
+    expect(data.split).toEqual({ ...routine, daysPerWeek: 2, active: true })
+    expect(data.logs).toEqual([])
+    expect(data.allLogs).toHaveLength(1) // the old routine's days still count toward the streak
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls).toEqual([
+      ['/api/workout-splits', { method: 'POST', body: JSON.stringify(routine) }],
+      ['/api/workout-splits/r2', { method: 'PATCH', body: JSON.stringify({ daysPerWeek: 2 }) }],
+    ])
+  })
+
+  it('sends a session exercise with the log it belongs to', async () => {
+    const client = makeClient()
+    const set = { id: 'set-1', splitLogId: 'log-1', exerciseName: 'Dips', weightKg: null, reps: 10, performedAt: '2026-10-05T12:00:00.000Z' }
+    void mutate<AddSetVars>(client, QUEUED.addSet, { label: 'Dips', set })
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(JSON.parse(api.mock.calls[0][1].body)).toEqual({ id: 'set-1', splitLogId: 'log-1', exerciseName: 'Dips', reps: 10, performedAt: set.performedAt })
   })
 })
 

@@ -1,5 +1,5 @@
 import { MutationObserver, useMutation, useMutationState, useQueryClient, type Mutation, type QueryClient } from '@tanstack/react-query'
-import type { Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet } from '@gainz/shared/types'
+import type { Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
 import { api } from './api'
 
 // The offline write queue. Each kind of write registers its send function once
@@ -35,6 +35,19 @@ export type LogDayVars = Label & {
   dayStart: string
   dayEnd: string
 }
+// PATCHes set fields to values: repeating one is harmless.
+export type UpdateLogVars = Label & {
+  splitId: string
+  logId: string
+  changes: Partial<Pick<SplitLog, 'dayIndex' | 'completed' | 'durationMinutes'>>
+}
+export type UpdateSplitVars = Label & { splitId: string; daysPerWeek: number }
+// Creating a routine makes it the active one (the server deactivates the rest).
+export type CreateSplitVars = Label & { split: Pick<WorkoutSplit, 'id' | 'name' | 'days'> & { daysPerWeek: number } }
+
+// The Training tab's query: the streak counts every routine's logs, the rest
+// only the active routine's.
+export type TrainingData = { split: WorkoutSplit | null; logs: SplitLog[]; allLogs: SplitLog[] }
 
 // One kind for every remove. `cacheKey` is the query (or prefix, e.g. ['today']
 // covers every day) the item is shown in; it's taken out of any list there.
@@ -46,6 +59,9 @@ export const QUEUED = {
   addWeight: ['queue', 'addWeight'],
   updateMe: ['queue', 'updateMe'],
   logDay: ['queue', 'logDay'],
+  updateLog: ['queue', 'updateLog'],
+  updateSplit: ['queue', 'updateSplit'],
+  createSplit: ['queue', 'createSplit'],
   saveFood: ['queue', 'saveFood'],
   addSet: ['queue', 'addSet'],
   setLiftGoals: ['queue', 'setLiftGoals'],
@@ -153,9 +169,45 @@ export function registerQueuedMutations(queryClient: QueryClient) {
       api(`/api/workout-splits/${splitId}/logs`, { method: 'POST', body: JSON.stringify({ ...log, dayStart, dayEnd }) }),
     onMutate: ({ splitId, log }: LogDayVars) => {
       const saved: SplitLog = { ...log, splitId, durationMinutes: null }
-      queryClient.setQueryData<{ logs: SplitLog[]; allLogs: SplitLog[] }>(['training'], (old) =>
-        old ? { ...old, logs: [saved, ...without(old.logs, log.id)], allLogs: [saved, ...without(old.allLogs, log.id)] } : old,
+      // Newest first, like the API: a past day filled in goes in its place, not on top.
+      const insert = (list: SplitLog[]) => [...without(list, log.id), saved].sort((a, b) => b.loggedAt.localeCompare(a.loggedAt))
+      queryClient.setQueryData<TrainingData>(['training'], (old) =>
+        old ? { ...old, logs: insert(old.logs), allLogs: insert(old.allLogs) } : old,
       )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.updateLog, {
+    ...common,
+    mutationFn: ({ splitId, logId, changes }: UpdateLogVars) =>
+      api(`/api/workout-splits/${splitId}/logs/${logId}`, { method: 'PATCH', body: JSON.stringify(changes) }),
+    onMutate: ({ logId, changes }: UpdateLogVars) => {
+      const patch = (list: SplitLog[]) => list.map((l) => (l.id === logId ? { ...l, ...changes } : l))
+      queryClient.setQueryData<TrainingData>(['training'], (old) =>
+        old ? { ...old, logs: patch(old.logs), allLogs: patch(old.allLogs) } : old,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.updateSplit, {
+    ...common,
+    mutationFn: ({ splitId, daysPerWeek }: UpdateSplitVars) =>
+      api(`/api/workout-splits/${splitId}`, { method: 'PATCH', body: JSON.stringify({ daysPerWeek }) }),
+    onMutate: ({ splitId, daysPerWeek }: UpdateSplitVars) => {
+      queryClient.setQueryData<TrainingData>(['training'], (old) =>
+        old?.split?.id === splitId ? { ...old, split: { ...old.split, daysPerWeek } } : old,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.createSplit, {
+    ...common,
+    mutationFn: ({ split }: CreateSplitVars) => api('/api/workout-splits', { method: 'POST', body: JSON.stringify(split) }),
+    onMutate: ({ split }: CreateSplitVars) => {
+      queryClient.setQueryData<TrainingData>(['training'], (old) => (old ? { ...old, split: { ...split, active: true }, logs: [] } : old))
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
   })
