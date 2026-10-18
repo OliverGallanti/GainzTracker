@@ -17,6 +17,15 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "plugins": ["expo-secure-store"]
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera to scan food barcodes",
+          "recordAudioAndroid": false
+        }
+      ]
+    ]
   }
 }

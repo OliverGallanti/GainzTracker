@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Pressable, Switch, Text, View } from 'react-native'
+import { Linking, Pressable, Switch, Text, View } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { OTHER_MEAL, scaleFood } from '@gainz/shared/macros'
-import type { SavedFood } from '@gainz/shared/types'
+import type { Product, SavedFood } from '@gainz/shared/types'
 import { useSavedFoods } from '../queries'
 import { QUEUED, useQueued, type AddMealVars, type SaveFoodVars } from '../queue'
 import { colors } from '../theme'
 import { Button, Chip, Field, Muted, styles } from '../ui'
+import ProductLookup from './ProductLookup'
 
 const text = (value: number | null) => (value == null ? '' : String(value))
 const number = (value: string) => (value ? Number(value) : null)
@@ -14,7 +15,8 @@ const number = (value: string) => (value ? Number(value) : null)
 // Queued (see queue.ts): it shows up straight away and is sent now, or when the
 // phone is back online. Problems are reported in the header, not here.
 // A saved food fills the form (times the servings), still editable; "Save for
-// reuse" stores the entered macros as one serving, as on the web.
+// reuse" stores the entered macros as one serving, as on the web. A scanned
+// product works the same way, scaled by the grams eaten instead (its values are per 100 g).
 export default function LogFoodForm({
   mealNames,
   defaultMeal,
@@ -30,26 +32,43 @@ export default function LogFoodForm({
   const [n, setN] = useState({ calories: '', proteinG: '', fatG: '', carbsG: '' })
   const [picked, setPicked] = useState<SavedFood | null>(null)
   const [servings, setServings] = useState('1')
+  const [product, setProduct] = useState<Product | null>(null)
+  const [grams, setGrams] = useState('')
   const [saveForReuse, setSaveForReuse] = useState(false)
   const add = useQueued<AddMealVars>(QUEUED.addMeal)
   const saveFood = useQueued<SaveFoodVars>(QUEUED.saveFood)
 
-  const fillFrom = (food: SavedFood, count: number) => {
+  const fillFrom = (name: string, food: Parameters<typeof scaleFood>[0], count: number) => {
     const scaled = scaleFood(food, count)
-    setDescription(food.name)
+    setDescription(name)
     setN({ calories: text(scaled.calories), proteinG: text(scaled.proteinG), fatG: text(scaled.fatG), carbsG: text(scaled.carbsG) })
   }
 
   const pick = (food: SavedFood) => {
     setPicked(food)
+    setProduct(null)
     setServings('1')
     setSaveForReuse(false)
-    fillFrom(food, 1)
+    fillFrom(food.name, food, 1)
   }
 
   const changeServings = (value: string) => {
     setServings(value)
-    if (picked && Number(value) > 0) fillFrom(picked, Number(value))
+    if (picked && Number(value) > 0) fillFrom(picked.name, picked, Number(value))
+  }
+
+  // Start from the label's serving size when it has one, otherwise 100 g.
+  const pickProduct = (found: Product) => {
+    const start = found.servingG ?? 100
+    setProduct(found)
+    setPicked(null)
+    setGrams(String(start))
+    fillFrom(found.name, found.per100g, start / 100)
+  }
+
+  const changeGrams = (value: string) => {
+    setGrams(value)
+    if (product && Number(value) > 0) fillFrom(product.name, product.per100g, Number(value) / 100)
   }
 
   const save = () => {
@@ -88,6 +107,8 @@ export default function LogFoodForm({
         </View>
       )}
 
+      <ProductLookup onFound={pickProduct} />
+
       <View style={{ gap: 6 }}>
         <Text style={styles.label}>Meal</Text>
         <View style={styles.chips}>
@@ -99,6 +120,22 @@ export default function LogFoodForm({
 
       <Field label="Description" value={description} onChange={setDescription} placeholder="e.g. Chicken + rice" />
       {picked && <Field label={`Servings of ${picked.name}`} value={servings} onChange={changeServings} numeric />}
+      {product && (
+        <View style={{ gap: 4 }}>
+          <Field label={`Amount eaten (g)${product.brand ? ` · ${product.brand}` : ''}`} value={grams} onChange={changeGrams} numeric />
+          <Muted>
+            {product.servingSize ? `Label serving: ${product.servingSize}. ` : ''}Values from{' '}
+            <Text
+              style={{ textDecorationLine: 'underline' }}
+              accessibilityRole="link"
+              onPress={() => void Linking.openURL(`https://world.openfoodfacts.org/product/${product.barcode}`)}
+            >
+              Open Food Facts
+            </Text>
+            , which is community-edited: check them against the pack.
+          </Muted>
+        </View>
+      )}
       <View style={[styles.row, { flexWrap: 'wrap' }]}>
         <Field label="Calories" value={n.calories} onChange={(v) => setN({ ...n, calories: v })} numeric />
         <Field label="Protein (g)" value={n.proteinG} onChange={(v) => setN({ ...n, proteinG: v })} numeric />

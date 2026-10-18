@@ -1,0 +1,117 @@
+import { useRef, useState } from 'react'
+import { Linking, Modal, StyleSheet, Text, View } from 'react-native'
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
+import type { Product } from '@gainz/shared/types'
+import { api } from '../api'
+import { useIsOnline } from '../offline'
+import { colors } from '../theme'
+import { Button, ErrorText, Field, Muted, styles as ui } from '../ui'
+
+const BARCODE = /^\d{8,14}$/
+
+// Find a packaged food by barcode: scanned, or typed. Same server route as the
+// web (/api/products, Open Food Facts behind it). Needs a connection, since the
+// product data lives on the server, not the phone.
+export default function ProductLookup({ onFound }: { onFound: (product: Product) => void }) {
+  const online = useIsOnline()
+  const [scanning, setScanning] = useState(false)
+  const [code, setCode] = useState('')
+  const [looking, setLooking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const lookup = async (barcode: string) => {
+    setError(null)
+    if (!BARCODE.test(barcode)) return setError('A barcode is 8 to 14 digits')
+    setLooking(true)
+    try {
+      const product = await api<Product | null>(`/api/products/${barcode}`)
+      if (product) onFound(product)
+      else setError('No product found for that barcode: enter it manually')
+    } catch {
+      setError('Could not reach the food database: please try again')
+    } finally {
+      setLooking(false)
+    }
+  }
+
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={ui.label}>Packaged food</Text>
+      {online ? (
+        <>
+          <View style={[ui.row, { alignItems: 'flex-end' }]}>
+            <Button label="Scan barcode" variant="secondary" onPress={() => setScanning(true)} disabled={looking} />
+            <Field label="or type the number" value={code} onChange={(v) => setCode(v.replace(/\D/g, ''))} keyboardType="number-pad" />
+          </View>
+          {code !== '' && (
+            <Button label={looking ? 'Looking up…' : 'Look up'} variant="secondary" onPress={() => void lookup(code)} disabled={looking} />
+          )}
+        </>
+      ) : (
+        <Muted>Barcode lookup needs a connection.</Muted>
+      )}
+      {error && <ErrorText>{error}</ErrorText>}
+
+      <Modal visible={scanning} animationType="slide" onRequestClose={() => setScanning(false)}>
+        <Scanner
+          onScanned={(barcode) => {
+            setScanning(false)
+            setCode(barcode)
+            void lookup(barcode)
+          }}
+          onClose={() => setScanning(false)}
+        />
+      </Modal>
+    </View>
+  )
+}
+
+function Scanner({ onScanned, onClose }: { onScanned: (barcode: string) => void; onClose: () => void }) {
+  const [permission, requestPermission] = useCameraPermissions()
+  // The camera reports the same barcode on every frame it sees it; take the first.
+  const done = useRef(false)
+
+  const handleScan = ({ data }: BarcodeScanningResult) => {
+    if (done.current) return
+    done.current = true
+    onScanned(data)
+  }
+
+  if (!permission) return <View style={styles.full} />
+
+  if (!permission.granted) {
+    return (
+      <View style={[styles.full, styles.center]}>
+        <Text style={[ui.text, styles.message]}>The camera is used to read food barcodes. Nothing is recorded or stored.</Text>
+        {permission.canAskAgain ? (
+          <Button label="Allow camera" onPress={() => void requestPermission()} />
+        ) : (
+          <Button label="Open settings" onPress={() => void Linking.openSettings()} />
+        )}
+        <Button label="Cancel" variant="secondary" onPress={onClose} />
+      </View>
+    )
+  }
+
+  return (
+    <View style={styles.full}>
+      <CameraView
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+        onBarcodeScanned={handleScan}
+      />
+      <View style={styles.footer}>
+        <Text style={[ui.text, styles.message]}>Point the camera at the barcode</Text>
+        <Button label="Cancel" variant="secondary" onPress={onClose} />
+      </View>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  full: { flex: 1, backgroundColor: '#000' },
+  center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, backgroundColor: colors.main },
+  message: { textAlign: 'center' },
+  footer: { position: 'absolute', left: 16, right: 16, bottom: 32, gap: 12, padding: 16, borderRadius: 16, backgroundColor: 'rgba(3, 22, 31, 0.85)' },
+})
