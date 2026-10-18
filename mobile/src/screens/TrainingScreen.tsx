@@ -7,6 +7,7 @@ import { computeWeeklyStreak, suggestedDayIndex, uniqueDays, weeklyGoal } from '
 import { SPLIT_TEMPLATES } from '@gainz/shared/templates'
 import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
 import { api } from '../api'
+import { QUEUED, useQueued, type LogDayVars } from '../queue'
 import { colors } from '../theme'
 import { Button, Card, Chip, ErrorText, Muted, Screen, styles as ui } from '../ui'
 
@@ -38,7 +39,7 @@ export default function TrainingScreen() {
         {training.isPending && <Muted>Loading…</Muted>}
         {training.isError && <ErrorText onPress={() => void training.refetch()}>Could not load your training: tap to retry</ErrorText>}
         {training.data && !split && <PickRoutine onCreated={refresh} />}
-        {split && training.data && <TodayLogger split={split} logs={logs} allLogs={training.data.allLogs} onChanged={refresh} />}
+        {split && training.data && <TodayLogger split={split} logs={logs} allLogs={training.data.allLogs} />}
       </Card>
 
       {split && logs.length > 0 && <RecentLogs split={split} logs={logs} onChanged={refresh} />}
@@ -50,30 +51,30 @@ function TodayLogger({
   split,
   logs,
   allLogs,
-  onChanged,
 }: {
   split: WorkoutSplit
   logs: SplitLog[]
   allLogs: SplitLog[]
-  onChanged: () => void
 }) {
   const goal = weeklyGoal(split)
   const { streak, thisWeekDays } = computeWeeklyStreak(allLogs, goal)
   const todayLog = logs.find((log) => new Date(log.loggedAt).toDateString() === new Date().toDateString())
   const [picked, setPicked] = useState<number | null>(null)
   const selected = picked ?? split.days.indexOf(split.days[suggestedDayIndex(split.days, logs)])
-  const [id] = useState(() => randomUUID())
+  const logDay = useQueued<LogDayVars>(QUEUED.logDay)
 
-  const log = useMutation({
-    mutationFn: (completed: boolean) => {
-      const dayStart = startOfLocalDay()
-      return api(`/api/workout-splits/${split.id}/logs`, {
-        method: 'POST',
-        body: JSON.stringify({ id, completed, dayIndex: selected, dayStart, dayEnd: new Date(dayStart.getTime() + DAY_MS), loggedAt: new Date() }),
-      })
-    },
-    onSuccess: onChanged,
-  })
+  // Queued (see queue.ts). The day's bounds are fixed now, on the phone: sent
+  // after midnight, it still counts for the day it was logged.
+  const log = (completed: boolean) => {
+    const dayStart = startOfLocalDay()
+    logDay.mutate({
+      label: `${split.days[selected]} (${completed ? 'done' : 'skipped'})`,
+      splitId: split.id,
+      log: { id: randomUUID(), dayIndex: selected, completed, loggedAt: new Date().toISOString() },
+      dayStart: dayStart.toISOString(),
+      dayEnd: new Date(dayStart.getTime() + DAY_MS).toISOString(),
+    })
+  }
 
   return (
     <View style={{ gap: 12 }}>
@@ -104,13 +105,12 @@ function TodayLogger({
           </View>
           <View style={ui.row}>
             <View style={{ flex: 1 }}>
-              <Button label="Mark done" onPress={() => log.mutate(true)} disabled={log.isPending} />
+              <Button label="Mark done" onPress={() => log(true)} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button label="Mark skipped" variant="secondary" onPress={() => log.mutate(false)} disabled={log.isPending} />
+              <Button label="Mark skipped" variant="secondary" onPress={() => log(false)} />
             </View>
           </View>
-          {log.isError && <ErrorText>Could not log today: please try again</ErrorText>}
         </>
       )}
     </View>

@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './src/auth'
 import SignInScreen from './src/screens/SignInScreen'
 import Tabs from './src/Tabs'
 import { CACHE_MAX_AGE_MS, CACHE_VERSION, persister } from './src/offline'
+import { registerQueuedMutations, shouldSaveMutation } from './src/queue'
 import { colors } from './src/theme'
 
 function Root() {
@@ -36,9 +37,8 @@ function SignOutOn401() {
 }
 
 export default function App() {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
+  const [queryClient] = useState(() => {
+    const client = new QueryClient({
         queryCache: new QueryCache({
           onError: (error) => {
             if (error instanceof UnauthorizedError) onUnauthorizedRef.current()
@@ -51,17 +51,25 @@ export default function App() {
             // before it could be saved/restored.
             gcTime: CACHE_MAX_AGE_MS,
           },
-          // ponytail: writes fail straight away offline (and say so) until the
-          // write queue lands; TanStack's default would leave them stuck "Saving…".
+          // Writes that aren't queued (targets, removes) fail straight away offline
+          // and say so; queued ones override this (see queue.ts).
           mutations: { networkMode: 'always' },
         },
-      }),
-  )
+      })
+    registerQueuedMutations(client)
+    return client
+  })
 
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister, maxAge: CACHE_MAX_AGE_MS, buster: CACHE_VERSION }}
+      persistOptions={{
+        persister,
+        maxAge: CACHE_MAX_AGE_MS,
+        buster: CACHE_VERSION,
+        dehydrateOptions: { shouldDehydrateMutation: shouldSaveMutation },
+      }}
+      onSuccess={() => queryClient.resumePausedMutations()}
     >
       <AuthProvider>
         <SignOutOn401 />

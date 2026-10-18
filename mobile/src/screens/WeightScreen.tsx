@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { computeBmi } from '@gainz/shared/body'
 import { api } from '../api'
+import { QUEUED, useQueued, type AddWeightVars, type UpdateMeVars } from '../queue'
 import { useMe, useWeights } from '../queries'
 import { Button, Card, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
 
@@ -92,33 +93,25 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 // Height is asked for only while it's missing: BMI and the calorie estimate need it.
+// Both writes are queued (see queue.ts), height first: one queue, sent in order.
 function LogWeightForm({ askHeight, onDone }: { askHeight: boolean; onDone: () => void }) {
-  const queryClient = useQueryClient()
   const [form, setForm] = useState({ weightKg: '', bodyFatPercent: '', heightCm: '' })
-  const [id] = useState(() => randomUUID())
+  const updateMe = useQueued<UpdateMeVars>(QUEUED.updateMe)
+  const addWeight = useQueued<AddWeightVars>(QUEUED.addWeight)
 
-  const save = useMutation({
-    // Height first: repeating that PUT is harmless, while the weight carries an id
-    // so a retry can't log it twice.
-    mutationFn: async () => {
-      if (askHeight && form.heightCm) {
-        await api('/api/me', { method: 'PUT', body: JSON.stringify({ heightCm: Number(form.heightCm) }) })
-      }
-      await api('/api/weights', {
-        method: 'POST',
-        body: JSON.stringify({
-          id,
-          weightKg: Number(form.weightKg),
-          ...(form.bodyFatPercent ? { bodyFatPercent: Number(form.bodyFatPercent) } : {}),
-        }),
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['weights'] })
-      queryClient.invalidateQueries({ queryKey: ['me'] })
-      onDone()
-    },
-  })
+  const save = () => {
+    if (askHeight && form.heightCm) {
+      updateMe.mutate({ label: 'Height', changes: { heightCm: Number(form.heightCm) } })
+    }
+    const entry = {
+      id: randomUUID(),
+      weightKg: Number(form.weightKg),
+      bodyFatPercent: form.bodyFatPercent ? Number(form.bodyFatPercent) : null,
+      loggedAt: new Date().toISOString(),
+    }
+    addWeight.mutate({ label: `${entry.weightKg} kg`, entry })
+    onDone()
+  }
 
   return (
     <View style={{ gap: 12 }}>
@@ -129,15 +122,10 @@ function LogWeightForm({ askHeight, onDone }: { askHeight: boolean; onDone: () =
       </View>
       <View style={ui.row}>
         <View style={{ flex: 1 }}>
-          <Button
-            label={save.isPending ? 'Saving…' : 'Save'}
-            onPress={() => save.mutate()}
-            disabled={!(Number(form.weightKg) > 0) || save.isPending}
-          />
+          <Button label="Save" onPress={save} disabled={!(Number(form.weightKg) > 0)} />
         </View>
         <Button label="Cancel" variant="secondary" onPress={onDone} />
       </View>
-      {save.isError && <ErrorText>Could not save that weight: please try again</ErrorText>}
     </View>
   )
 }

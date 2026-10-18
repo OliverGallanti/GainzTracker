@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native'
 import { useAuth } from './auth'
 import { useIsOnline } from './offline'
+import { useSyncState } from './queue'
 import TodayScreen from './screens/TodayScreen'
 import TrainingScreen from './screens/TrainingScreen'
 import WeightScreen from './screens/WeightScreen'
@@ -22,6 +23,7 @@ export default function Tabs() {
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('today')
   const Current = TABS.find((t) => t.key === tab)!.Screen
   const online = useIsOnline()
+  const sync = useSyncState()
 
   return (
     <View style={styles.root}>
@@ -32,11 +34,22 @@ export default function Tabs() {
         <Button label="Sign out" variant="small" onPress={() => void signOut()} />
       </View>
 
-      {!online && (
+      {(!online || sync.waiting > 0) && (
         <View style={styles.offline} accessibilityRole="alert" accessibilityLiveRegion="polite">
-          <Text style={styles.offlineText}>Offline: showing saved data. Logging needs a connection for now.</Text>
+          <Text style={styles.offlineText}>
+            {!online ? 'Offline: showing saved data. ' : ''}
+            {sync.waiting > 0 ? `Waiting to sync (${sync.waiting}).` : 'What you log is sent when you reconnect.'}
+          </Text>
         </View>
       )}
+
+      {sync.failed.map((item) => (
+        <View key={item.mutationId} style={styles.failed} accessibilityRole="alert">
+          <Text style={styles.failedText}>Couldn't save: {item.variables.label}</Text>
+          <Button label="Retry" variant="small" onPress={() => sync.retry(item)} />
+          <Button label="Dismiss" variant="small" onPress={() => sync.dismiss(item.mutationId)} />
+        </View>
+      ))}
 
       <View style={styles.body}>
         <Current />
@@ -78,6 +91,8 @@ const styles = StyleSheet.create({
   body: { flex: 1 },
   offline: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'rgba(251, 191, 36, 0.15)', borderBottomWidth: 1, borderBottomColor: 'rgba(251, 191, 36, 0.4)' },
   offlineText: { color: '#fcd34d', fontSize: 13 },
+  failed: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 6, backgroundColor: 'rgba(248, 113, 113, 0.12)' },
+  failedText: { flex: 1, color: colors.danger, fontSize: 13 },
   bar: { flexDirection: 'row', backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border },
   tab: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 6 },
   tabText: { color: colors.muted, fontWeight: '500' },

@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { Text, View } from 'react-native'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { OTHER_MEAL } from '@gainz/shared/macros'
-import { api } from '../api'
-import { Button, Chip, ErrorText, Field, styles } from '../ui'
+import { QUEUED, useQueued, type AddMealVars } from '../queue'
+import { Button, Chip, Field, styles } from '../ui'
 
-// Sends a phone-made id with the create, so a retry after a dropped connection
-// can't log the food twice (the server returns the first one instead).
+// Queued (see queue.ts): it shows up straight away and is sent now, or when the
+// phone is back online. Problems are reported in the header, not here.
 export default function LogFoodForm({
   mealNames,
   defaultMeal,
@@ -17,31 +16,26 @@ export default function LogFoodForm({
   defaultMeal: string
   onDone: () => void
 }) {
-  const queryClient = useQueryClient()
   const [description, setDescription] = useState('')
   const [mealName, setMealName] = useState(defaultMeal)
   const [n, setN] = useState({ calories: '', proteinG: '', fatG: '', carbsG: '' })
-  const [id] = useState(() => randomUUID()) // one id per form, so a re-press retries the same create
+  const add = useQueued<AddMealVars>(QUEUED.addMeal)
+  const number = (value: string) => (value ? Number(value) : null)
 
-  const save = useMutation({
-    mutationFn: () =>
-      api('/api/meals', {
-        method: 'POST',
-        body: JSON.stringify({
-          id,
-          description: description.trim(),
-          calories: Number(n.calories),
-          ...(n.proteinG ? { proteinG: Number(n.proteinG) } : {}),
-          ...(n.fatG ? { fatG: Number(n.fatG) } : {}),
-          ...(n.carbsG ? { carbsG: Number(n.carbsG) } : {}),
-          ...(mealName !== OTHER_MEAL ? { mealName } : {}),
-        }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['today'] })
-      onDone()
-    },
-  })
+  const save = () => {
+    const meal = {
+      id: randomUUID(),
+      description: description.trim(),
+      calories: Number(n.calories),
+      proteinG: number(n.proteinG),
+      fatG: number(n.fatG),
+      carbsG: number(n.carbsG),
+      mealName: mealName === OTHER_MEAL ? null : mealName,
+      loggedAt: new Date().toISOString(),
+    }
+    add.mutate({ label: meal.description, meal })
+    onDone()
+  }
 
   const valid = description.trim() !== '' && n.calories !== '' && Number(n.calories) >= 0
 
@@ -62,11 +56,10 @@ export default function LogFoodForm({
       </View>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
-          <Button label={save.isPending ? 'Saving…' : 'Add'} onPress={() => save.mutate()} disabled={!valid || save.isPending} />
+          <Button label="Add" onPress={save} disabled={!valid} />
         </View>
         <Button label="Cancel" variant="secondary" onPress={onDone} />
       </View>
-      {save.isError && <ErrorText>Could not log that food: please try again</ErrorText>}
     </View>
   )
 }
