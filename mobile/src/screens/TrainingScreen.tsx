@@ -55,7 +55,7 @@ export default function TrainingScreen() {
   const refresh = () => void Promise.all([training.refetch(), sets.refetch()])
 
   return (
-    <Screen refreshing={training.isRefetching} onRefresh={refresh}>
+    <Screen>
       <Card
         title="Training"
         right={split && !editingRoutine ? <Button label="Change routine" variant="small" onPress={() => setEditingRoutine(true)} /> : null}

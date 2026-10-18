@@ -43,7 +43,7 @@ export default function TodayScreen() {
   const ready = today.data && me.data
 
   return (
-    <Screen refreshing={today.isRefetching} onRefresh={() => void Promise.all([today.refetch(), me.refetch()])}>
+    <Screen>
       <Card
         title="Today's macros"
         right={ready && mode === 'view' && goal ? <Button label="Targets" variant="small" onPress={() => setMode('targets')} /> : null}

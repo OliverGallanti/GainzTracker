@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { QueryCache, QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { UnauthorizedError } from './src/api'
@@ -71,11 +72,13 @@ export default function App() {
       }}
       onSuccess={() => queryClient.resumePausedMutations()}
     >
-      <AuthProvider>
-        <SignOutOn401 />
-        <StatusBar style="light" />
-        <Root />
-      </AuthProvider>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <SignOutOn401 />
+          <StatusBar style="light" />
+          <Root />
+        </AuthProvider>
+      </SafeAreaProvider>
     </PersistQueryClientProvider>
   )
 }

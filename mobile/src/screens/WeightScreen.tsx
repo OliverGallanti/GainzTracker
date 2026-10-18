@@ -27,7 +27,7 @@ export default function WeightScreen() {
     .join(' · ')
 
   return (
-    <Screen refreshing={weights.isRefetching} onRefresh={() => void Promise.all([weights.refetch(), me.refetch()])}>
+    <Screen>
       <Card title="Weight">
         {(weights.isPending || me.isPending) && <Muted>Loading…</Muted>}
         {(weights.isError || me.isError) && (

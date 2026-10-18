@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import {
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text as NativeText,
@@ -21,24 +20,12 @@ export function Text({ style, ...props }: TextProps) {
 // Small shared building blocks so every screen looks and behaves the same:
 // 48px touch targets, the web palette, and labelled controls for TalkBack.
 
-export function Screen({
-  children,
-  refreshing = false,
-  onRefresh,
-}: {
-  children: ReactNode
-  refreshing?: boolean
-  onRefresh?: () => void
-}) {
+// No pull-to-refresh: it fired on ordinary scrolls, and data already refreshes
+// on its own when a tab opens, the app comes back to the front (offline.ts) or
+// the connection returns.
+export function Screen({ children }: { children: ReactNode }) {
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.screenContent}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} /> : undefined
-      }
-    >
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
   )

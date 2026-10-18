@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import NetInfo from '@react-native-community/netinfo'
-import { onlineManager } from '@tanstack/react-query'
+import { AppState } from 'react-native'
+import { focusManager, onlineManager } from '@tanstack/react-query'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 
 // Offline reads: every query result is saved to the phone (AsyncStorage) and
@@ -20,6 +21,13 @@ export const CACHE_VERSION = '1'
 onlineManager.setEventListener((setOnline) =>
   NetInfo.addEventListener((state) => setOnline(state.isConnected !== false)),
 )
+
+// Nor does it know when the app is in front: coming back to it refetches
+// whatever's on screen (the phone's "window focus").
+focusManager.setEventListener((setFocused) => {
+  const subscription = AppState.addEventListener('change', (state) => setFocused(state === 'active'))
+  return () => subscription.remove()
+})
 
 export function useIsOnline() {
   return useSyncExternalStore(onlineManager.subscribe.bind(onlineManager), () => onlineManager.isOnline())

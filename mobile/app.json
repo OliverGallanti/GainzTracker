@@ -9,6 +9,7 @@
     "backgroundColor": "#053345",
     "android": {
       "package": "com.olivergallanti.gainztracker",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#053345",
         "foregroundImage": "./assets/android-icon-foreground.png",

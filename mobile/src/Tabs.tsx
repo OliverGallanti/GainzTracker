@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Pressable, StatusBar, StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useIsOnline } from './offline'
 import { useSyncState } from './queue'
 import BigFourScreen from './screens/BigFourScreen'
@@ -26,10 +27,13 @@ export default function Tabs() {
   const Current = TABS.find((t) => t.key === tab)!.Screen
   const online = useIsOnline()
   const sync = useSyncState()
+  // Android draws the app under the status bar and the navigation bar (edge to
+  // edge); these are their heights, so the header and tab bar clear them.
+  const insets = useSafeAreaInsets()
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Text style={styles.brand}>
           Gainz<Text style={styles.brandMuted}>.Tracker</Text>
         </Text>
@@ -56,7 +60,7 @@ export default function Tabs() {
         <Current />
       </View>
 
-      <View style={styles.bar} accessibilityRole="tablist">
+      <View style={[styles.bar, { paddingBottom: insets.bottom }]} accessibilityRole="tablist">
         {TABS.map((t) => (
           <Pressable
             key={t.key}
@@ -81,7 +85,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: (StatusBar.currentHeight ?? 24) + 8,
     paddingBottom: 8,
     backgroundColor: colors.card,
     borderBottomWidth: 1,

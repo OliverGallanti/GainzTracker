@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Linking, Modal, StyleSheet, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
 import type { Product } from '@gainz/shared/types'
 import { api } from '../api'
@@ -70,6 +71,7 @@ function Scanner({ onScanned, onClose }: { onScanned: (barcode: string) => void;
   const [permission, requestPermission] = useCameraPermissions()
   // The camera reports the same barcode on every frame it sees it; take the first.
   const done = useRef(false)
+  const insets = useSafeAreaInsets() // keeps Cancel above the phone's navigation bar
 
   const handleScan = ({ data }: BarcodeScanningResult) => {
     if (done.current) return
@@ -101,7 +103,7 @@ function Scanner({ onScanned, onClose }: { onScanned: (barcode: string) => void;
         barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
         onBarcodeScanned={handleScan}
       />
-      <View style={styles.footer}>
+      <View style={[styles.footer, { bottom: insets.bottom + 16 }]}>
         <Text style={[ui.text, styles.message]}>Point the camera at the barcode</Text>
         <Button label="Cancel" variant="secondary" onPress={onClose} />
       </View>
@@ -113,5 +115,5 @@ const styles = StyleSheet.create({
   full: { flex: 1, backgroundColor: '#000' },
   center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, backgroundColor: colors.main },
   message: { textAlign: 'center' },
-  footer: { position: 'absolute', left: 16, right: 16, bottom: 32, gap: 12, padding: 16, borderRadius: 16, backgroundColor: 'rgba(3, 22, 31, 0.85)' },
+  footer: { position: 'absolute', left: 16, right: 16, gap: 12, padding: 16, borderRadius: 16, backgroundColor: 'rgba(3, 22, 31, 0.85)' },
 })

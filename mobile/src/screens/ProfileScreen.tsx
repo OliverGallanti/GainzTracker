@@ -15,7 +15,7 @@ export default function ProfileScreen() {
   const me = useMe()
 
   return (
-    <Screen refreshing={me.isRefetching} onRefresh={() => void me.refetch()}>
+    <Screen>
       <Card title="Profile">
         {me.isPending && <Muted>Loading…</Muted>}
         {me.isError && <ErrorText onPress={() => void me.refetch()}>Could not load your profile: tap to retry</ErrorText>}
