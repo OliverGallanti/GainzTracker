@@ -67,7 +67,7 @@ export default function TargetsForm({
       <Text style={styles.cardTitle}>Daily targets</Text>
 
       {tdee == null ? (
-        <Muted>Add your sex, age and activity level on the web, and log a weight and height, to get a calorie estimate.</Muted>
+        <Muted>Fill in your sex, age and activity level in the Profile tab, and log a weight and height, to get a calorie estimate.</Muted>
       ) : (
         <>
           <Muted>Estimated maintenance: {tdee} cal/day</Muted>

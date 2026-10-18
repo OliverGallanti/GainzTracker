@@ -1,5 +1,5 @@
 import { MutationObserver, useMutation, useMutationState, useQueryClient, type Mutation, type QueryClient } from '@tanstack/react-query'
-import type { Me, Meal, SplitLog, WeightEntry } from '@gainz/shared/types'
+import type { Me, Meal, SavedFood, SplitLog, WeightEntry } from '@gainz/shared/types'
 import { api } from './api'
 
 // The offline write queue. Each kind of write registers its send function once
@@ -20,7 +20,12 @@ export type AddMealVars = Label & {
   meal: Pick<Meal, 'id' | 'description' | 'calories' | 'proteinG' | 'fatG' | 'carbsG' | 'mealName' | 'loggedAt'>
 }
 export type AddWeightVars = Label & { entry: WeightEntry }
-export type UpdateMeVars = Label & { changes: Partial<Pick<Me, 'heightCm'>> }
+export type UpdateMeVars = Label & {
+  changes: Partial<Pick<Me, 'heightCm' | 'sex' | 'age' | 'activityLevel' | 'weightGoalKg' | 'bodyFatGoalPercent'>>
+}
+// Saved foods are keyed by name on the server (saving a name again replaces it),
+// which makes a repeat harmless without a client id.
+export type SaveFoodVars = Label & { food: Omit<SavedFood, 'id'> }
 export type LogDayVars = Label & {
   splitId: string
   log: Pick<SplitLog, 'id' | 'dayIndex' | 'completed' | 'loggedAt'>
@@ -33,6 +38,7 @@ export const QUEUED = {
   addWeight: ['queue', 'addWeight'],
   updateMe: ['queue', 'updateMe'],
   logDay: ['queue', 'logDay'],
+  saveFood: ['queue', 'saveFood'],
 } as const
 
 const without = <T extends { id: string }>(list: T[] | undefined, id: string) => (list ?? []).filter((x) => x.id !== id)
@@ -74,6 +80,20 @@ export function registerQueuedMutations(queryClient: QueryClient) {
       queryClient.setQueryData<Me>(['me'], (old) => (old ? { ...old, ...changes } : old))
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.saveFood, {
+    ...common,
+    mutationFn: ({ food }: SaveFoodVars) => api('/api/saved-foods', { method: 'POST', body: JSON.stringify(nullsOmitted(food)) }),
+    onMutate: ({ food }: SaveFoodVars) => {
+      // A stand-in id until the server's comes back with the refetch.
+      queryClient.setQueryData<SavedFood[]>(['savedFoods'], (old) =>
+        old
+          ? [...old.filter((f) => f.name !== food.name), { ...food, id: `unsent:${food.name}` }].sort((a, b) => a.name.localeCompare(b.name))
+          : old,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['savedFoods'] }),
   })
 
   queryClient.setMutationDefaults(QUEUED.logDay, {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, registerQueuedMutations, shouldSaveMutation, type AddMealVars, type AddWeightVars, type UpdateMeVars } from './queue'
+import { QUEUED, registerQueuedMutations, shouldSaveMutation, type AddMealVars, type AddWeightVars, type SaveFoodVars, type UpdateMeVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -107,5 +107,37 @@ describe('offline write queue', () => {
     const [failed] = client.getMutationCache().getAll()
     expect(failed.state.status).toBe('error')
     expect(failed.state.variables).toEqual(meal) // same id, so retrying can't duplicate
+  })
+})
+
+describe('saved foods', () => {
+  it('shows a saved food in the list straight away, sorted, replacing one with the same name', async () => {
+    const client = makeClient()
+    client.setQueryData(['savedFoods'], [
+      { id: 'a', name: 'Chili', calories: 400, proteinG: 30, fatG: null, carbsG: null },
+      { id: 'b', name: 'Oats', calories: 300, proteinG: 10, fatG: null, carbsG: null },
+    ])
+
+    void mutate<SaveFoodVars>(client, QUEUED.saveFood, { label: 'Save Apple', food: { name: 'Apple', calories: 95, proteinG: null, fatG: null, carbsG: null } })
+    void mutate<SaveFoodVars>(client, QUEUED.saveFood, { label: 'Save Chili', food: { name: 'Chili', calories: 450, proteinG: null, fatG: null, carbsG: null } })
+    await flush()
+
+    const list = client.getQueryData<{ name: string; calories: number }[]>(['savedFoods'])!
+    expect(list.map((f) => f.name)).toEqual(['Apple', 'Chili', 'Oats'])
+    expect(list.find((f) => f.name === 'Chili')!.calories).toBe(450)
+  })
+
+  it('is sent by name after a restart (the server replaces by name, so a repeat is harmless)', async () => {
+    const client = makeClient()
+    void mutate<SaveFoodVars>(client, QUEUED.saveFood, { label: 'Save Apple', food: { name: 'Apple', calories: 95, proteinG: null, fatG: null, carbsG: null } })
+    await flush()
+
+    const restarted = restart(client)
+    onlineManager.setOnline(true)
+    await restarted.resumePausedMutations()
+
+    expect(api).toHaveBeenCalledTimes(1)
+    expect(api.mock.calls[0][0]).toBe('/api/saved-foods')
+    expect(JSON.parse(api.mock.calls[0][1].body)).toEqual({ name: 'Apple', calories: 95 })
   })
 })
