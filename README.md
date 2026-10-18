@@ -65,7 +65,7 @@ Run scripts from the root: `npm run lint`, `npm test` and `npm run typecheck` co
 
 ## Mobile app
 
-`mobile/` is an Expo app sharing `@gainz/shared` with the web app and calling the same server. It signs in with native Google Sign-In and a Bearer token (see "Mobile login" in [server/README.md](server/README.md)), keeps the token in the device keystore (`expo-secure-store`), and fetches with TanStack Query, which is what the planned offline cache builds on. Creates send a phone-made id so a retried request can't duplicate a row. So far it has sign-in and Today's macros (progress bars, foods by meal, log and remove food); targets and the other cards are still web-only.
+`mobile/` is an Expo app sharing `@gainz/shared` with the web app and calling the same server. It signs in with native Google Sign-In and a Bearer token (see "Mobile login" in [server/README.md](server/README.md)), keeps the token in the device keystore (`expo-secure-store`), and fetches with TanStack Query, which is what the planned offline cache builds on. Creates send a phone-made id so a retried request can't duplicate a row. Screens (bottom tabs, `mobile/src/Tabs.tsx`): **Today** (macro progress, daily targets with the same presets and suggestion as the web, foods by meal, log and remove food), **Weight** (latest weight, body fat, BMI, log a weight, history with remove), **Training** (weekly streak, pick today's day and mark it done or skipped, start a routine from the shared templates, recent days with remove). Shared look and controls live in `mobile/src/ui.tsx`. Still web-only: charts, Big 4, meal slots, saved foods, barcode scanning, session details, profile and passkeys.
 
 Google Sign-In needs native code, so the app runs in a development build, not Expo Go:
 

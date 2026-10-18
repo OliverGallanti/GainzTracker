@@ -5,7 +5,7 @@ import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-qu
 import { UnauthorizedError } from './src/api'
 import { AuthProvider, useAuth } from './src/auth'
 import SignInScreen from './src/screens/SignInScreen'
-import TodayScreen from './src/screens/TodayScreen'
+import Tabs from './src/Tabs'
 import { colors } from './src/theme'
 
 function Root() {
@@ -17,7 +17,7 @@ function Root() {
       </View>
     )
   }
-  return status === 'signedIn' ? <TodayScreen /> : <SignInScreen />
+  return status === 'signedIn' ? <Tabs /> : <SignInScreen />
 }
 
 // A rejected token anywhere (expired or revoked) signs the user out, so no screen

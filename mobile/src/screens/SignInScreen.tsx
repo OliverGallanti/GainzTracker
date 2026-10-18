@@ -13,8 +13,11 @@ export default function SignInScreen() {
     setError(null)
     try {
       await signIn()
-    } catch {
-      setError('Could not sign in: please try again')
+    } catch (err) {
+      // Dev builds show the real cause (e.g. Google's DEVELOPER_ERROR when the
+      // Android OAuth client or its SHA-1 is missing); release builds stay generic.
+      const detail = err instanceof Error ? `${(err as { code?: string }).code ?? ''} ${err.message}`.trim() : String(err)
+      setError(__DEV__ ? `Could not sign in: ${detail}` : 'Could not sign in: please try again')
     } finally {
       setPending(false)
     }
