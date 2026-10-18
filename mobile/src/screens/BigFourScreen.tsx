@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { BIG_FOUR_LIFTS } from '@gainz/shared/lifts'
 import { getStrengthReferenceLines, getStrengthTier } from '@gainz/shared/strength'
@@ -8,9 +8,9 @@ import type { WorkoutSet } from '@gainz/shared/types'
 import { api } from '../api'
 import LineChart from '../LineChart'
 import { useMe, useWeights } from '../queries'
-import { QUEUED, useQueued, type AddSetVars, type SetLiftGoalsVars } from '../queue'
+import { QUEUED, useQueued, useUnsyncedIds, type AddSetVars, type RemoveVars, type SetLiftGoalsVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Unsynced, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 const describe = (set: WorkoutSet) => `${set.weightKg ?? '–'} kg${set.reps ? ` × ${set.reps}` : ''}`
@@ -18,7 +18,6 @@ const describe = (set: WorkoutSet) => `${set.weightKg ?? '–'} kg${set.reps ? `
 // The web Big 4 card, phone-sized: ranked by each lift's most recent entry (not
 // the all-time best), rated against bodyweight with the shared strength standards.
 export default function BigFourScreen() {
-  const queryClient = useQueryClient()
   const me = useMe()
   const weights = useWeights()
   const sets = useQuery({ queryKey: ['workoutSets'], queryFn: () => api<WorkoutSet[]>('/api/workout-sets') }) // newest first
@@ -26,10 +25,8 @@ export default function BigFourScreen() {
   const [selected, setSelected] = useState(BIG_FOUR_LIFTS[0])
   const [mode, setMode] = useState<'view' | 'log' | 'goals'>('view')
 
-  const remove = useMutation({
-    mutationFn: (id: string) => api(`/api/workout-sets/${id}`, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workoutSets'] }),
-  })
+  const remove = useQueued<RemoveVars>(QUEUED.remove)
+  const unsynced = useUnsyncedIds()
 
   const loaded = sets.data && goals.data && me.data && weights.data
   const sex = me.data?.sex ?? null
@@ -121,17 +118,23 @@ export default function BigFourScreen() {
                   {set.exerciseName} · {describe(set)}
                 </Text>
                 <Muted>{formatDate(set.performedAt)}</Muted>
+                {unsynced.has(set.id) && <Unsynced />}
               </View>
               <Button
                 label="Remove"
                 variant="small"
-                onPress={() => remove.mutate(set.id)}
-                disabled={remove.isPending}
+                onPress={() =>
+                  remove.mutate({
+                    label: `Remove ${set.exerciseName} ${describe(set)}`,
+                    path: `/api/workout-sets/${set.id}`,
+                    cacheKey: ['workoutSets'],
+                    id: set.id,
+                  })
+                }
                 accessibilityLabel={`Remove ${set.exerciseName} ${describe(set)} from ${formatDate(set.performedAt)}`}
               />
             </View>
           ))}
-          {remove.isError && <ErrorText>Could not remove that lift: please try again</ErrorText>}
         </Card>
       )}
     </Screen>

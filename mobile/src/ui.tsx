@@ -134,6 +134,11 @@ export function Muted({ children }: { children: ReactNode }) {
   return <Text style={styles.muted}>{children}</Text>
 }
 
+// On a row the server doesn't have yet (see useUnsyncedIds in queue.ts).
+export function Unsynced() {
+  return <Text style={styles.unsynced}>Not synced yet</Text>
+}
+
 export function ErrorText({ children, onPress }: { children: ReactNode; onPress?: () => void }) {
   return (
     <Text style={styles.error} onPress={onPress} accessibilityRole={onPress ? 'button' : 'text'}>
@@ -174,4 +179,5 @@ export const styles = StyleSheet.create({
   text: { color: colors.text },
   muted: { color: colors.muted },
   error: { color: colors.danger },
+  unsynced: { color: '#fcd34d', fontSize: 13 }, // the offline banner's amber
 })

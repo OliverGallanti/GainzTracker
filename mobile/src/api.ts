@@ -36,7 +36,7 @@ export async function api<T = any>(path: string, options: RequestInit = {}): Pro
   })
 
   if (res.status === 401) throw new UnauthorizedError()
-  if (!res.ok) throw new Error(`Request to ${path} failed with status ${res.status}`)
+  if (!res.ok) throw Object.assign(new Error(`Request to ${path} failed with status ${res.status}`), { status: res.status })
   if (res.status === 204) return null as T
   return res.json()
 }

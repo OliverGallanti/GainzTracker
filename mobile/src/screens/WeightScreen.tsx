@@ -1,27 +1,21 @@
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { computeBmi } from '@gainz/shared/body'
 import type { WeightEntry } from '@gainz/shared/types'
-import { api } from '../api'
 import LineChart from '../LineChart'
-import { QUEUED, useQueued, type AddWeightVars, type UpdateMeVars } from '../queue'
+import { QUEUED, useQueued, useUnsyncedIds, type AddWeightVars, type RemoveVars, type UpdateMeVars } from '../queue'
 import { useMe, useWeights } from '../queries'
-import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Unsynced, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function WeightScreen() {
-  const queryClient = useQueryClient()
   const me = useMe()
   const weights = useWeights()
   const [logging, setLogging] = useState(false)
-
-  const remove = useMutation({
-    mutationFn: (id: string) => api(`/api/weights/${id}`, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['weights'] }),
-  })
+  const remove = useQueued<RemoveVars>(QUEUED.remove)
+  const unsynced = useUnsyncedIds()
 
   const entries = weights.data ?? [] // newest first
   const latest = entries[0]
@@ -72,17 +66,18 @@ export default function WeightScreen() {
                   {entry.weightKg} kg{entry.bodyFatPercent != null ? ` · ${entry.bodyFatPercent}%` : ''}
                 </Text>
                 <Muted>{formatDate(entry.loggedAt)}</Muted>
+                {unsynced.has(entry.id) && <Unsynced />}
               </View>
               <Button
                 label="Remove"
                 variant="small"
-                onPress={() => remove.mutate(entry.id)}
-                disabled={remove.isPending}
+                onPress={() =>
+                  remove.mutate({ label: `Remove ${entry.weightKg} kg`, path: `/api/weights/${entry.id}`, cacheKey: ['weights'], id: entry.id })
+                }
                 accessibilityLabel={`Remove ${entry.weightKg} kg from ${formatDate(entry.loggedAt)}`}
               />
             </View>
           ))}
-          {remove.isError && <ErrorText>Could not remove that entry: please try again</ErrorText>}
         </Card>
       )}
     </Screen>

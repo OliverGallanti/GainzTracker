@@ -1,20 +1,20 @@
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { startOfLocalDay } from '@gainz/shared/dates'
 import { formatMacro, groupByMeal, OTHER_MEAL, sumToday } from '@gainz/shared/macros'
 import type { MacroGoal, Meal } from '@gainz/shared/types'
 import { api } from '../api'
 import { todayKey } from '../offline'
 import { useMe, useWeights } from '../queries'
+import { QUEUED, useQueued, useUnsyncedIds, type RemoveVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, ErrorText, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, ErrorText, Muted, Screen, Unsynced, styles as ui } from '../ui'
 import LogFoodForm from './LogFoodForm'
 import TargetsForm from './TargetsForm'
 
 // Today's macros: the same data and grouping as the web card, phone-sized.
 export default function TodayScreen() {
-  const queryClient = useQueryClient()
   const [mode, setMode] = useState<'view' | 'targets' | { logMeal: string }>('view')
   const me = useMe()
   const weights = useWeights()
@@ -31,10 +31,8 @@ export default function TodayScreen() {
     },
   })
 
-  const remove = useMutation({
-    mutationFn: (id: string) => api(`/api/meals/${id}`, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['today'] }),
-  })
+  const remove = useQueued<RemoveVars>(QUEUED.remove)
+  const unsynced = useUnsyncedIds()
 
   const goal = today.data?.goal ?? null
   const meals = today.data?.meals ?? []
@@ -105,19 +103,18 @@ export default function TodayScreen() {
                     .filter(Boolean)
                     .join(' · ')}
                 </Muted>
+                {unsynced.has(meal.id) && <Unsynced />}
               </View>
               <Button
                 label="Remove"
                 variant="small"
-                onPress={() => remove.mutate(meal.id)}
-                disabled={remove.isPending}
+                onPress={() => remove.mutate({ label: `Remove ${meal.description}`, path: `/api/meals/${meal.id}`, cacheKey: ['today'], id: meal.id })}
                 accessibilityLabel={`Remove ${meal.description}`}
               />
             </View>
           ))}
         </Card>
       ))}
-      {remove.isError && <ErrorText>Could not remove that food: please try again</ErrorText>}
     </Screen>
   )
 }

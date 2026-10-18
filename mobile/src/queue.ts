@@ -36,7 +36,12 @@ export type LogDayVars = Label & {
   dayEnd: string
 }
 
+// One kind for every remove. `cacheKey` is the query (or prefix, e.g. ['today']
+// covers every day) the item is shown in; it's taken out of any list there.
+export type RemoveVars = Label & { path: string; cacheKey: readonly unknown[]; id: string }
+
 export const QUEUED = {
+  remove: ['queue', 'remove'],
   addMeal: ['queue', 'addMeal'],
   addWeight: ['queue', 'addWeight'],
   updateMe: ['queue', 'updateMe'],
@@ -48,6 +53,16 @@ export const QUEUED = {
 
 const without = <T extends { id: string }>(list: T[] | undefined, id: string) => (list ?? []).filter((x) => x.id !== id)
 
+// Removes an id from a cached list, or from every list in a cached object
+// (today's { goal, meals }, training's { logs, allLogs }).
+function dropId(data: unknown, id: string): unknown {
+  if (Array.isArray(data)) return without(data, id)
+  if (data && typeof data === 'object') {
+    return Object.fromEntries(Object.entries(data).map(([k, v]) => [k, Array.isArray(v) ? without(v, id) : v]))
+  }
+  return data
+}
+
 export function registerQueuedMutations(queryClient: QueryClient) {
   const common = {
     networkMode: 'online' as const,
@@ -56,6 +71,19 @@ export function registerQueuedMutations(queryClient: QueryClient) {
     // Render's free tier can need a minute to wake up; repeats are safe (ids).
     retry: 3,
   }
+
+  queryClient.setMutationDefaults(QUEUED.remove, {
+    ...common,
+    // 404 = already gone (a resend after a cut-off reply, or removed on the web): done.
+    mutationFn: ({ path }: RemoveVars) =>
+      api(path, { method: 'DELETE' }).catch((err: { status?: number }) => {
+        if (err.status !== 404) throw err
+      }),
+    onMutate: ({ cacheKey, id }: RemoveVars) => {
+      queryClient.setQueriesData({ queryKey: cacheKey }, (old: unknown) => dropId(old, id))
+    },
+    onSettled: (_data, _error, { cacheKey }: RemoveVars) => queryClient.invalidateQueries({ queryKey: cacheKey }),
+  })
 
   queryClient.setMutationDefaults(QUEUED.addMeal, {
     ...common,
@@ -172,4 +200,21 @@ export function useSyncState() {
   }
 
   return { waiting, failed, dismiss, retry }
+}
+
+// The id of the row a queued add puts on screen (removes take theirs off, so
+// they never need a mark).
+export const queuedItemId = (vars: unknown) => {
+  const v = vars as Partial<AddMealVars & AddWeightVars & AddSetVars & LogDayVars>
+  return v.meal?.id ?? v.entry?.id ?? v.set?.id ?? v.log?.id
+}
+
+// Ids of rows on screen the server doesn't have yet: queued adds still waiting
+// or refused (the header offers Retry/Dismiss for those).
+export function useUnsyncedIds() {
+  const ids = useMutationState({
+    filters: { mutationKey: ['queue'], predicate: (m) => m.state.status === 'pending' || m.state.status === 'error' },
+    select: (m) => queuedItemId(m.state.variables),
+  })
+  return new Set(ids.filter(Boolean))
 }

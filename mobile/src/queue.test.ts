@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, registerQueuedMutations, shouldSaveMutation, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
+import { QUEUED, queuedItemId, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -107,6 +107,58 @@ describe('offline write queue', () => {
     const [failed] = client.getMutationCache().getAll()
     expect(failed.state.status).toBe('error')
     expect(failed.state.variables).toEqual(meal) // same id, so retrying can't duplicate
+  })
+})
+
+describe('removes', () => {
+  it('takes the item off screen straight away and sends the DELETE after a restart', async () => {
+    const client = makeClient()
+    client.setQueryData(['today', today], { goal: null, meals: [{ id: 'meal-1' }, { id: 'meal-2' }] })
+    client.setQueryData(['training'], { split: null, logs: [{ id: 'log-1' }], allLogs: [{ id: 'log-1' }] })
+
+    void mutate<RemoveVars>(client, QUEUED.remove, { label: 'Remove Oats', path: '/api/meals/meal-1', cacheKey: ['today'], id: 'meal-1' })
+    void mutate<RemoveVars>(client, QUEUED.remove, { label: 'Remove day', path: '/api/workout-splits/s/logs/log-1', cacheKey: ['training'], id: 'log-1' })
+    await flush()
+    expect(client.getQueryData(['today', today])).toEqual({ goal: null, meals: [{ id: 'meal-2' }] })
+    expect(client.getQueryData(['training'])).toEqual({ split: null, logs: [], allLogs: [] })
+
+    const restarted = restart(client)
+    onlineManager.setOnline(true)
+    await restarted.resumePausedMutations()
+    expect(api.mock.calls).toEqual([
+      ['/api/meals/meal-1', { method: 'DELETE' }],
+      ['/api/workout-splits/s/logs/log-1', { method: 'DELETE' }],
+    ])
+  })
+
+  it('counts a 404 as done (already gone), so a resend is harmless', async () => {
+    onlineManager.setOnline(true)
+    api.mockRejectedValue(Object.assign(new Error('404'), { status: 404 }))
+    const client = makeClient()
+
+    await mutate<RemoveVars>(client, QUEUED.remove, { label: 'x', path: '/api/weights/w-1', cacheKey: ['weights'], id: 'w-1' })
+    expect(client.getMutationCache().getAll()[0].state.status).toBe('success')
+  })
+
+  it('sends an unsent add before its remove (one queue, in order)', async () => {
+    const client = makeClient()
+    void mutate(client, QUEUED.addMeal, meal)
+    void mutate<RemoveVars>(client, QUEUED.remove, { label: 'x', path: '/api/meals/meal-1', cacheKey: ['today'], id: 'meal-1' })
+    await flush()
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls.map(([path, o]) => `${o.method} ${path}`)).toEqual(['POST /api/meals', 'DELETE /api/meals/meal-1'])
+  })
+})
+
+describe('not synced yet mark', () => {
+  it('finds the on-screen id of each kind of queued add', () => {
+    expect(queuedItemId(meal)).toBe('meal-1')
+    expect(queuedItemId({ label: '', entry: { id: 'w-1' } })).toBe('w-1')
+    expect(queuedItemId({ label: '', set: { id: 'set-1' } })).toBe('set-1')
+    expect(queuedItemId({ label: '', log: { id: 'log-1' } })).toBe('log-1')
+    expect(queuedItemId({ label: '', goals: {} })).toBeUndefined()
   })
 })
 

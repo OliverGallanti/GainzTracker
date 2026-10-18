@@ -7,9 +7,9 @@ import { computeWeeklyStreak, suggestedDayIndex, uniqueDays, weeklyGoal } from '
 import { SPLIT_TEMPLATES } from '@gainz/shared/templates'
 import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
 import { api } from '../api'
-import { QUEUED, useQueued, type LogDayVars } from '../queue'
+import { QUEUED, useQueued, useUnsyncedIds, type LogDayVars, type RemoveVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Muted, Screen, Unsynced, styles as ui } from '../ui'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
@@ -42,7 +42,7 @@ export default function TrainingScreen() {
         {split && training.data && <TodayLogger split={split} logs={logs} allLogs={training.data.allLogs} />}
       </Card>
 
-      {split && logs.length > 0 && <RecentLogs split={split} logs={logs} onChanged={refresh} />}
+      {split && logs.length > 0 && <RecentLogs split={split} logs={logs} />}
     </Screen>
   )
 }
@@ -117,11 +117,9 @@ function TodayLogger({
   )
 }
 
-function RecentLogs({ split, logs, onChanged }: { split: WorkoutSplit; logs: SplitLog[]; onChanged: () => void }) {
-  const remove = useMutation({
-    mutationFn: (logId: string) => api(`/api/workout-splits/${split.id}/logs/${logId}`, { method: 'DELETE' }),
-    onSuccess: onChanged,
-  })
+function RecentLogs({ split, logs }: { split: WorkoutSplit; logs: SplitLog[] }) {
+  const remove = useQueued<RemoveVars>(QUEUED.remove)
+  const unsynced = useUnsyncedIds()
 
   return (
     <Card title="Recent days">
@@ -133,18 +131,24 @@ function RecentLogs({ split, logs, onChanged }: { split: WorkoutSplit; logs: Spl
               {formatDate(log.loggedAt)} · {log.completed ? 'Done' : 'Skipped'}
               {log.durationMinutes ? ` · ${log.durationMinutes} min` : ''}
             </Muted>
+            {unsynced.has(log.id) && <Unsynced />}
           </View>
           <Button
             label="Remove"
             variant="small"
-            onPress={() => remove.mutate(log.id)}
-            disabled={remove.isPending}
+            onPress={() =>
+              remove.mutate({
+                label: `Remove ${split.days[log.dayIndex]} on ${formatDate(log.loggedAt)}`,
+                path: `/api/workout-splits/${split.id}/logs/${log.id}`,
+                cacheKey: ['training'],
+                id: log.id,
+              })
+            }
             accessibilityLabel={`Remove ${split.days[log.dayIndex]} on ${formatDate(log.loggedAt)}`}
           />
         </View>
       ))}
       <Muted>Removing a day also removes any exercises logged on it.</Muted>
-      {remove.isError && <ErrorText>Could not remove that day: please try again</ErrorText>}
     </Card>
   )
 }
