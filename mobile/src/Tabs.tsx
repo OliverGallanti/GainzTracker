@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native'
 import { useAuth } from './auth'
+import { useIsOnline } from './offline'
 import TodayScreen from './screens/TodayScreen'
 import TrainingScreen from './screens/TrainingScreen'
 import WeightScreen from './screens/WeightScreen'
@@ -20,6 +21,7 @@ export default function Tabs() {
   const { signOut } = useAuth()
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('today')
   const Current = TABS.find((t) => t.key === tab)!.Screen
+  const online = useIsOnline()
 
   return (
     <View style={styles.root}>
@@ -29,6 +31,12 @@ export default function Tabs() {
         </Text>
         <Button label="Sign out" variant="small" onPress={() => void signOut()} />
       </View>
+
+      {!online && (
+        <View style={styles.offline} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          <Text style={styles.offlineText}>Offline: showing saved data. Logging needs a connection for now.</Text>
+        </View>
+      )}
 
       <View style={styles.body}>
         <Current />
@@ -68,6 +76,8 @@ const styles = StyleSheet.create({
   brand: { fontSize: 20, fontWeight: '700', color: colors.text },
   brandMuted: { color: colors.muted },
   body: { flex: 1 },
+  offline: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'rgba(251, 191, 36, 0.15)', borderBottomWidth: 1, borderBottomColor: 'rgba(251, 191, 36, 0.4)' },
+  offlineText: { color: '#fcd34d', fontSize: 13 },
   bar: { flexDirection: 'row', backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border },
   tab: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 6 },
   tabText: { color: colors.muted, fontWeight: '500' },

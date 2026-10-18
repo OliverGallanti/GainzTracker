@@ -5,6 +5,7 @@ import { startOfLocalDay } from '@gainz/shared/dates'
 import { formatMacro, groupByMeal, OTHER_MEAL, sumToday } from '@gainz/shared/macros'
 import type { MacroGoal, Meal } from '@gainz/shared/types'
 import { api } from '../api'
+import { todayKey } from '../offline'
 import { useMe, useWeights } from '../queries'
 import { colors } from '../theme'
 import { Button, Card, ErrorText, Muted, Screen, styles as ui } from '../ui'
@@ -19,7 +20,7 @@ export default function TodayScreen() {
   const weights = useWeights()
 
   const today = useQuery({
-    queryKey: ['today'],
+    queryKey: todayKey(),
     queryFn: async () => {
       const since = startOfLocalDay().toISOString()
       const [goal, meals] = await Promise.all([

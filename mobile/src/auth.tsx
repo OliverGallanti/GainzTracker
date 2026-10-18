@@ -3,6 +3,7 @@ import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/goo
 import { useQueryClient } from '@tanstack/react-query'
 import { api, clearToken, loadToken, saveToken } from './api'
 import { GOOGLE_WEB_CLIENT_ID } from './config'
+import { persister } from './offline'
 
 GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID })
 
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await GoogleSignin.signOut().catch(() => {})
     await clearToken()
     queryClient.clear()
+    await persister.removeClient()
     setStatus('signedOut')
   }, [queryClient])
 
