@@ -5,6 +5,8 @@
   --color-secondary: #808f85;
   --color-third: #dce0d9;
   --color-card: #03161f;
+  /* Manrope (variable, self-hosted via @fontsource, so no request to Google). */
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {

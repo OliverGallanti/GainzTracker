@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View } from 'react-native'
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg'
 import { chartYDomain } from '@gainz/shared/chart'
-import { colors } from './theme'
+import { colors, FONT } from './theme'
 
 const HEIGHT = 180
 const PAD = { left: 40, right: 12, top: 12, bottom: 22 }
@@ -69,7 +69,7 @@ export default function LineChart({
             <Line key={`g${tick}`} x1={PAD.left} x2={width - PAD.right} y1={y(tick)} y2={y(tick)} stroke={GRID_COLOR} />
           ))}
           {ticks.map((tick) => (
-            <SvgText key={`t${tick}`} x={PAD.left - 6} y={y(tick) + 4} fill={LABEL_COLOR} fontSize={10} textAnchor="end">
+            <SvgText fontFamily={FONT} key={`t${tick}`} x={PAD.left - 6} y={y(tick) + 4} fill={LABEL_COLOR} fontSize={10} textAnchor="end">
               {tick}
             </SvgText>
           ))}
@@ -78,7 +78,7 @@ export default function LineChart({
             <Line key={ref.label} x1={PAD.left} x2={width - PAD.right} y1={y(ref.value)} y2={y(ref.value)} stroke={GRID_COLOR} strokeDasharray="2 4" />
           ))}
           {referenceLines.map((ref) => (
-            <SvgText key={`l${ref.label}`} x={PAD.left + 4} y={y(ref.value) - 3} fill={LABEL_COLOR} fontSize={9}>
+            <SvgText fontFamily={FONT} key={`l${ref.label}`} x={PAD.left + 4} y={y(ref.value) - 3} fill={LABEL_COLOR} fontSize={9}>
               {ref.label}
             </SvgText>
           ))}
@@ -86,7 +86,7 @@ export default function LineChart({
           {goal != null && (
             <>
               <Line x1={PAD.left} x2={width - PAD.right} y1={y(goal)} y2={y(goal)} stroke={GOAL_COLOR} strokeDasharray="5 4" />
-              <SvgText x={width - PAD.right} y={y(goal) - 4} fill={GOAL_COLOR} fontSize={10} textAnchor="end">
+              <SvgText fontFamily={FONT} x={width - PAD.right} y={y(goal) - 4} fill={GOAL_COLOR} fontSize={10} textAnchor="end">
                 Goal
               </SvgText>
             </>
@@ -102,11 +102,11 @@ export default function LineChart({
             <Circle key={i} cx={x(times[i])} cy={y(d.value)} r={3} fill={colors.text} />
           ))}
 
-          <SvgText x={PAD.left} y={HEIGHT - 6} fill={LABEL_COLOR} fontSize={10}>
+          <SvgText fontFamily={FONT} x={PAD.left} y={HEIGHT - 6} fill={LABEL_COLOR} fontSize={10}>
             {shortDate(t0)}
           </SvgText>
           {t1 !== t0 && (
-            <SvgText x={width - PAD.right} y={HEIGHT - 6} fill={LABEL_COLOR} fontSize={10} textAnchor="end">
+            <SvgText fontFamily={FONT} x={width - PAD.right} y={HEIGHT - 6} fill={LABEL_COLOR} fontSize={10} textAnchor="end">
               {shortDate(t1)}
             </SvgText>
           )}

@@ -21,6 +21,7 @@ const CREDITS = [
       { name: 'Tailwind CSS', url: 'https://tailwindcss.com' },
       { name: 'Recharts', url: 'https://recharts.org' },
       { name: 'Lucide', url: 'https://lucide.dev', note: 'icons' },
+      { name: 'Manrope', url: 'https://fonts.google.com/specimen/Manrope', note: 'typeface' },
       { name: 'ZXing', url: 'https://github.com/zxing-js/library', note: 'barcode scanning' },
     ],
   },

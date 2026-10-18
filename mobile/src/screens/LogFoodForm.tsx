@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Linking, Pressable, Switch, Text, View } from 'react-native'
+import { Linking, Pressable, Switch, View } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { OTHER_MEAL, scaleFood } from '@gainz/shared/macros'
 import type { Product, SavedFood } from '@gainz/shared/types'
 import { useSavedFoods } from '../queries'
 import { QUEUED, useQueued, type AddMealVars, type SaveFoodVars } from '../queue'
 import { colors } from '../theme'
-import { Button, Chip, Field, Muted, styles } from '../ui'
+import { Text, Button, Chip, Field, Muted, styles } from '../ui'
 import ProductLookup from './ProductLookup'
 
 const text = (value: number | null) => (value == null ? '' : String(value))

@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native'
 import { useAuth } from '../auth'
 import { colors } from '../theme'
+import { Text } from '../ui'
 
 export default function SignInScreen() {
   const { signIn } = useAuth()

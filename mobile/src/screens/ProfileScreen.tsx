@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
 import { missingProfileFields } from '@gainz/shared/onboarding'
 import { ACTIVITY_LEVELS } from '@gainz/shared/tdee'
 import type { Me, Sex } from '@gainz/shared/types'
 import { useAuth } from '../auth'
 import { useMe } from '../queries'
 import { QUEUED, useQueued, type UpdateMeVars } from '../queue'
-import { Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
 
 const text = (value: number | null | undefined) => (value == null ? '' : String(value))
 

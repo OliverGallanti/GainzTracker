@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { startOfLocalDay } from '@gainz/shared/dates'
@@ -9,7 +9,7 @@ import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
 import { api } from '../api'
 import { QUEUED, useQueued, type LogDayVars } from '../queue'
 import { colors } from '../theme'
-import { Button, Card, Chip, ErrorText, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Muted, Screen, styles as ui } from '../ui'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })

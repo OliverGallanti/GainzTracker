@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { computeBmi } from '@gainz/shared/body'
@@ -8,7 +8,7 @@ import { api } from '../api'
 import LineChart from '../LineChart'
 import { QUEUED, useQueued, type AddWeightVars, type UpdateMeVars } from '../queue'
 import { useMe, useWeights } from '../queries'
-import { Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 

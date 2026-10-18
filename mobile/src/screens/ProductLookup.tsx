@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
-import { Linking, Modal, StyleSheet, Text, View } from 'react-native'
+import { Linking, Modal, StyleSheet, View } from 'react-native'
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
 import type { Product } from '@gainz/shared/types'
 import { api } from '../api'
 import { useIsOnline } from '../offline'
 import { colors } from '../theme'
-import { Button, ErrorText, Field, Muted, styles as ui } from '../ui'
+import { Text, Button, ErrorText, Field, Muted, styles as ui } from '../ui'
 
 const BARCODE = /^\d{8,14}$/
 

@@ -7,3 +7,7 @@ export const colors = {
   border: 'rgba(128, 143, 133, 0.4)',
   danger: '#f87171',
 }
+
+// Embedded at build time by the expo-font plugin (app.json), one file per
+// weight, so fontWeight in a style picks the matching Manrope file.
+export const FONT = 'Manrope'

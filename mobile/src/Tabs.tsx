@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StatusBar, StyleSheet, View } from 'react-native'
 import { useIsOnline } from './offline'
 import { useSyncState } from './queue'
 import BigFourScreen from './screens/BigFourScreen'
@@ -8,7 +8,7 @@ import TodayScreen from './screens/TodayScreen'
 import TrainingScreen from './screens/TrainingScreen'
 import WeightScreen from './screens/WeightScreen'
 import { colors } from './theme'
-import { Button } from './ui'
+import { Text, Button } from './ui'
 
 const TABS = [
   { key: 'today', label: 'Today', Screen: TodayScreen },

@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ADULT_AGE, PROTEIN_RANGE_TEXT, suggestMacros, tdeePresets, type Goal } from '@gainz/shared/macroSplit'
 import { computeBmr, computeTdee } from '@gainz/shared/tdee'
 import type { MacroGoal, Me } from '@gainz/shared/types'
 import { api } from '../api'
-import { Button, Chip, ErrorText, Field, Muted, styles } from '../ui'
+import { Text, Button, Chip, ErrorText, Field, Muted, styles } from '../ui'
 
 const text = (value: number | null | undefined) => (value == null ? '' : String(value))
 

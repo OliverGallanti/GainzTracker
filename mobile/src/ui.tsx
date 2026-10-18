@@ -4,12 +4,19 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
+  Text as NativeText,
   TextInput,
   View,
   type TextInputProps,
+  type TextProps,
 } from 'react-native'
-import { colors } from './theme'
+import { colors, FONT } from './theme'
+
+// React Native has no app-wide default font, so every screen uses this Text,
+// which is the native one with Manrope first (a style can still override it).
+export function Text({ style, ...props }: TextProps) {
+  return <NativeText style={[{ fontFamily: FONT }, style]} {...props} />
+}
 
 // Small shared building blocks so every screen looks and behaves the same:
 // 48px touch targets, the web palette, and labelled controls for TalkBack.
@@ -162,6 +169,7 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.main,
     color: colors.text,
+    fontFamily: FONT,
   },
   text: { color: colors.text },
   muted: { color: colors.muted },

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { BIG_FOUR_LIFTS } from '@gainz/shared/lifts'
@@ -10,7 +10,7 @@ import LineChart from '../LineChart'
 import { useMe, useWeights } from '../queries'
 import { QUEUED, useQueued, type AddSetVars, type SetLiftGoalsVars } from '../queue'
 import { colors } from '../theme'
-import { Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 const describe = (set: WorkoutSet) => `${set.weightKg ?? '–'} kg${set.reps ? ` × ${set.reps}` : ''}`
