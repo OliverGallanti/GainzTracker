@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, registerQueuedMutations, shouldSaveMutation, type AddMealVars, type AddWeightVars, type SaveFoodVars, type UpdateMeVars } from './queue'
+import { QUEUED, registerQueuedMutations, shouldSaveMutation, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -139,5 +139,37 @@ describe('saved foods', () => {
     expect(api).toHaveBeenCalledTimes(1)
     expect(api.mock.calls[0][0]).toBe('/api/saved-foods')
     expect(JSON.parse(api.mock.calls[0][1].body)).toEqual({ name: 'Apple', calories: 95 })
+  })
+})
+
+describe('Big 4', () => {
+  it('shows a logged lift straight away and sends it after a restart with its id and time', async () => {
+    const client = makeClient()
+    client.setQueryData(['workoutSets'], [])
+    const set = { id: 'set-1', exerciseName: 'Squat', weightKg: 100, reps: null, performedAt: new Date().toISOString() }
+
+    void mutate<AddSetVars>(client, QUEUED.addSet, { label: 'Squat 100 kg', set })
+    await flush()
+    expect(client.getQueryData<{ id: string }[]>(['workoutSets'])!.map((s) => s.id)).toEqual(['set-1'])
+
+    const restarted = restart(client)
+    onlineManager.setOnline(true)
+    await restarted.resumePausedMutations()
+
+    expect(api.mock.calls[0][0]).toBe('/api/workout-sets')
+    expect(JSON.parse(api.mock.calls[0][1].body)).toEqual({ id: 'set-1', exerciseName: 'Squat', weightKg: 100, performedAt: set.performedAt })
+  })
+
+  it('merges new lift goals into the shown ones and sends only the changed lifts', async () => {
+    const client = makeClient()
+    client.setQueryData(['liftGoals'], { Squat: 120, Deadlift: 180 })
+
+    void mutate<SetLiftGoalsVars>(client, QUEUED.setLiftGoals, { label: 'Lift goals', goals: { Squat: 140 } })
+    await flush()
+    expect(client.getQueryData(['liftGoals'])).toEqual({ Squat: 140, Deadlift: 180 })
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls[0]).toEqual(['/api/lift-goals', { method: 'PUT', body: JSON.stringify({ Squat: 140 }) }])
   })
 })

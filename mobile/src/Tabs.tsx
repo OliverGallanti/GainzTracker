@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native'
 import { useIsOnline } from './offline'
 import { useSyncState } from './queue'
+import BigFourScreen from './screens/BigFourScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import TodayScreen from './screens/TodayScreen'
 import TrainingScreen from './screens/TrainingScreen'
@@ -13,10 +14,11 @@ const TABS = [
   { key: 'today', label: 'Today', Screen: TodayScreen },
   { key: 'weight', label: 'Weight', Screen: WeightScreen },
   { key: 'training', label: 'Training', Screen: TrainingScreen },
+  { key: 'bigFour', label: 'Big 4', Screen: BigFourScreen },
   { key: 'profile', label: 'Profile', Screen: ProfileScreen },
 ] as const
 
-// Four screens don't need a navigation library: a fixed header, the current
+// Five screens don't need a navigation library: a fixed header, the current
 // screen, and a bottom bar. ponytail: no back-stack or deep links; add
 // a navigator when a screen needs to push another.
 export default function Tabs() {

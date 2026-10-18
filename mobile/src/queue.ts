@@ -1,5 +1,5 @@
 import { MutationObserver, useMutation, useMutationState, useQueryClient, type Mutation, type QueryClient } from '@tanstack/react-query'
-import type { Me, Meal, SavedFood, SplitLog, WeightEntry } from '@gainz/shared/types'
+import type { Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet } from '@gainz/shared/types'
 import { api } from './api'
 
 // The offline write queue. Each kind of write registers its send function once
@@ -26,6 +26,9 @@ export type UpdateMeVars = Label & {
 // Saved foods are keyed by name on the server (saving a name again replaces it),
 // which makes a repeat harmless without a client id.
 export type SaveFoodVars = Label & { food: Omit<SavedFood, 'id'> }
+export type AddSetVars = Label & { set: WorkoutSet }
+// PUT /api/lift-goals replaces only the lifts it names: repeating it is harmless.
+export type SetLiftGoalsVars = Label & { goals: Record<string, number> }
 export type LogDayVars = Label & {
   splitId: string
   log: Pick<SplitLog, 'id' | 'dayIndex' | 'completed' | 'loggedAt'>
@@ -39,6 +42,8 @@ export const QUEUED = {
   updateMe: ['queue', 'updateMe'],
   logDay: ['queue', 'logDay'],
   saveFood: ['queue', 'saveFood'],
+  addSet: ['queue', 'addSet'],
+  setLiftGoals: ['queue', 'setLiftGoals'],
 } as const
 
 const without = <T extends { id: string }>(list: T[] | undefined, id: string) => (list ?? []).filter((x) => x.id !== id)
@@ -94,6 +99,24 @@ export function registerQueuedMutations(queryClient: QueryClient) {
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['savedFoods'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.addSet, {
+    ...common,
+    mutationFn: ({ set }: AddSetVars) => api('/api/workout-sets', { method: 'POST', body: JSON.stringify(nullsOmitted(set)) }),
+    onMutate: ({ set }: AddSetVars) => {
+      queryClient.setQueryData<WorkoutSet[]>(['workoutSets'], (old) => (old ? [set, ...without(old, set.id)] : old))
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['workoutSets'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.setLiftGoals, {
+    ...common,
+    mutationFn: ({ goals }: SetLiftGoalsVars) => api('/api/lift-goals', { method: 'PUT', body: JSON.stringify(goals) }),
+    onMutate: ({ goals }: SetLiftGoalsVars) => {
+      queryClient.setQueryData<Record<string, number>>(['liftGoals'], (old) => (old ? { ...old, ...goals } : old))
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['liftGoals'] }),
   })
 
   queryClient.setMutationDefaults(QUEUED.logDay, {
