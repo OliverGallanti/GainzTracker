@@ -1,3 +1,4 @@
+import { chartYDomain } from '@gainz/shared/chart'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 // Chart chrome mapped to the app's theme tokens (index.css) rather than
@@ -73,17 +74,10 @@ export function StatLineChart({
   xDomain?: number[]
   decimals?: number
 }) {
-  // The default 'dataMin'/'dataMax' domain only looks at plotted points, so a
-  // goal reference line outside that range would render off-screen. Compute
-  // the domain from the data AND every reference value so all of them stay
-  // on-screen.
+  // Includes the goal and reference lines, so none of them render off-screen
+  // (shared with the mobile chart).
   const values = data.map((d) => d.value).filter((v): v is number => v != null)
-  const extraValues = [...(goal != null ? [goal] : []), ...referenceLines.map((r) => r.value)]
-  const allValues = [...values, ...extraValues]
-  const min = Math.min(...allValues)
-  const max = Math.max(...allValues)
-  const padding = Math.max((max - min) * 0.1, 1)
-  const yDomain = [Math.floor(min - padding), Math.ceil(max + padding)]
+  const yDomain = chartYDomain(values, [...(goal != null ? [goal] : []), ...referenceLines.map((r) => r.value)]) ?? [0, 1]
 
   // Ambiguous "Sep 17" ticks read fine within one year but not across a
   // multi-year range, so only pay for the wider "Sep '26" label when needed.

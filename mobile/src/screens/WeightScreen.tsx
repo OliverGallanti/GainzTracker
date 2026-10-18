@@ -3,10 +3,12 @@ import { StyleSheet, Text, View } from 'react-native'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { computeBmi } from '@gainz/shared/body'
+import type { WeightEntry } from '@gainz/shared/types'
 import { api } from '../api'
+import LineChart from '../LineChart'
 import { QUEUED, useQueued, type AddWeightVars, type UpdateMeVars } from '../queue'
 import { useMe, useWeights } from '../queries'
-import { Button, Card, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
+import { Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -57,6 +59,10 @@ export default function WeightScreen() {
         )}
       </Card>
 
+      {entries.length > 0 && me.data && (
+        <ProgressChart entries={entries} weightGoal={me.data.weightGoalKg} bodyFatGoal={me.data.bodyFatGoalPercent} />
+      )}
+
       {entries.length > 0 && (
         <Card title="History">
           {entries.slice(0, 30).map((entry) => (
@@ -80,6 +86,62 @@ export default function WeightScreen() {
         </Card>
       )}
     </Screen>
+  )
+}
+
+const RANGES = [
+  { key: '1M', days: 30 },
+  { key: '3M', days: 90 },
+  { key: '6M', days: 182 },
+  { key: '1Y', days: 365 },
+  { key: 'All', days: null },
+] as const
+
+// Weight or body fat over a chosen window; the stats above always use the full history.
+function ProgressChart({
+  entries,
+  weightGoal,
+  bodyFatGoal,
+}: {
+  entries: WeightEntry[]
+  weightGoal: number | null
+  bodyFatGoal: number | null
+}) {
+  const [series, setSeries] = useState<'weight' | 'bodyFat'>('weight')
+  const [range, setRange] = useState<(typeof RANGES)[number]['key']>('1Y')
+  // Pinned once per mount so the window doesn't drift between renders.
+  const [now] = useState(() => Date.now())
+
+  const days = RANGES.find((r) => r.key === range)!.days
+  const cutoff = days ? now - days * 24 * 60 * 60 * 1000 : null
+  const inRange = [...entries].reverse().filter((e) => !cutoff || new Date(e.loggedAt).getTime() >= cutoff) // oldest first
+  const hasBodyFat = entries.some((e) => e.bodyFatPercent != null)
+  const points =
+    series === 'weight'
+      ? inRange.map((e) => ({ loggedAt: e.loggedAt, value: e.weightKg }))
+      : inRange.flatMap((e) => (e.bodyFatPercent != null ? [{ loggedAt: e.loggedAt, value: e.bodyFatPercent }] : []))
+
+  return (
+    <Card title="Progress">
+      {hasBodyFat && (
+        <View style={ui.chips}>
+          <Chip label="Weight" selected={series === 'weight'} onPress={() => setSeries('weight')} />
+          <Chip label="Body fat" selected={series === 'bodyFat'} onPress={() => setSeries('bodyFat')} />
+        </View>
+      )}
+      <View style={ui.chips}>
+        {RANGES.map((r) => (
+          <Chip key={r.key} label={r.key} selected={range === r.key} onPress={() => setRange(r.key)} />
+        ))}
+      </View>
+      {points.length === 0 ? (
+        <Muted>Nothing logged in this range.</Muted>
+      ) : series === 'weight' ? (
+        <LineChart data={points} unit="kg" goal={weightGoal} label="Weight" />
+      ) : (
+        <LineChart data={points} unit="%" goal={bodyFatGoal} label="Body fat" />
+      )}
+    </Card>
   )
 }
 

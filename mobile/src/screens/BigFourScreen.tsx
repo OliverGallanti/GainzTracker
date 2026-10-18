@@ -6,6 +6,7 @@ import { BIG_FOUR_LIFTS } from '@gainz/shared/lifts'
 import { getStrengthReferenceLines, getStrengthTier } from '@gainz/shared/strength'
 import type { WorkoutSet } from '@gainz/shared/types'
 import { api } from '../api'
+import LineChart from '../LineChart'
 import { useMe, useWeights } from '../queries'
 import { QUEUED, useQueued, type AddSetVars, type SetLiftGoalsVars } from '../queue'
 import { colors } from '../theme'
@@ -42,6 +43,9 @@ export default function BigFourScreen() {
   const current = ranked.find((r) => r.name === selected)!
   const goal = goals.data?.[selected]
   const levels = getStrengthReferenceLines(selected, bodyweight, sex)
+  const history = bigFourSets
+    .flatMap((s) => (s.exerciseName === selected && s.weightKg != null ? [{ loggedAt: s.performedAt, value: s.weightKg }] : []))
+    .reverse() // oldest first
   const refresh = () => void Promise.all([sets.refetch(), goals.refetch(), me.refetch(), weights.refetch()])
 
   return (
@@ -85,6 +89,11 @@ export default function BigFourScreen() {
                 <Button label={goal ? 'Edit goals' : 'Set goals'} variant="small" onPress={() => setMode('goals')} />
               </View>
               {current.tier && <Text style={ui.text}>{current.tier.icon} {current.tier.label}</Text>}
+              {history.length > 0 ? (
+                <LineChart data={history} unit="kg" goal={goal} referenceLines={levels} label={`${selected} progress`} />
+              ) : (
+                <Muted>No {selected} entries logged yet.</Muted>
+              )}
               {levels.length > 0 && (
                 <View style={{ gap: 2 }}>
                   <Muted>Strength levels at your bodyweight ({bodyweight} kg):</Muted>
