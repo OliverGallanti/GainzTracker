@@ -158,7 +158,9 @@ export default function LogFoodForm({
             accessibilityElementsHidden
             importantForAccessibility="no"
           />
-          <Muted>Save for reuse (macros are for one serving)</Muted>
+          <View style={{ flex: 1 }}>
+            <Muted>Save for reuse (macros are for one serving)</Muted>
+          </View>
         </Pressable>
       )}
 

@@ -7,9 +7,9 @@ import type { MacroGoal, Meal } from '@gainz/shared/types'
 import { api } from '../api'
 import { todayKey } from '../offline'
 import { useMe, useWeights } from '../queries'
-import { QUEUED, useQueued, useUnsyncedIds, type RemoveVars } from '../queue'
+import { QUEUED, useQueued, useUnsyncedIds, type MoveMealVars, type RemoveVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, ErrorText, Muted, Screen, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Muted, Screen, Unsynced, styles as ui } from '../ui'
 import LogFoodForm from './LogFoodForm'
 import TargetsForm from './TargetsForm'
 
@@ -32,7 +32,9 @@ export default function TodayScreen() {
   })
 
   const remove = useQueued<RemoveVars>(QUEUED.remove)
+  const move = useQueued<MoveMealVars>(QUEUED.moveMeal)
   const unsynced = useUnsyncedIds()
+  const [movingId, setMovingId] = useState<string | null>(null)
 
   const goal = today.data?.goal ?? null
   const meals = today.data?.meals ?? []
@@ -95,22 +97,46 @@ export default function TodayScreen() {
         >
           {group.entries.length === 0 && <Text style={styles.faint}>Nothing logged</Text>}
           {group.entries.map((meal) => (
-            <View key={meal.id} style={styles.mealRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={ui.text}>{meal.description}</Text>
-                <Muted>
-                  {[`${meal.calories} cal`, formatMacro(meal.proteinG, 'g P'), formatMacro(meal.fatG, 'g F'), formatMacro(meal.carbsG, 'g C')]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Muted>
-                {unsynced.has(meal.id) && <Unsynced />}
+            <View key={meal.id} style={{ gap: 8 }}>
+              <View style={styles.mealRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={ui.text}>{meal.description}</Text>
+                  <Muted>
+                    {[`${meal.calories} cal`, formatMacro(meal.proteinG, 'g P'), formatMacro(meal.fatG, 'g F'), formatMacro(meal.carbsG, 'g C')]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Muted>
+                  {unsynced.has(meal.id) && <Unsynced />}
+                </View>
+                <Button
+                  label="Move"
+                  variant="small"
+                  onPress={() => setMovingId(movingId === meal.id ? null : meal.id)}
+                  accessibilityLabel={`Move ${meal.description} to another meal`}
+                />
+                <Button
+                  label="Remove"
+                  variant="small"
+                  onPress={() => remove.mutate({ label: `Remove ${meal.description}`, path: `/api/meals/${meal.id}`, cacheKey: ['today'], id: meal.id })}
+                  accessibilityLabel={`Remove ${meal.description}`}
+                />
               </View>
-              <Button
-                label="Remove"
-                variant="small"
-                onPress={() => remove.mutate({ label: `Remove ${meal.description}`, path: `/api/meals/${meal.id}`, cacheKey: ['today'], id: meal.id })}
-                accessibilityLabel={`Remove ${meal.description}`}
-              />
+              {movingId === meal.id && (
+                <View style={ui.chips}>
+                  {[...mealNames, OTHER_MEAL].map((name) => (
+                    <Chip
+                      key={name}
+                      label={name}
+                      selected={group.name === name}
+                      onPress={() => {
+                        setMovingId(null)
+                        if (group.name === name) return
+                        move.mutate({ label: `Move ${meal.description}`, id: meal.id, mealName: name === OTHER_MEAL ? null : name })
+                      }}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
           ))}
         </Card>

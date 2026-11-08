@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, queuedItemId, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
+import { QUEUED, queuedItemId, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -204,6 +204,21 @@ describe('training', () => {
     onlineManager.setOnline(true)
     await client.resumePausedMutations()
     expect(JSON.parse(api.mock.calls[0][1].body)).toEqual({ id: 'set-1', splitLogId: 'log-1', exerciseName: 'Dips', reps: 10, performedAt: set.performedAt })
+  })
+})
+
+describe('moving a food between meals', () => {
+  it('moves it on screen straight away and sends the new meal, null for Other', async () => {
+    const client = makeClient()
+    client.setQueryData(['today', today], { goal: null, meals: [{ id: 'meal-1', mealName: 'Lunch' }, { id: 'meal-2', mealName: 'Lunch' }] })
+
+    void mutate<MoveMealVars>(client, QUEUED.moveMeal, { label: 'Move', id: 'meal-1', mealName: null })
+    await flush()
+    expect(client.getQueryData(['today', today])).toEqual({ goal: null, meals: [{ id: 'meal-1', mealName: null }, { id: 'meal-2', mealName: 'Lunch' }] })
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls[0]).toEqual(['/api/meals/meal-1', { method: 'PATCH', body: JSON.stringify({ mealName: null }) }])
   })
 })
 

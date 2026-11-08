@@ -19,6 +19,8 @@ type Label = { label: string } // what the "couldn't save" list calls it
 export type AddMealVars = Label & {
   meal: Pick<Meal, 'id' | 'description' | 'calories' | 'proteinG' | 'fatG' | 'carbsG' | 'mealName' | 'loggedAt'>
 }
+// null = "Other". A PATCH to a value: repeating it is harmless.
+export type MoveMealVars = Label & { id: string; mealName: string | null }
 export type AddWeightVars = Label & { entry: WeightEntry }
 export type UpdateMeVars = Label & {
   changes: Partial<Pick<Me, 'heightCm' | 'sex' | 'age' | 'activityLevel' | 'weightGoalKg' | 'bodyFatGoalPercent'>>
@@ -56,6 +58,7 @@ export type RemoveVars = Label & { path: string; cacheKey: readonly unknown[]; i
 export const QUEUED = {
   remove: ['queue', 'remove'],
   addMeal: ['queue', 'addMeal'],
+  moveMeal: ['queue', 'moveMeal'],
   addWeight: ['queue', 'addWeight'],
   updateMe: ['queue', 'updateMe'],
   logDay: ['queue', 'logDay'],
@@ -108,6 +111,17 @@ export function registerQueuedMutations(queryClient: QueryClient) {
       const key = ['today', new Date(meal.loggedAt).toDateString()]
       queryClient.setQueryData<{ meals: Meal[] }>(key, (old) =>
         old ? { ...old, meals: [{ ...meal } as Meal, ...without(old.meals, meal.id)] } : old,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['today'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.moveMeal, {
+    ...common,
+    mutationFn: ({ id, mealName }: MoveMealVars) => api(`/api/meals/${id}`, { method: 'PATCH', body: JSON.stringify({ mealName }) }),
+    onMutate: ({ id, mealName }: MoveMealVars) => {
+      queryClient.setQueriesData<{ meals: Meal[] }>({ queryKey: ['today'] }, (old) =>
+        old ? { ...old, meals: old.meals.map((m) => (m.id === id ? { ...m, mealName } : m)) } : old,
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['today'] }),
