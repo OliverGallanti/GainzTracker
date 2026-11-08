@@ -48,8 +48,8 @@ export default function BigFourScreen() {
   return (
     <Screen>
       <Card title="Big 4" right={loaded && mode === 'view' ? <Button label="Log lift" variant="small" onPress={() => setMode('log')} /> : null}>
-        {!loaded && !(sets.isError || goals.isError) && <Muted>Loading…</Muted>}
-        {(sets.isError || goals.isError) && <ErrorText onPress={refresh}>Could not load your lifts: tap to retry</ErrorText>}
+        {!loaded && !(sets.isLoadingError || goals.isLoadingError) && <Muted>Loading…</Muted>}
+        {(sets.isLoadingError || goals.isLoadingError) && <ErrorText onPress={refresh}>Could not load your lifts: tap to retry</ErrorText>}
 
         {loaded && mode === 'log' && <LogLiftForm initialLift={selected} onDone={() => setMode('view')} />}
         {loaded && mode === 'goals' && <GoalsForm goals={goals.data} onDone={() => setMode('view')} />}

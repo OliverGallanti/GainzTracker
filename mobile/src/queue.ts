@@ -1,5 +1,5 @@
 import { MutationObserver, useMutation, useMutationState, useQueryClient, type Mutation, type QueryClient } from '@tanstack/react-query'
-import type { Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
+import type { MacroGoal, Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
 import { api } from './api'
 
 // The offline write queue. Each kind of write registers its send function once
@@ -240,6 +240,30 @@ const isQueued = (mutationKey: readonly unknown[] | undefined) => mutationKey?.[
 // cut off mid-send.
 export const shouldSaveMutation = (m: Mutation<unknown, Error, unknown, unknown>) =>
   m.state.status === 'pending' && isQueued(m.options.mutationKey)
+
+// A refetch returns what the server has, which doesn't include writes still on
+// their way (a sleeping server can take a minute): put them back on top, or
+// they'd vanish from the screen until they're sent. Every onMutate is safe to
+// repeat, and running them in queue order gives the same result as the first time.
+export function reapplyQueuedWrites(client: QueryClient) {
+  for (const m of client.getMutationCache().getAll()) {
+    if (m.state.status === 'pending' && isQueued(m.options.mutationKey)) {
+      void m.options.onMutate?.(m.state.variables, { client, meta: m.options.meta, mutationKey: m.options.mutationKey })
+    }
+  }
+}
+
+// Today's cache is per date, so the first open of a day has nothing saved. Rather
+// than wait for the server: the latest saved day's targets, with no food yet.
+export function newDayToday(client: QueryClient) {
+  const [latest] = client
+    .getQueryCache()
+    .findAll({ queryKey: ['today'] })
+    .filter((q) => q.state.data)
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt)
+  const saved = latest?.state.data as { goal: MacroGoal | null } | undefined
+  return saved && { goal: saved.goal, meals: [] as Meal[] }
+}
 
 export function useQueued<TVars>(key: (typeof QUEUED)[keyof typeof QUEUED]) {
   return useMutation<unknown, Error, TVars>({ mutationKey: key })

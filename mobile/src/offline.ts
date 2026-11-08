@@ -12,7 +12,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 export const persister = createAsyncStoragePersister({ storage: AsyncStorage })
 
 // Saved data older than this is discarded rather than shown.
-export const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 7
+export const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30
 
 // Bump when a query's data shape changes, so an old saved cache isn't read as new.
 export const CACHE_VERSION = '1'

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, queuedItemId, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
+import { QueryCache, QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
+import { QUEUED, newDayToday, queuedItemId, reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -219,6 +219,32 @@ describe('moving a food between meals', () => {
     onlineManager.setOnline(true)
     await client.resumePausedMutations()
     expect(api.mock.calls[0]).toEqual(['/api/meals/meal-1', { method: 'PATCH', body: JSON.stringify({ mealName: null }) }])
+  })
+})
+
+describe('saved data while the server is slow', () => {
+  it('keeps a write still being sent on screen when a refetch comes back without it', async () => {
+    onlineManager.setOnline(true)
+    api.mockReturnValue(new Promise(() => {})) // the POST never finishes: a sleeping server
+    const client: QueryClient = new QueryClient({ queryCache: new QueryCache({ onSuccess: () => reapplyQueuedWrites(client) }) })
+    registerQueuedMutations(client)
+    client.setQueryData(['weights'], [])
+    const entry = { id: 'w-1', weightKg: 80, bodyFatPercent: null, loggedAt: new Date().toISOString() }
+
+    void mutate<AddWeightVars>(client, QUEUED.addWeight, { label: '80 kg', entry })
+    await flush()
+    await client.fetchQuery({ queryKey: ['weights'], queryFn: () => [{ id: 'old', weightKg: 79 }] })
+
+    expect(client.getQueryData<{ id: string }[]>(['weights'])!.map((w) => w.id)).toEqual(['w-1', 'old'])
+  })
+
+  it('starts a new day from the latest saved targets with no food', () => {
+    const client = makeClient()
+    expect(newDayToday(client)).toBeUndefined()
+
+    client.setQueryData(['today', 'Mon'], { goal: { proteinG: 1 }, meals: [{ id: 'a' }] }, { updatedAt: 1000 })
+    client.setQueryData(['today', 'Tue'], { goal: { proteinG: 2 }, meals: [{ id: 'b' }] }, { updatedAt: 2000 })
+    expect(newDayToday(client)).toEqual({ goal: { proteinG: 2 }, meals: [] })
   })
 })
 

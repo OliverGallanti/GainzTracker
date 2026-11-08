@@ -18,7 +18,7 @@ export default function ProfileScreen() {
     <Screen>
       <Card title="Profile">
         {me.isPending && <Muted>Loading…</Muted>}
-        {me.isError && <ErrorText onPress={() => void me.refetch()}>Could not load your profile: tap to retry</ErrorText>}
+        {me.isLoadingError && <ErrorText onPress={() => void me.refetch()}>Could not load your profile: tap to retry</ErrorText>}
         {me.data && <ProfileForm me={me.data} />}
       </Card>
 

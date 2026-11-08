@@ -2,19 +2,22 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { QueryCache, QueryClient } from '@tanstack/react-query'
+import { QueryCache, QueryClient, useIsRestoring } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { UnauthorizedError } from './src/api'
 import { AuthProvider, useAuth } from './src/auth'
 import SignInScreen from './src/screens/SignInScreen'
 import Tabs from './src/Tabs'
 import { CACHE_MAX_AGE_MS, CACHE_VERSION, persister } from './src/offline'
-import { registerQueuedMutations, shouldSaveMutation } from './src/queue'
+import { reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation } from './src/queue'
 import { colors } from './src/theme'
 
 function Root() {
   const { status } = useAuth()
-  if (status === 'loading') {
+  // Screens wait for the saved data (milliseconds, it's on the phone) so they
+  // open on it instead of finding the cache empty.
+  const restoring = useIsRestoring()
+  if (status === 'loading' || restoring) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.text} />
@@ -39,8 +42,9 @@ function SignOutOn401() {
 
 export default function App() {
   const [queryClient] = useState(() => {
-    const client = new QueryClient({
+    const client: QueryClient = new QueryClient({
         queryCache: new QueryCache({
+          onSuccess: () => reapplyQueuedWrites(client),
           onError: (error) => {
             if (error instanceof UnauthorizedError) onUnauthorizedRef.current()
           },

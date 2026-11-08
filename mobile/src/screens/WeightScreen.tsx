@@ -30,7 +30,7 @@ export default function WeightScreen() {
     <Screen>
       <Card title="Weight">
         {(weights.isPending || me.isPending) && <Muted>Loading…</Muted>}
-        {(weights.isError || me.isError) && (
+        {(weights.isLoadingError || me.isLoadingError) && (
           <ErrorText onPress={() => void Promise.all([weights.refetch(), me.refetch()])}>
             Could not load your weight: tap to retry
           </ErrorText>

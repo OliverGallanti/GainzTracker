@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { startOfLocalDay } from '@gainz/shared/dates'
 import { formatMacro, groupByMeal, OTHER_MEAL, sumToday } from '@gainz/shared/macros'
 import type { MacroGoal, Meal } from '@gainz/shared/types'
 import { api } from '../api'
 import { todayKey } from '../offline'
 import { useMe, useWeights } from '../queries'
-import { QUEUED, useQueued, useUnsyncedIds, type MoveMealVars, type RemoveVars } from '../queue'
+import { newDayToday, QUEUED, useQueued, useUnsyncedIds, type MoveMealVars, type RemoveVars } from '../queue'
 import { colors } from '../theme'
 import { Text, Button, Card, Chip, ErrorText, Muted, Screen, Unsynced, styles as ui } from '../ui'
 import LogFoodForm from './LogFoodForm'
@@ -15,6 +15,7 @@ import TargetsForm from './TargetsForm'
 
 // Today's macros: the same data and grouping as the web card, phone-sized.
 export default function TodayScreen() {
+  const queryClient = useQueryClient()
   const [mode, setMode] = useState<'view' | 'targets' | { logMeal: string }>('view')
   const me = useMe()
   const weights = useWeights()
@@ -29,6 +30,8 @@ export default function TodayScreen() {
       ])
       return { goal, meals }
     },
+    initialData: () => newDayToday(queryClient),
+    initialDataUpdatedAt: 1, // always out of date, so the real day is still fetched
   })
 
   const remove = useQueued<RemoveVars>(QUEUED.remove)
@@ -51,7 +54,7 @@ export default function TodayScreen() {
         right={ready && mode === 'view' && goal ? <Button label="Targets" variant="small" onPress={() => setMode('targets')} /> : null}
       >
         {(today.isPending || me.isPending) && <Muted>Loading…</Muted>}
-        {(today.isError || me.isError) && (
+        {(today.isLoadingError || me.isLoadingError) && (
           <ErrorText onPress={() => void Promise.all([today.refetch(), me.refetch()])}>
             Could not load your macros: tap to retry
           </ErrorText>

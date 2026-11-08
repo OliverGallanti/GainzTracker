@@ -61,7 +61,7 @@ export default function TrainingScreen() {
         right={split && !editingRoutine ? <Button label="Change routine" variant="small" onPress={() => setEditingRoutine(true)} /> : null}
       >
         {training.isPending && <Muted>Loading…</Muted>}
-        {training.isError && <ErrorText onPress={refresh}>Could not load your training: tap to retry</ErrorText>}
+        {training.isLoadingError && <ErrorText onPress={refresh}>Could not load your training: tap to retry</ErrorText>}
         {training.data && (editingRoutine || !split) && (
           <RoutineEditor onDone={split ? () => setEditingRoutine(false) : undefined} />
         )}
