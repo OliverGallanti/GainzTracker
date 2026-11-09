@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { AccessibilityInfo, Animated, StyleSheet, View } from 'react-native'
+import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { QueryCache, QueryClient, useIsRestoring } from '@tanstack/react-query'
@@ -12,19 +13,65 @@ import { CACHE_MAX_AGE_MS, CACHE_VERSION, persister } from './src/offline'
 import { reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation } from './src/queue'
 import { colors } from './src/theme'
 
+// Outside any component, so it runs before the system splash can go away.
+void SplashScreen.preventAutoHideAsync()
+SplashScreen.setOptions({ duration: 0 }) // its default fade would cover the start of AnimatedSplash
+
 function Root() {
   const { status } = useAuth()
   // Screens wait for the saved data (milliseconds, it's on the phone) so they
   // open on it instead of finding the cache empty.
   const restoring = useIsRestoring()
-  if (status === 'loading' || restoring) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.text} />
-      </View>
-    )
-  }
-  return status === 'signedIn' ? <Tabs /> : <SignInScreen />
+  const loading = status === 'loading' || restoring
+  const [splashDone, setSplashDone] = useState(false)
+
+  return (
+    <View style={styles.root}>
+      {!loading && (status === 'signedIn' ? <Tabs /> : <SignInScreen />)}
+      {!splashDone && <AnimatedSplash ready={!loading} onDone={setSplashDone} />}
+    </View>
+  )
+}
+
+// Android's own splash can only be a still image, so this takes over from it:
+// the same logo at the same size and place (imageWidth in app.json), then a
+// short scale-up and fade into the app. It only waits for what's on the phone.
+const SPLASH_SIZE = 288
+
+function AnimatedSplash({ ready, onDone }: { ready: boolean; onDone: (done: boolean) => void }) {
+  const [progress] = useState(() => new Animated.Value(0))
+  const [drawn, setDrawn] = useState(false)
+
+  useEffect(() => {
+    if (!ready || !drawn) return
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (reduceMotion) onDone(true)
+      else Animated.timing(progress, { toValue: 1, duration: 500, useNativeDriver: true }).start(() => onDone(true))
+    })
+  }, [ready, drawn, progress, onDone])
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.splash, { opacity: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}
+    >
+      <Animated.Image
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- how React Native loads a bundled image
+        source={require('./assets/android-icon-foreground.png')}
+        onLoadEnd={() => {
+          setDrawn(true)
+          void SplashScreen.hideAsync()
+        }}
+        style={{
+          width: SPLASH_SIZE,
+          height: SPLASH_SIZE,
+          transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] }) }],
+        }}
+      />
+    </Animated.View>
+  )
 }
 
 // A rejected token anywhere (expired or revoked) signs the user out, so no screen
@@ -88,5 +135,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.main },
+  root: { flex: 1, backgroundColor: colors.main },
+  splash: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.main },
 })
