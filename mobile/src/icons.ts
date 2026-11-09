@@ -1,0 +1,18 @@
+// The web app's Lucide icons, one import each: Metro doesn't tree-shake, so
+// importing from the package root would load every icon at startup.
+export { default as CalendarDays } from 'lucide-react-native/icons/calendar-days'
+export { default as Check } from 'lucide-react-native/icons/check'
+export { default as ChevronDown } from 'lucide-react-native/icons/chevron-down'
+export { default as ChevronLeft } from 'lucide-react-native/icons/chevron-left'
+export { default as ChevronRight } from 'lucide-react-native/icons/chevron-right'
+export { default as ChevronUp } from 'lucide-react-native/icons/chevron-up'
+export { default as Dumbbell } from 'lucide-react-native/icons/dumbbell'
+export { default as History } from 'lucide-react-native/icons/history'
+export { default as Pencil } from 'lucide-react-native/icons/pencil'
+export { default as Plus } from 'lucide-react-native/icons/plus'
+export { default as Repeat } from 'lucide-react-native/icons/repeat'
+export { default as Scale } from 'lucide-react-native/icons/scale'
+export { default as Target } from 'lucide-react-native/icons/target'
+export { default as User } from 'lucide-react-native/icons/user'
+export { default as Utensils } from 'lucide-react-native/icons/utensils'
+export { default as X } from 'lucide-react-native/icons/x'

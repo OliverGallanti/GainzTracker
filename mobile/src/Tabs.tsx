@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { CalendarDays, Dumbbell, Scale, User, Utensils } from './icons'
 import { useIsOnline } from './offline'
 import { useSyncState } from './queue'
 import BigFourScreen from './screens/BigFourScreen'
@@ -12,11 +13,11 @@ import { colors } from './theme'
 import { Text, Button } from './ui'
 
 const TABS = [
-  { key: 'today', label: 'Today', Screen: TodayScreen },
-  { key: 'weight', label: 'Weight', Screen: WeightScreen },
-  { key: 'training', label: 'Training', Screen: TrainingScreen },
-  { key: 'bigFour', label: 'Big 4', Screen: BigFourScreen },
-  { key: 'profile', label: 'Profile', Screen: ProfileScreen },
+  { key: 'today', label: 'Today', Screen: TodayScreen, Icon: Utensils },
+  { key: 'weight', label: 'Weight', Screen: WeightScreen, Icon: Scale },
+  { key: 'training', label: 'Training', Screen: TrainingScreen, Icon: CalendarDays },
+  { key: 'bigFour', label: 'Big 4', Screen: BigFourScreen, Icon: Dumbbell },
+  { key: 'profile', label: 'Profile', Screen: ProfileScreen, Icon: User },
 ] as const
 
 // Five screens don't need a navigation library: a fixed header, the current
@@ -69,6 +70,7 @@ export default function Tabs() {
             accessibilityState={{ selected: tab === t.key }}
             style={styles.tab}
           >
+            <t.Icon size={20} color={tab === t.key ? colors.text : colors.muted} />
             <Text style={[styles.tabText, tab === t.key && styles.tabTextSelected]}>{t.label}</Text>
             <View style={[styles.indicator, tab === t.key && styles.indicatorSelected]} />
           </Pressable>
@@ -98,8 +100,8 @@ const styles = StyleSheet.create({
   failed: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 6, backgroundColor: 'rgba(248, 113, 113, 0.12)' },
   failedText: { flex: 1, color: colors.danger, fontSize: 13 },
   bar: { flexDirection: 'row', backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border },
-  tab: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  tabText: { color: colors.muted, fontWeight: '500' },
+  tab: { flex: 1, minHeight: 60, alignItems: 'center', justifyContent: 'center', gap: 3, paddingTop: 6 },
+  tabText: { color: colors.muted, fontSize: 12, fontWeight: '500' },
   tabTextSelected: { color: colors.text, fontWeight: '700' },
   indicator: { width: 24, height: 3, borderRadius: 2, backgroundColor: 'transparent' },
   indicatorSelected: { backgroundColor: colors.text },

@@ -6,9 +6,12 @@ import {
   Text as NativeText,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
   type TextProps,
+  type ViewStyle,
 } from 'react-native'
+import type { LucideIcon } from 'lucide-react-native'
 import { colors, FONT } from './theme'
 
 // React Native has no app-wide default font, so every screen uses this Text,
@@ -55,12 +58,14 @@ export function Button({
   variant = 'primary',
   disabled = false,
   accessibilityLabel,
+  icon: Icon,
 }: {
   label: string
   onPress: () => void
   variant?: 'primary' | 'secondary' | 'small'
   disabled?: boolean
   accessibilityLabel?: string
+  icon?: LucideIcon
 }) {
   return (
     <Pressable
@@ -72,18 +77,60 @@ export function Button({
       hitSlop={variant === 'small' ? 8 : 0}
       style={({ pressed }) => [styles[variant], (pressed || disabled) && styles.dim]}
     >
-      <Text style={variant === 'primary' ? styles.primaryText : styles.secondaryText}>{label}</Text>
+      <View style={styles.buttonContent}>
+        {Icon && <Icon size={16} color={variant === 'primary' ? colors.main : colors.text} />}
+        <Text style={[variant === 'primary' ? styles.primaryText : styles.secondaryText, { flexShrink: 1 }]}>{label}</Text>
+      </View>
     </Pressable>
   )
 }
 
-export function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+// `label` is what TalkBack reads, since there's no text to read.
+export function IconButton({
+  icon: Icon,
+  label,
+  onPress,
+  disabled = false,
+}: {
+  icon: LucideIcon
+  label: string
+  onPress: () => void
+  disabled?: boolean
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      style={({ pressed }) => [styles.iconButton, (pressed || disabled) && styles.dim]}
+    >
+      <Icon size={18} color={colors.text} />
+    </Pressable>
+  )
+}
+
+export function Chip({
+  label,
+  selected,
+  onPress,
+  style,
+  accessibilityLabel,
+}: {
+  label: string
+  selected: boolean
+  onPress: () => void
+  style?: StyleProp<ViewStyle>
+  accessibilityLabel?: string
+}) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
-      style={[styles.chip, selected && styles.chipSelected]}
+      style={[styles.chip, selected && styles.chipSelected, style]}
     >
       <Text style={selected ? styles.chipTextSelected : styles.text}>{label}</Text>
     </Pressable>
@@ -139,7 +186,9 @@ export const styles = StyleSheet.create({
   screenContent: { padding: 16, paddingBottom: 32, gap: 16 },
   card: { gap: 12, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  cardTitle: { fontSize: 18, fontWeight: '600', color: colors.text },
+  cardTitle: { flexShrink: 1, fontSize: 18, fontWeight: '600', color: colors.text },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  iconButton: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: colors.border },
   primary: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 12, backgroundColor: colors.text },
   secondary: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
   small: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border },

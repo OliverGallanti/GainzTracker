@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { computeBmi } from '@gainz/shared/body'
 import type { WeightEntry } from '@gainz/shared/types'
+import { Scale } from '../icons'
 import LineChart from '../LineChart'
 import { QUEUED, useQueued, useUnsyncedIds, type AddWeightVars, type RemoveVars, type UpdateMeVars } from '../queue'
 import { useMe, useWeights } from '../queries'
@@ -47,7 +48,7 @@ export default function WeightScreen() {
             {logging ? (
               <LogWeightForm askHeight={height == null} onDone={() => setLogging(false)} />
             ) : (
-              <Button label="Log weight" onPress={() => setLogging(true)} />
+              <Button label="Log weight" icon={Scale} onPress={() => setLogging(true)} />
             )}
           </>
         )}

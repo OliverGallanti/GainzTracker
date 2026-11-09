@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { startOfLocalDay, startOfLocalWeek } from './dates'
+import { buildMonthGrid, startOfLocalDay, startOfLocalWeek } from './dates'
+
+describe('buildMonthGrid', () => {
+  it('pads to the weekday of the 1st and has every day of the month', () => {
+    const cells = buildMonthGrid(new Date(2026, 1, 15)) // Feb 2026: starts on a Sunday, 28 days
+    expect(cells).toHaveLength(28)
+    expect(cells[0]?.getDate()).toBe(1)
+
+    const sept = buildMonthGrid(new Date(2026, 8, 1)) // Sep 2026: starts on a Tuesday, 30 days
+    expect(sept.slice(0, 2)).toEqual([null, null])
+    expect(sept[2]?.getDate()).toBe(1)
+    expect(sept).toHaveLength(32)
+  })
+})
 
 describe('startOfLocalDay', () => {
   it('zeroes the time while keeping the calendar date', () => {

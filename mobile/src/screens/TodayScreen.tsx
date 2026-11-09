@@ -5,6 +5,7 @@ import { startOfLocalDay } from '@gainz/shared/dates'
 import { formatMacro, groupByMeal, OTHER_MEAL, sumToday } from '@gainz/shared/macros'
 import type { MacroGoal, Meal } from '@gainz/shared/types'
 import { api } from '../api'
+import { Target, Utensils } from '../icons'
 import { todayKey } from '../offline'
 import { useMe, useWeights } from '../queries'
 import { newDayToday, QUEUED, useQueued, useUnsyncedIds, type MoveMealVars, type RemoveVars } from '../queue'
@@ -51,7 +52,7 @@ export default function TodayScreen() {
     <Screen>
       <Card
         title="Today's macros"
-        right={ready && mode === 'view' && goal ? <Button label="Targets" variant="small" onPress={() => setMode('targets')} /> : null}
+        right={ready && mode === 'view' && goal ? <Button label="Targets" icon={Target} variant="small" onPress={() => setMode('targets')} /> : null}
       >
         {(today.isPending || me.isPending) && <Muted>Loading…</Muted>}
         {(today.isLoadingError || me.isLoadingError) && (
@@ -67,7 +68,7 @@ export default function TodayScreen() {
         {ready && mode === 'view' && !goal && (
           <>
             <Muted>Set your daily protein, fat and carb targets to start tracking.</Muted>
-            <Button label="Set your daily targets" onPress={() => setMode('targets')} />
+            <Button label="Set your daily targets" icon={Target} onPress={() => setMode('targets')} />
           </>
         )}
 
@@ -80,7 +81,7 @@ export default function TodayScreen() {
           </View>
         )}
 
-        {ready && mode === 'view' && <Button label="Log food" onPress={() => setMode({ logMeal: nextMeal })} />}
+        {ready && mode === 'view' && <Button label="Log food" icon={Utensils} onPress={() => setMode({ logMeal: nextMeal })} />}
         {ready && typeof mode === 'object' && (
           <LogFoodForm mealNames={mealNames} defaultMeal={mode.logMeal} onDone={() => setMode('view')} />
         )}

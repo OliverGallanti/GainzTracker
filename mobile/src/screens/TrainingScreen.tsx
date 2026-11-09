@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
-import { startOfLocalDay } from '@gainz/shared/dates'
+import { buildMonthGrid, startOfLocalDay } from '@gainz/shared/dates'
 import { computeWeeklyStreak, suggestedDayIndex, uniqueDays, weeklyGoal } from '@gainz/shared/splits'
 import { SPLIT_TEMPLATES } from '@gainz/shared/templates'
 import type { SplitLog, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
 import { api } from '../api'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, History, Plus, Repeat, Target, X } from '../icons'
 import {
   QUEUED,
   useQueued,
@@ -20,18 +22,12 @@ import {
   type UpdateSplitVars,
 } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, IconButton, Muted, Screen, Unsynced, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 const WEEK = [1, 2, 3, 4, 5, 6, 7]
-
-// Today and the six days before it, as local midnights: the days the logger can fill in.
-const recentDays = () => {
-  const today = startOfLocalDay()
-  return WEEK.map((_, i) => new Date(today.getFullYear(), today.getMonth(), today.getDate() - i))
-}
-const dayLabel = (date: Date, i: number) =>
-  i === 0 ? 'Today' : i === 1 ? 'Yesterday' : date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })
+const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+const REMOVE_NOTE = 'Removing a day also removes any exercises logged on it.'
 
 export default function TrainingScreen() {
   // Same load as the web card: the streak counts days across every routine, the
@@ -49,64 +45,225 @@ export default function TrainingScreen() {
   const sets = useQuery({ queryKey: ['workoutSets'], queryFn: () => api<WorkoutSet[]>('/api/workout-sets') })
   const [editingRoutine, setEditingRoutine] = useState(false)
   const [openLogId, setOpenLogId] = useState<string | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const insets = useSafeAreaInsets() // modals are edge to edge too
 
   const split = training.data?.split
   const logs = training.data?.logs ?? []
+  const openLog = logs.find((log) => log.id === openLogId)
   const refresh = () => void Promise.all([training.refetch(), sets.refetch()])
+  // A day opened from the history goes back to it; one opened from the calendar just closes.
+  const closeSheet = () => (openLog ? setOpenLogId(null) : setHistoryOpen(false))
 
   return (
     <Screen>
-      <Card
-        title="Training"
-        right={split && !editingRoutine ? <Button label="Change routine" variant="small" onPress={() => setEditingRoutine(true)} /> : null}
-      >
-        {training.isPending && <Muted>Loading…</Muted>}
-        {training.isLoadingError && <ErrorText onPress={refresh}>Could not load your training: tap to retry</ErrorText>}
-        {training.data && (editingRoutine || !split) && (
-          <RoutineEditor onDone={split ? () => setEditingRoutine(false) : undefined} />
-        )}
-        {split && !editingRoutine && training.data && (
-          <Logger split={split} logs={logs} allLogs={training.data.allLogs} onLogged={setOpenLogId} />
-        )}
-      </Card>
-
-      {split && logs.length > 0 && (
-        <Card title="Recent days">
-          {logs.slice(0, 14).map((log) =>
-            openLogId === log.id ? (
-              <LogEditor key={log.id} split={split} log={log} sets={sets.data} onClose={() => setOpenLogId(null)} />
-            ) : (
-              <LogRow key={log.id} split={split} log={log} onEdit={() => setOpenLogId(log.id)} />
-            ),
-          )}
-          <Muted>Removing a day also removes any exercises logged on it.</Muted>
+      {!training.data && (
+        <Card title="Training">
+          {training.isPending && <Muted>Loading…</Muted>}
+          {training.isLoadingError && <ErrorText onPress={refresh}>Could not load your training: tap to retry</ErrorText>}
         </Card>
       )}
+
+      {training.data && (editingRoutine || !split) && (
+        <Card title={split ? 'Change routine' : 'Choose a routine'}>
+          <RoutineEditor onDone={split ? () => setEditingRoutine(false) : undefined} />
+        </Card>
+      )}
+
+      {split && !editingRoutine && training.data && (
+        <>
+          <RoutineSummary split={split} allLogs={training.data.allLogs} onChange={() => setEditingRoutine(true)} />
+          <Logger split={split} logs={logs} onOpenLog={setOpenLogId} onOpenHistory={() => setHistoryOpen(true)} />
+        </>
+      )}
+
+      {split && (
+        <Modal visible={historyOpen || !!openLog} animationType="slide" onRequestClose={closeSheet}>
+          <View style={[styles.sheet, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+            <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+              <View style={styles.sheetHeader}>
+                <Text style={ui.cardTitle} accessibilityRole="header">
+                  {openLog ? formatDate(openLog.loggedAt) : 'Recent days'}
+                </Text>
+                <IconButton icon={X} label="Close" onPress={closeSheet} />
+              </View>
+              <ScrollView contentContainerStyle={ui.screenContent} keyboardShouldPersistTaps="handled">
+                {openLog ? (
+                  <LogEditor key={openLog.id} split={split} log={openLog} sets={sets.data} onClose={closeSheet} />
+                ) : (
+                  <>
+                    {logs.slice(0, 14).map((log) => (
+                      <LogRow key={log.id} split={split} log={log} onEdit={() => setOpenLogId(log.id)} />
+                    ))}
+                    <Muted>{REMOVE_NOTE}</Muted>
+                  </>
+                )}
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
+      )}
     </Screen>
+  )
+}
+
+function RoutineSummary({ split, allLogs, onChange }: { split: WorkoutSplit; allLogs: SplitLog[]; onChange: () => void }) {
+  const updateSplit = useQueued<UpdateSplitVars>(QUEUED.updateSplit)
+  const [editingGoal, setEditingGoal] = useState(false)
+  const goal = weeklyGoal(split)
+  const { streak, thisWeekDays } = computeWeeklyStreak(allLogs, goal)
+
+  const changeGoal = (daysPerWeek: number) => {
+    setEditingGoal(false)
+    if (daysPerWeek !== goal) updateSplit.mutate({ label: `Weekly goal ${daysPerWeek}`, splitId: split.id, daysPerWeek })
+  }
+
+  return (
+    <Card title={split.name} right={<Button label="Change routine" icon={Repeat} variant="small" onPress={onChange} />}>
+      <Muted>{split.days.join(' → ')}</Muted>
+      <View style={ui.row}>
+        <View style={styles.stat} accessible accessibilityLabel={`${streak} week streak`}>
+          <Text style={styles.statNumber}>{streak}</Text>
+          <Muted>{streak === 1 ? 'week' : 'weeks'} streak</Muted>
+        </View>
+        <View style={styles.stat} accessible accessibilityLabel={`${thisWeekDays} of ${goal} days this week`}>
+          <View style={styles.statValue}>
+            <Text style={styles.statNumber}>
+              {thisWeekDays}
+              <Text style={styles.statOf}> / {goal}</Text>
+            </Text>
+            {thisWeekDays >= goal && <Check size={20} color={colors.text} />}
+          </View>
+          <Muted>days this week</Muted>
+        </View>
+      </View>
+      {editingGoal ? (
+        <View style={{ gap: 8 }}>
+          <Muted>Days a week for a good week</Muted>
+          <DaysPerWeek value={goal} onChange={changeGoal} />
+        </View>
+      ) : (
+        <Button label="Change weekly goal" icon={Target} variant="small" onPress={() => setEditingGoal(true)} />
+      )}
+    </Card>
+  )
+}
+
+// Seven equal cells, so the row always fits on one line.
+function DaysPerWeek({ value, onChange }: { value: number; onChange: (days: number) => void }) {
+  return (
+    <View style={styles.week}>
+      {WEEK.map((n) => (
+        <Chip
+          key={n}
+          label={String(n)}
+          selected={value === n}
+          onPress={() => onChange(n)}
+          style={styles.weekCell}
+          accessibilityLabel={`${n} ${n === 1 ? 'day' : 'days'} a week`}
+        />
+      ))}
+    </View>
+  )
+}
+
+// A big tappable choice: a routine day, or a template.
+function Tile({
+  title,
+  subtitle,
+  selected = false,
+  half = false,
+  onPress,
+}: {
+  title: string
+  subtitle?: string
+  selected?: boolean
+  half?: boolean
+  onPress: () => void
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={[styles.tile, half && styles.tileHalf, selected && ui.chipSelected]}
+    >
+      <Text style={selected ? ui.chipTextSelected : styles.strong}>{title}</Text>
+      {subtitle && <Text style={[styles.tileSubtitle, selected && { color: colors.main }]}>{subtitle}</Text>}
+    </Pressable>
+  )
+}
+
+// The month, as on the web: done and skipped days filled in, any past day can be
+// picked, future ones can't. Tapping today or the picked day goes back to today.
+function Calendar({ logs, selected, onSelect }: { logs: SplitLog[]; selected: Date; onSelect: (date: Date | null) => void }) {
+  const today = startOfLocalDay()
+  const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+  const logsByDate = new Map(logs.map((log) => [new Date(log.loggedAt).toDateString(), log]))
+  const isCurrentMonth = month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth()
+  const turn = (by: number) => setMonth(new Date(month.getFullYear(), month.getMonth() + by, 1))
+
+  return (
+    <View>
+      <View style={styles.monthHeader}>
+        <IconButton icon={ChevronLeft} label="Previous month" onPress={() => turn(-1)} />
+        <Text style={styles.strong} accessibilityRole="header">
+          {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+        </Text>
+        <IconButton icon={ChevronRight} label="Next month" onPress={() => turn(1)} disabled={isCurrentMonth} />
+      </View>
+      <View style={styles.grid}>
+        {WEEKDAY_LABELS.map((label, i) => (
+          <Text key={i} style={[styles.cell, styles.weekday]}>
+            {label}
+          </Text>
+        ))}
+        {buildMonthGrid(month).map((date, i) => {
+          if (!date) return <View key={i} style={styles.cell} />
+          const key = date.toDateString()
+          const log = logsByDate.get(key)
+          const isToday = key === today.toDateString()
+          const isSelected = key === selected.toDateString()
+          const future = date > today
+          return (
+            <Pressable
+              key={i}
+              onPress={() => onSelect(isToday || isSelected ? null : date)}
+              disabled={future}
+              accessibilityRole="button"
+              accessibilityLabel={`${formatDate(date.toISOString())}${log ? (log.completed ? ', done' : ', skipped') : ''}`}
+              accessibilityState={{ selected: isSelected, disabled: future }}
+              style={[styles.cell, styles.day, isToday && styles.dayToday, isSelected && styles.daySelected]}
+            >
+              <View style={[styles.dayFill, log && (log.completed ? styles.dayDone : styles.daySkipped)]}>
+                <Text style={log ? styles.dayTextLogged : future ? styles.dayTextFuture : ui.muted}>{date.getDate()}</Text>
+              </View>
+            </Pressable>
+          )
+        })}
+      </View>
+    </View>
   )
 }
 
 function Logger({
   split,
   logs,
-  allLogs,
-  onLogged,
+  onOpenLog,
+  onOpenHistory,
 }: {
   split: WorkoutSplit
   logs: SplitLog[]
-  allLogs: SplitLog[]
-  onLogged: (logId: string) => void
+  onOpenLog: (logId: string) => void
+  onOpenHistory: () => void
 }) {
-  const goal = weeklyGoal(split)
-  const { streak, thisWeekDays } = computeWeeklyStreak(allLogs, goal)
-  const [days] = useState(recentDays)
-  const [dayOffset, setDayOffset] = useState(0)
+  const [pickedDate, setPickedDate] = useState<Date | null>(null) // null: today
   const [picked, setPicked] = useState<number | null>(null)
-  const selected = picked ?? split.days.indexOf(split.days[suggestedDayIndex(split.days, logs)])
+  const suggested = split.days.indexOf(split.days[suggestedDayIndex(split.days, logs)])
+  const selected = picked ?? suggested
   const logDay = useQueued<LogDayVars>(QUEUED.logDay)
-  const updateSplit = useQueued<UpdateSplitVars>(QUEUED.updateSplit)
 
-  const target = days[dayOffset]
+  const target = pickedDate ?? startOfLocalDay()
   const targetLog = logs.find((log) => new Date(log.loggedAt).toDateString() === target.toDateString())
 
   // Queued (see queue.ts). The day's bounds are fixed now, on the phone: sent
@@ -114,7 +271,7 @@ function Logger({
   // logged at its noon, as on the web.
   const log = (completed: boolean) => {
     const dayEnd = new Date(target.getFullYear(), target.getMonth(), target.getDate() + 1)
-    const loggedAt = dayOffset === 0 ? new Date() : new Date(target.getFullYear(), target.getMonth(), target.getDate(), 12)
+    const loggedAt = pickedDate ? new Date(target.getFullYear(), target.getMonth(), target.getDate(), 12) : new Date()
     const id = randomUUID()
     logDay.mutate({
       label: `${split.days[selected]} (${completed ? 'done' : 'skipped'})`,
@@ -124,58 +281,48 @@ function Logger({
       dayEnd: dayEnd.toISOString(),
     })
     // Straight on to the exercises, as on the web.
-    if (completed) onLogged(id)
-  }
-
-  const changeGoal = (daysPerWeek: number) => {
-    if (daysPerWeek !== goal) updateSplit.mutate({ label: `Weekly goal ${daysPerWeek}`, splitId: split.id, daysPerWeek })
+    if (completed) onOpenLog(id)
   }
 
   return (
-    <View style={{ gap: 12 }}>
-      <Text style={ui.text}>
-        <Text style={styles.strong}>{split.name}</Text> · {split.days.join(' → ')}
-      </Text>
-      <View style={styles.streak} accessible accessibilityLabel={`${streak} week streak, ${thisWeekDays} of ${goal} days this week`}>
-        <Text style={styles.streakNumber}>{streak}</Text>
-        <View>
-          <Text style={ui.text}>{streak === 1 ? 'week' : 'weeks'} streak</Text>
-          <Muted>
-            {thisWeekDays} of {goal} days this week
-          </Muted>
-        </View>
+    <Card>
+      <Calendar logs={logs} selected={target} onSelect={setPickedDate} />
+      <View style={styles.legend}>
+        <View style={[styles.legendSwatch, styles.dayDone]} />
+        <Muted>Done</Muted>
+        <View style={[styles.legendSwatch, styles.daySkipped]} />
+        <Muted>Skipped</Muted>
+        <View style={{ flex: 1 }} />
+        {logs.length > 0 && <Button label="Recent days" icon={History} variant="small" onPress={onOpenHistory} />}
       </View>
 
-      <Muted>Weekly goal (days a week)</Muted>
-      <View style={ui.chips}>
-        {WEEK.map((n) => (
-          <Chip key={n} label={String(n)} selected={goal === n} onPress={() => changeGoal(n)} />
-        ))}
-      </View>
-
-      <Muted>Day</Muted>
-      <View style={ui.chips}>
-        {days.map((date, i) => (
-          <Chip key={i} label={dayLabel(date, i)} selected={dayOffset === i} onPress={() => setDayOffset(i)} />
-        ))}
-      </View>
+      <View style={styles.divider} />
 
       {targetLog ? (
-        <Muted>
-          {dayLabel(target, dayOffset)}: {split.days[targetLog.dayIndex]} · {targetLog.completed ? 'done' : 'skipped'}. Edit it in
-          Recent days below.
-        </Muted>
+        <>
+          <LogRow split={split} log={targetLog} onEdit={() => onOpenLog(targetLog.id)} />
+          <Muted>{REMOVE_NOTE}</Muted>
+        </>
       ) : (
         <>
-          <Muted>{dayOffset === 0 ? 'What are you training today?' : `What did you train on ${formatDate(target.toISOString())}?`}</Muted>
+          <Text style={styles.question} accessibilityRole="header">
+            {pickedDate ? `What did you train on ${formatDate(target.toISOString())}?` : 'What are you training today?'}
+          </Text>
           <View style={ui.chips}>
             {uniqueDays(split.days).map(({ label, index }) => (
-              <Chip key={index} label={label} selected={selected === index} onPress={() => setPicked(index)} />
+              <Tile
+                key={index}
+                half
+                title={label}
+                subtitle={index === suggested ? 'Up next' : undefined}
+                selected={selected === index}
+                onPress={() => setPicked(index)}
+              />
             ))}
           </View>
           <View style={ui.row}>
             <View style={{ flex: 1 }}>
-              <Button label="Mark done" onPress={() => log(true)} />
+              <Button label="Mark done" icon={Check} onPress={() => log(true)} />
             </View>
             <View style={{ flex: 1 }}>
               <Button label="Mark skipped" variant="secondary" onPress={() => log(false)} />
@@ -183,7 +330,7 @@ function Logger({
           </View>
         </>
       )}
-    </View>
+    </Card>
   )
 }
 
@@ -234,8 +381,7 @@ function LogEditor({
     updateLog.mutate({ label: `${day} on ${formatDate(log.loggedAt)}: ${what}`, splitId: split.id, logId: log.id, changes })
 
   return (
-    <View style={styles.editor}>
-      <Text style={styles.strong}>{formatDate(log.loggedAt)}</Text>
+    <View style={{ gap: 12 }}>
       <View style={ui.chips}>
         {uniqueDays(split.days).map(({ label, index }) => (
           <Chip
@@ -312,16 +458,11 @@ function SessionEditor({ log, sets, onDone }: { log: SplitLog; sets: WorkoutSet[
           <View style={[ui.row, { alignItems: 'flex-end' }]}>
             <Field label="kg" value={row.weightKg} onChange={(v) => edit(index, { weightKg: v })} numeric />
             <Field label="Reps" value={row.reps} onChange={(v) => edit(index, { reps: v.replace(/\D/g, '') })} keyboardType="number-pad" />
-            <Button
-              label="✕"
-              variant="small"
-              onPress={() => setRows(rows.filter((_, i) => i !== index))}
-              accessibilityLabel={`Remove ${row.exerciseName || 'exercise'}`}
-            />
+            <IconButton icon={X} label={`Remove ${row.exerciseName || 'exercise'}`} onPress={() => setRows(rows.filter((_, i) => i !== index))} />
           </View>
         </View>
       ))}
-      <Button label="+ Add exercise" variant="secondary" onPress={() => setRows([...rows, emptyRow()])} />
+      <Button label="Add exercise" icon={Plus} variant="secondary" onPress={() => setRows([...rows, emptyRow()])} />
       <Field label="Duration (minutes)" value={duration} onChange={(v) => setDuration(v.replace(/\D/g, ''))} keyboardType="number-pad" />
       <View style={ui.row}>
         <View style={{ flex: 1 }}>
@@ -345,14 +486,14 @@ function RoutineEditor({ onDone }: { onDone?: () => void }) {
       <View style={{ gap: 8 }}>
         <Muted>{onDone ? 'Pick a new routine.' : 'Pick a routine to start tracking your weekly streak.'}</Muted>
         {SPLIT_TEMPLATES.map((template) => (
-          <Button
+          <Tile
             key={template.name}
-            label={`${template.name} · ${template.days.join(' → ')}`}
-            variant="secondary"
+            title={template.name}
+            subtitle={template.days.join(' → ')}
             onPress={() => setDraft({ name: template.name, days: [...template.days] })}
           />
         ))}
-        <Button label="Custom" variant="secondary" onPress={() => setDraft({ name: '', days: ['', ''] })} />
+        <Tile title="Custom" subtitle="Name your own days" onPress={() => setDraft({ name: '', days: ['', ''] })} />
         {onDone && <Button label="Cancel" variant="secondary" onPress={onDone} />}
       </View>
     )
@@ -375,35 +516,37 @@ function RoutineEditor({ onDone }: { onDone?: () => void }) {
   }
 
   return (
-    <View style={{ gap: 12 }}>
+    <View style={{ gap: 16 }}>
       <Field label="Routine name" value={name} onChange={(v) => setDraft({ name: v, days })} />
-      <Muted>Days per week to count as a good week</Muted>
-      <View style={ui.chips}>
-        {WEEK.map((n) => (
-          <Chip key={n} label={String(n)} selected={daysPerWeek === n} onPress={() => setPerWeek(n)} />
-        ))}
+      <View style={{ gap: 8 }}>
+        <Muted>Days a week for a good week</Muted>
+        <DaysPerWeek value={daysPerWeek} onChange={setPerWeek} />
       </View>
-      <Muted>Days (in order)</Muted>
-      {days.map((day, index) => (
-        <View key={index} style={[ui.row, { alignItems: 'flex-end' }]}>
-          <Field label={`Day ${index + 1}`} value={day} onChange={(v) => setDays(days.map((d, i) => (i === index ? v : d)))} placeholder="e.g. Push" />
-          <Button label="↑" variant="small" onPress={() => move(index, -1)} disabled={index === 0} accessibilityLabel={`Move day ${index + 1} up`} />
-          <Button
-            label="↓"
-            variant="small"
-            onPress={() => move(index, 1)}
-            disabled={index === days.length - 1}
-            accessibilityLabel={`Move day ${index + 1} down`}
-          />
-          <Button label="✕" variant="small" onPress={() => setDays(days.filter((_, i) => i !== index))} accessibilityLabel={`Remove day ${index + 1}`} />
-        </View>
-      ))}
-      <Button label="+ Add day" variant="secondary" onPress={() => setDays([...days, ''])} />
+      <View style={{ gap: 8 }}>
+        <Muted>Days, in order</Muted>
+        {days.map((day, index) => (
+          <View key={index} style={styles.dayRow}>
+            <Text style={styles.dayNumber}>{index + 1}</Text>
+            <TextInput
+              value={day}
+              onChangeText={(v) => setDays(days.map((d, i) => (i === index ? v : d)))}
+              placeholder="e.g. Push"
+              placeholderTextColor={colors.muted}
+              accessibilityLabel={`Day ${index + 1}`}
+              style={[ui.input, { flex: 1 }]}
+            />
+            <IconButton icon={ChevronUp} label={`Move day ${index + 1} up`} onPress={() => move(index, -1)} disabled={index === 0} />
+            <IconButton icon={ChevronDown} label={`Move day ${index + 1} down`} onPress={() => move(index, 1)} disabled={index === days.length - 1} />
+            <IconButton icon={X} label={`Remove day ${index + 1}`} onPress={() => setDays(days.filter((_, i) => i !== index))} />
+          </View>
+        ))}
+        <Button label="Add day" icon={Plus} variant="secondary" onPress={() => setDays([...days, ''])} />
+      </View>
       <View style={ui.row}>
         <View style={{ flex: 1 }}>
           <Button label="Save routine" onPress={save} disabled={cleaned.length === 0} />
         </View>
-        <Button label={onDone ? 'Cancel' : 'Back'} variant="secondary" onPress={onDone ?? (() => setDraft(null))} />
+        <Button label="Back" variant="secondary" onPress={() => setDraft(null)} />
       </View>
     </View>
   )
@@ -411,9 +554,35 @@ function RoutineEditor({ onDone }: { onDone?: () => void }) {
 
 const styles = StyleSheet.create({
   strong: { fontWeight: '600', color: colors.text },
-  streak: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  streakNumber: { fontSize: 36, fontWeight: '700', color: colors.text },
+  question: { fontSize: 16, fontWeight: '600', color: colors.text },
+  stat: { flex: 1, padding: 12, borderRadius: 12, backgroundColor: colors.main },
+  statValue: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statNumber: { fontSize: 28, fontWeight: '700', color: colors.text },
+  statOf: { fontSize: 18, fontWeight: '500', color: colors.muted },
+  week: { flexDirection: 'row', gap: 6 },
+  weekCell: { flex: 1, paddingHorizontal: 0, alignItems: 'center' },
+  tile: { minHeight: 56, justifyContent: 'center', gap: 2, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  tileHalf: { flexGrow: 1, flexBasis: '45%' },
+  tileSubtitle: { color: colors.muted, fontSize: 13 },
+  monthHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cell: { width: '14.28%', height: 42 }, // a seventh, rounded down so seven always fit a row
+  weekday: { height: 24, textAlign: 'center', color: colors.muted, fontSize: 12 },
+  day: { padding: 2, borderRadius: 10, borderWidth: 2, borderColor: 'transparent' },
+  dayToday: { borderColor: colors.border },
+  daySelected: { borderColor: colors.text },
+  dayFill: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+  dayDone: { backgroundColor: colors.text },
+  daySkipped: { backgroundColor: 'rgba(251, 191, 36, 0.8)' },
+  dayTextLogged: { color: colors.main, fontWeight: '600' },
+  dayTextFuture: { color: 'rgba(220, 224, 217, 0.3)' },
+  legend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendSwatch: { width: 12, height: 12, borderRadius: 3, marginLeft: 4 },
+  divider: { height: 1, backgroundColor: colors.border },
+  sheet: { flex: 1, backgroundColor: colors.main },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  editor: { gap: 12, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.text },
+  dayRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dayNumber: { width: 14, color: colors.muted, textAlign: 'center' },
   exercise: { gap: 8, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
 })

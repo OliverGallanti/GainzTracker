@@ -6,6 +6,7 @@ import { BIG_FOUR_LIFTS } from '@gainz/shared/lifts'
 import { getStrengthReferenceLines, getStrengthTier } from '@gainz/shared/strength'
 import type { WorkoutSet } from '@gainz/shared/types'
 import { api } from '../api'
+import { Dumbbell, Pencil, Plus } from '../icons'
 import LineChart from '../LineChart'
 import { useMe, useWeights } from '../queries'
 import { QUEUED, useQueued, useUnsyncedIds, type AddSetVars, type RemoveVars, type SetLiftGoalsVars } from '../queue'
@@ -47,7 +48,7 @@ export default function BigFourScreen() {
 
   return (
     <Screen>
-      <Card title="Big 4" right={loaded && mode === 'view' ? <Button label="Log lift" variant="small" onPress={() => setMode('log')} /> : null}>
+      <Card title="Big 4" right={loaded && mode === 'view' ? <Button label="Log lift" icon={Dumbbell} variant="small" onPress={() => setMode('log')} /> : null}>
         {!loaded && !(sets.isLoadingError || goals.isLoadingError) && <Muted>Loading…</Muted>}
         {(sets.isLoadingError || goals.isLoadingError) && <ErrorText onPress={refresh}>Could not load your lifts: tap to retry</ErrorText>}
 
@@ -83,7 +84,7 @@ export default function BigFourScreen() {
                 <Text style={ui.text}>
                   {selected} goal: <Text style={styles.strong}>{goal ? `${goal} kg` : 'not set'}</Text>
                 </Text>
-                <Button label={goal ? 'Edit goals' : 'Set goals'} variant="small" onPress={() => setMode('goals')} />
+                <Button label={goal ? 'Edit goals' : 'Set goals'} icon={goal ? Pencil : Plus} variant="small" onPress={() => setMode('goals')} />
               </View>
               {current.tier && <Text style={ui.text}>{current.tier.icon} {current.tier.label}</Text>}
               {history.length > 0 ? (

@@ -1,21 +1,10 @@
 import { useState } from 'react'
 import type { SplitLog } from '@gainz/shared/types'
-import { startOfLocalDay } from '@gainz/shared/dates'
+import { buildMonthGrid, startOfLocalDay } from '@gainz/shared/dates'
 import { uniqueDays } from '@gainz/shared/splits'
 import SessionEditor from './SessionEditor'
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-
-// Leading `null`s pad the grid so day 1 lands in the correct weekday column.
-function buildMonthGrid(viewDate: Date) {
-  const year = viewDate.getFullYear()
-  const month = viewDate.getMonth()
-  const startOffset = new Date(year, month, 1).getDay()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const cells: (Date | null)[] = Array(startOffset).fill(null)
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d))
-  return cells
-}
 
 // Details of one logged day. Keyed by log id at the call site, so the
 // confirm-remove prompt and session editor never carry over to another log.
