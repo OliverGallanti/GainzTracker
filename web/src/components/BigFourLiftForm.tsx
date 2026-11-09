@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
-import { BIG_FOUR_LIFTS } from '@gainz/shared/lifts'
+import { BIG_FOUR_LIFTS, formatEffort, RPE_VALUES } from '@gainz/shared/lifts'
 import { useSubmit } from '../lib/useSubmit'
 
 function BigFourLiftForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
-  const [form, setForm] = useState({ exerciseName: BIG_FOUR_LIFTS[0], weightKg: '', reps: '' })
+  const [form, setForm] = useState({ exerciseName: BIG_FOUR_LIFTS[0], weightKg: '', reps: '', rpe: '' })
 
   const { submit, saving, error } = useSubmit(async () => {
     await api('/api/workout-sets', {
@@ -13,6 +13,7 @@ function BigFourLiftForm({ onSaved, onCancel }: { onSaved: () => void; onCancel:
         exerciseName: form.exerciseName,
         weightKg: Number(form.weightKg),
         ...(form.reps ? { reps: Number(form.reps) } : {}),
+        ...(form.rpe ? { rpe: Number(form.rpe) } : {}),
       }),
     })
     onSaved()
@@ -58,6 +59,22 @@ function BigFourLiftForm({ onSaved, onCancel }: { onSaved: () => void; onCancel:
           onChange={(e) => setForm({ ...form, reps: e.target.value })}
           className="rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
         />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-third">Effort (optional)</span>
+        <select
+          value={form.rpe}
+          onChange={(e) => setForm({ ...form, rpe: e.target.value })}
+          className="rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
+        >
+          <option value="">None</option>
+          {RPE_VALUES.map((rpe) => (
+            <option key={rpe} value={rpe}>
+              {formatEffort(rpe)}
+            </option>
+          ))}
+        </select>
       </label>
 
       <div className="mt-1 flex gap-2">

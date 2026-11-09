@@ -25,6 +25,7 @@ const createSetSchema = z.object({
   exerciseName: z.string().min(1),
   weightKg: z.number().nonnegative().optional(),
   reps: z.number().int().nonnegative().optional(),
+  rpe: z.number().min(6).max(10).multipleOf(0.5).optional(), // RPE_VALUES in shared/src/lifts.ts
   performedAt: z.coerce.date().optional(),
 })
 

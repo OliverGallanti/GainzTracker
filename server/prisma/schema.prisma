@@ -230,6 +230,7 @@ model WorkoutSet {
   exerciseName String
   weightKg     Float?
   reps         Int?
+  rpe          Float? // optional effort, 6 to 10; reps in reserve is 10 - rpe
   performedAt  DateTime        @default(now())
 
   @@index([userId, performedAt])

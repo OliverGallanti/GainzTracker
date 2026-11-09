@@ -2,16 +2,16 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
-import { BIG_FOUR_LIFTS } from '@gainz/shared/lifts'
+import { BIG_FOUR_LIFTS, formatEffort, RPE_VALUES } from '@gainz/shared/lifts'
 import { getStrengthReferenceLines, getStrengthTier } from '@gainz/shared/strength'
 import type { WorkoutSet } from '@gainz/shared/types'
 import { api } from '../api'
-import { Dumbbell, Pencil, Plus } from '../icons'
+import { Dumbbell, History, Pencil, Plus } from '../icons'
 import LineChart from '../LineChart'
 import { useMe, useWeights } from '../queries'
 import { QUEUED, useQueued, useUnsyncedIds, type AddSetVars, type RemoveVars, type SetLiftGoalsVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Sheet, Unsynced, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 const describe = (set: WorkoutSet) => `${set.weightKg ?? '–'} kg${set.reps ? ` × ${set.reps}` : ''}`
@@ -25,6 +25,7 @@ export default function BigFourScreen() {
   const goals = useQuery({ queryKey: ['liftGoals'], queryFn: () => api<Record<string, number>>('/api/lift-goals') })
   const [selected, setSelected] = useState(BIG_FOUR_LIFTS[0])
   const [mode, setMode] = useState<'view' | 'log' | 'goals'>('view')
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const remove = useQueued<RemoveVars>(QUEUED.remove)
   const unsynced = useUnsyncedIds()
@@ -106,38 +107,41 @@ export default function BigFourScreen() {
                 </View>
               )}
             </View>
+
+            {bigFourSets.length > 0 && <Button label="Recent lifts" icon={History} variant="secondary" onPress={() => setHistoryOpen(true)} />}
           </>
         )}
       </Card>
 
-      {loaded && bigFourSets.length > 0 && (
-        <Card title="Recent lifts">
-          {bigFourSets.slice(0, 20).map((set) => (
-            <View key={set.id} style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={ui.text}>
-                  {set.exerciseName} · {describe(set)}
-                </Text>
-                <Muted>{formatDate(set.performedAt)}</Muted>
-                {unsynced.has(set.id) && <Unsynced />}
-              </View>
-              <Button
-                label="Remove"
-                variant="small"
-                onPress={() =>
-                  remove.mutate({
-                    label: `Remove ${set.exerciseName} ${describe(set)}`,
-                    path: `/api/workout-sets/${set.id}`,
-                    cacheKey: ['workoutSets'],
-                    id: set.id,
-                  })
-                }
-                accessibilityLabel={`Remove ${set.exerciseName} ${describe(set)} from ${formatDate(set.performedAt)}`}
-              />
+      <Sheet visible={historyOpen} title="Recent lifts" onClose={() => setHistoryOpen(false)}>
+        {bigFourSets.slice(0, 20).map((set) => (
+          <View key={set.id} style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={ui.text}>
+                {set.exerciseName} · {describe(set)}
+              </Text>
+              <Muted>
+                {formatDate(set.performedAt)}
+                {set.rpe != null ? ` · ${formatEffort(set.rpe)}` : ''}
+              </Muted>
+              {unsynced.has(set.id) && <Unsynced />}
             </View>
-          ))}
-        </Card>
-      )}
+            <Button
+              label="Remove"
+              variant="small"
+              onPress={() =>
+                remove.mutate({
+                  label: `Remove ${set.exerciseName} ${describe(set)}`,
+                  path: `/api/workout-sets/${set.id}`,
+                  cacheKey: ['workoutSets'],
+                  id: set.id,
+                })
+              }
+              accessibilityLabel={`Remove ${set.exerciseName} ${describe(set)} from ${formatDate(set.performedAt)}`}
+            />
+          </View>
+        ))}
+      </Sheet>
     </Screen>
   )
 }
@@ -148,6 +152,7 @@ function LogLiftForm({ initialLift, onDone }: { initialLift: string; onDone: () 
   const [lift, setLift] = useState(initialLift)
   const [weightKg, setWeightKg] = useState('')
   const [reps, setReps] = useState('')
+  const [rpe, setRpe] = useState<number | null>(null)
 
   const save = () => {
     const set: WorkoutSet = {
@@ -155,6 +160,7 @@ function LogLiftForm({ initialLift, onDone }: { initialLift: string; onDone: () 
       exerciseName: lift,
       weightKg: Number(weightKg),
       reps: reps ? Number(reps) : null,
+      rpe,
       performedAt: new Date().toISOString(),
     }
     addSet.mutate({ label: `${lift} ${describe(set)}`, set })
@@ -172,6 +178,22 @@ function LogLiftForm({ initialLift, onDone }: { initialLift: string; onDone: () 
       <View style={[ui.row, { flexWrap: 'wrap' }]}>
         <Field label="Weight (kg)" value={weightKg} onChange={setWeightKg} numeric />
         <Field label="Reps (optional)" value={reps} onChange={(v) => setReps(v.replace(/\D/g, ''))} keyboardType="number-pad" />
+      </View>
+      <View style={{ gap: 8 }}>
+        <Muted>{rpe == null ? 'Effort (optional): 10 means no reps left' : formatEffort(rpe)}</Muted>
+        <View style={ui.chips}>
+          <Chip label="None" selected={rpe == null} onPress={() => setRpe(null)} style={styles.rpeCell} />
+          {RPE_VALUES.map((value) => (
+            <Chip
+              key={value}
+              label={String(value)}
+              selected={rpe === value}
+              onPress={() => setRpe(value)}
+              style={styles.rpeCell}
+              accessibilityLabel={formatEffort(value)}
+            />
+          ))}
+        </View>
       </View>
       <View style={ui.row}>
         <View style={{ flex: 1 }}>
@@ -227,5 +249,6 @@ const styles = StyleSheet.create({
   detail: { gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
   detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   strong: { fontWeight: '600' },
+  rpeCell: { flexBasis: '17%', flexGrow: 1, paddingHorizontal: 0, alignItems: 'center' }, // five to a row: two even rows
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 })

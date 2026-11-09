@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { buildMonthGrid, startOfLocalDay } from '@gainz/shared/dates'
@@ -22,7 +21,7 @@ import {
   type UpdateSplitVars,
 } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Field, IconButton, Muted, Screen, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, IconButton, Muted, Screen, Sheet, Unsynced, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 const WEEK = [1, 2, 3, 4, 5, 6, 7]
@@ -46,7 +45,6 @@ export default function TrainingScreen() {
   const [editingRoutine, setEditingRoutine] = useState(false)
   const [openLogId, setOpenLogId] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const insets = useSafeAreaInsets() // modals are edge to edge too
 
   const split = training.data?.split
   const logs = training.data?.logs ?? []
@@ -78,30 +76,18 @@ export default function TrainingScreen() {
       )}
 
       {split && (
-        <Modal visible={historyOpen || !!openLog} animationType="slide" onRequestClose={closeSheet}>
-          <View style={[styles.sheet, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-            <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-              <View style={styles.sheetHeader}>
-                <Text style={ui.cardTitle} accessibilityRole="header">
-                  {openLog ? formatDate(openLog.loggedAt) : 'Recent days'}
-                </Text>
-                <IconButton icon={X} label="Close" onPress={closeSheet} />
-              </View>
-              <ScrollView contentContainerStyle={ui.screenContent} keyboardShouldPersistTaps="handled">
-                {openLog ? (
-                  <LogEditor key={openLog.id} split={split} log={openLog} sets={sets.data} onClose={closeSheet} />
-                ) : (
-                  <>
-                    {logs.slice(0, 14).map((log) => (
-                      <LogRow key={log.id} split={split} log={log} onEdit={() => setOpenLogId(log.id)} />
-                    ))}
-                    <Muted>{REMOVE_NOTE}</Muted>
-                  </>
-                )}
-              </ScrollView>
-            </KeyboardAvoidingView>
-          </View>
-        </Modal>
+        <Sheet visible={historyOpen || !!openLog} title={openLog ? formatDate(openLog.loggedAt) : 'Recent days'} onClose={closeSheet}>
+          {openLog ? (
+            <LogEditor key={openLog.id} split={split} log={openLog} sets={sets.data} onClose={closeSheet} />
+          ) : (
+            <>
+              {logs.slice(0, 14).map((log) => (
+                <LogRow key={log.id} split={split} log={log} onEdit={() => setOpenLogId(log.id)} />
+              ))}
+              <Muted>{REMOVE_NOTE}</Muted>
+            </>
+          )}
+        </Sheet>
       )}
     </Screen>
   )
@@ -579,8 +565,6 @@ const styles = StyleSheet.create({
   legend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendSwatch: { width: 12, height: 12, borderRadius: 3, marginLeft: 4 },
   divider: { height: 1, backgroundColor: colors.border },
-  sheet: { flex: 1, backgroundColor: colors.main },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dayRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dayNumber: { width: 14, color: colors.muted, textAlign: 'center' },

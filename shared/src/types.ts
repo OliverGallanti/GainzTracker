@@ -81,6 +81,7 @@ export interface WorkoutSet {
   exerciseName: string
   weightKg: number | null
   reps: number | null
+  rpe?: number | null // how hard it was, 6 to 10 (see RPE_VALUES)
   performedAt: string
   splitLogId?: string | null // the training day it was logged in, if any
 }

@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { BIG_FOUR_LIFTS } from './lifts'
+import { BIG_FOUR_LIFTS, formatEffort, RPE_VALUES } from './lifts'
 import { STRENGTH_STANDARDS } from './strength'
+
+describe('RPE', () => {
+  it('shows reps in reserve as the same scale read the other way', () => {
+    expect(formatEffort(8)).toBe('RPE 8 · RIR 2')
+    expect(formatEffort(6.5)).toBe('RPE 6.5 · RIR 3.5')
+    expect(formatEffort(10)).toBe('RPE 10 · RIR 0')
+  })
+
+  // The server accepts 6 to 10 in half steps (server/src/routes/workouts.ts).
+  it('offers exactly what the API accepts', () => {
+    expect(RPE_VALUES).toEqual([6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10])
+  })
+})
 
 describe('BIG_FOUR_LIFTS', () => {
   // The server validates lift-goal names against a hardcoded copy of this list

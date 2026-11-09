@@ -30,10 +30,9 @@ function DashboardShell({ user, onLogout }: DashboardProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-secondary/40 bg-card/90 px-4 py-4 backdrop-blur sm:px-6">
-        <span className="text-lg font-bold tracking-tight text-third">
-          Gainz<span className="text-third/60">.Tracker</span>
-        </span>
+      <header className="flex items-center justify-between border-b border-secondary/40 bg-card/90 px-4 py-3 backdrop-blur sm:px-6">
+        {/* The file is a square with the wordmark centred; object-cover crops the empty top and bottom. */}
+        <img src="/GainzTrackerLogo.svg" alt="Gainz.Tracker" className="-ml-1.5 aspect-[2.75] h-10 object-cover" />
         <button
           type="button"
           onClick={handleLogout}

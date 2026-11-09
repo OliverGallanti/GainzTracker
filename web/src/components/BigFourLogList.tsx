@@ -1,3 +1,4 @@
+import { formatEffort } from '@gainz/shared/lifts'
 import type { WorkoutSet } from '@gainz/shared/types'
 
 function formatDate(isoString: string) {
@@ -43,7 +44,8 @@ function BigFourLogList({
               <div>
                 <span className="text-third">{s.exerciseName}</span>
                 <span className="ml-2 text-xs text-third/60">
-                  {s.weightKg}kg{s.reps ? ` × ${s.reps}` : ''} · {formatDate(s.performedAt)}
+                  {s.weightKg}kg{s.reps ? ` × ${s.reps}` : ''}
+                  {s.rpe != null ? ` · ${formatEffort(s.rpe)}` : ''} · {formatDate(s.performedAt)}
                 </span>
               </div>
               <button

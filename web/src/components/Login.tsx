@@ -28,8 +28,9 @@ function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
     <main className="flex flex-1 flex-col items-center justify-center px-4 py-12 sm:px-6">
       <div className="glow-card w-full max-w-sm rounded-2xl border border-secondary/40 bg-card/90 p-6 shadow-2xl shadow-black/40 backdrop-blur sm:max-w-md sm:p-8">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-third sm:text-3xl">
-            Gainz<span className="text-third/60">.Tracker</span>
+          <h1>
+            {/* The file is a square with the wordmark centred; object-cover crops the empty top and bottom. */}
+            <img src="/GainzTrackerLogo.svg" alt="Gainz.Tracker" className="mx-auto aspect-[2.75] w-56 object-cover sm:w-64" />
           </h1>
           <p className="mt-2 text-sm text-third/60">Track your fitness gains</p>
         </div>

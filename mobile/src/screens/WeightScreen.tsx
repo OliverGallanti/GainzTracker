@@ -3,11 +3,11 @@ import { StyleSheet, View } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { computeBmi } from '@gainz/shared/body'
 import type { WeightEntry } from '@gainz/shared/types'
-import { Scale } from '../icons'
+import { History, Scale } from '../icons'
 import LineChart from '../LineChart'
 import { QUEUED, useQueued, useUnsyncedIds, type AddWeightVars, type RemoveVars, type UpdateMeVars } from '../queue'
 import { useMe, useWeights } from '../queries'
-import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Sheet, Unsynced, styles as ui } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -15,6 +15,7 @@ export default function WeightScreen() {
   const me = useMe()
   const weights = useWeights()
   const [logging, setLogging] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const remove = useQueued<RemoveVars>(QUEUED.remove)
   const unsynced = useUnsyncedIds()
 
@@ -29,7 +30,7 @@ export default function WeightScreen() {
 
   return (
     <Screen>
-      <Card title="Weight">
+      <Card title="Weight" right={entries.length > 0 ? <Button label="History" icon={History} variant="small" onPress={() => setHistoryOpen(true)} /> : null}>
         {(weights.isPending || me.isPending) && <Muted>Loading…</Muted>}
         {(weights.isLoadingError || me.isLoadingError) && (
           <ErrorText onPress={() => void Promise.all([weights.refetch(), me.refetch()])}>
@@ -58,29 +59,27 @@ export default function WeightScreen() {
         <ProgressChart entries={entries} weightGoal={me.data.weightGoalKg} bodyFatGoal={me.data.bodyFatGoalPercent} />
       )}
 
-      {entries.length > 0 && (
-        <Card title="History">
-          {entries.slice(0, 30).map((entry) => (
-            <View key={entry.id} style={styles.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={ui.text}>
-                  {entry.weightKg} kg{entry.bodyFatPercent != null ? ` · ${entry.bodyFatPercent}%` : ''}
-                </Text>
-                <Muted>{formatDate(entry.loggedAt)}</Muted>
-                {unsynced.has(entry.id) && <Unsynced />}
-              </View>
-              <Button
-                label="Remove"
-                variant="small"
-                onPress={() =>
-                  remove.mutate({ label: `Remove ${entry.weightKg} kg`, path: `/api/weights/${entry.id}`, cacheKey: ['weights'], id: entry.id })
-                }
-                accessibilityLabel={`Remove ${entry.weightKg} kg from ${formatDate(entry.loggedAt)}`}
-              />
+      <Sheet visible={historyOpen} title="History" onClose={() => setHistoryOpen(false)}>
+        {entries.slice(0, 30).map((entry) => (
+          <View key={entry.id} style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={ui.text}>
+                {entry.weightKg} kg{entry.bodyFatPercent != null ? ` · ${entry.bodyFatPercent}%` : ''}
+              </Text>
+              <Muted>{formatDate(entry.loggedAt)}</Muted>
+              {unsynced.has(entry.id) && <Unsynced />}
             </View>
-          ))}
-        </Card>
-      )}
+            <Button
+              label="Remove"
+              variant="small"
+              onPress={() =>
+                remove.mutate({ label: `Remove ${entry.weightKg} kg`, path: `/api/weights/${entry.id}`, cacheKey: ['weights'], id: entry.id })
+              }
+              accessibilityLabel={`Remove ${entry.weightKg} kg from ${formatDate(entry.loggedAt)}`}
+            />
+          </View>
+        ))}
+      </Sheet>
     </Screen>
   )
 }
