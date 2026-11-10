@@ -1,16 +1,25 @@
-import { useState } from 'react'
-import { Linking, Pressable, Switch, View } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { randomUUID } from 'expo-crypto'
-import { OTHER_MEAL, scaleFood } from '@gainz/shared/macros'
+import { formatMacro, OTHER_MEAL, scaleFood } from '@gainz/shared/macros'
 import type { Product, SavedFood } from '@gainz/shared/types'
 import { useSavedFoods } from '../queries'
 import { QUEUED, useQueued, type AddMealVars, type SaveFoodVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Chip, Field, Muted, animateLayout, styles } from '../ui'
+import { X } from '../icons'
+import { Text, Button, Chip, Field, IconButton, Muted, animateLayout, styles } from '../ui'
 import ProductLookup from './ProductLookup'
 
 const text = (value: number | null) => (value == null ? '' : String(value))
 const number = (value: string) => (value ? Number(value) : null)
+const summary = (food: SavedFood) => [`${food.calories} cal`, formatMacro(food.proteinG, 'g P')].filter(Boolean).join(' · ')
+
+// Saved foods last logged, newest first, kept on the phone only (the server
+// lists them by name). ponytail: per phone, not synced; move to the server if
+// the web wants the same order.
+const RECENT_KEY = 'recentFoods'
+const SHOWN = 5
 
 // Queued (see queue.ts): it shows up straight away and is sent now, or when the
 // phone is back online. Problems are reported in the header, not here.
@@ -35,8 +44,16 @@ export default function LogFoodForm({
   const [product, setProduct] = useState<Product | null>(null)
   const [grams, setGrams] = useState('')
   const [saveForReuse, setSaveForReuse] = useState(false)
+  const [query, setQuery] = useState('')
+  const [recent, setRecent] = useState<string[]>([])
   const add = useQueued<AddMealVars>(QUEUED.addMeal)
   const saveFood = useQueued<SaveFoodVars>(QUEUED.saveFood)
+
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_KEY)
+      .then((saved) => saved && setRecent(JSON.parse(saved)))
+      .catch(() => {})
+  }, [])
 
   const fillFrom = (name: string, food: Parameters<typeof scaleFood>[0], count: number) => {
     const scaled = scaleFood(food, count)
@@ -73,7 +90,16 @@ export default function LogFoodForm({
     if (product && Number(value) > 0) fillFrom(product.name, product.per100g, Number(value) / 100)
   }
 
+  const unpick = () => {
+    animateLayout()
+    setPicked(null)
+    setServings('1')
+  }
+
   const save = () => {
+    if (picked) {
+      void AsyncStorage.setItem(RECENT_KEY, JSON.stringify([picked.id, ...recent.filter((id) => id !== picked.id)].slice(0, 50))).catch(() => {})
+    }
     const macros = { calories: Math.round(Number(n.calories)), proteinG: number(n.proteinG), fatG: number(n.fatG), carbsG: number(n.carbsG) }
     if (saveForReuse && !picked) {
       saveFood.mutate({ label: `Save ${description.trim()}`, food: { name: description.trim(), ...macros } })
@@ -93,20 +119,48 @@ export default function LogFoodForm({
 
   const valid = description.trim() !== '' && n.calories !== '' && Number(n.calories) >= 0
   const foods = savedFoods.data ?? []
+  const q = query.trim().toLowerCase()
+  const rank = (food: SavedFood) => {
+    const i = recent.indexOf(food.id)
+    return i === -1 ? Infinity : i
+  }
+  // Recent first, then by name (the server's order; sort is stable).
+  const shown = (q ? foods.filter((food) => food.name.toLowerCase().includes(q)) : [...foods].sort((a, b) => rank(a) - rank(b))).slice(0, SHOWN)
 
   return (
     <View style={{ gap: 12 }}>
-      <Text style={styles.cardTitle}>Log food</Text>
-
-      {foods.length > 0 && (
-        <View style={{ gap: 6 }}>
-          <Text style={styles.label}>Saved foods</Text>
-          <View style={styles.chips}>
-            {foods.map((food) => (
-              <Chip key={food.id} label={food.name} selected={picked?.id === food.id} onPress={() => pick(food)} />
-            ))}
+      {picked ? (
+        <View style={[local.food, local.picked]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.text}>{picked.name}</Text>
+            <Muted>{summary(picked)} per serving</Muted>
           </View>
+          <IconButton icon={X} label={`Clear ${picked.name}`} onPress={unpick} />
         </View>
+      ) : (
+        foods.length > 0 && (
+          <View style={{ gap: 6 }}>
+            <Field label="Saved foods" value={query} onChange={setQuery} placeholder="Search saved foods" />
+            <View>
+              {shown.map((food) => (
+                <Pressable
+                  key={food.id}
+                  onPress={() => pick(food)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${food.name}, ${summary(food)}`}
+                  style={({ pressed }) => [local.food, pressed && styles.dim]}
+                >
+                  <Text style={[styles.text, { flex: 1 }]} numberOfLines={1}>
+                    {food.name}
+                  </Text>
+                  <Muted>{summary(food)}</Muted>
+                </Pressable>
+              ))}
+              {shown.length === 0 && <Muted>No saved food matches “{query.trim()}”.</Muted>}
+              {!q && foods.length > SHOWN && <Muted>Search to see all {foods.length}.</Muted>}
+            </View>
+          </View>
+        )
       )}
 
       <ProductLookup onFound={pickProduct} />
@@ -175,3 +229,8 @@ export default function LogFoodForm({
     </View>
   )
 }
+
+const local = StyleSheet.create({
+  food: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderBottomWidth: 1, borderBottomColor: colors.border },
+  picked: { paddingLeft: 12, paddingVertical: 4, paddingRight: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 12 },
+})

@@ -9,7 +9,7 @@ import { todayKey } from '../offline'
 import { useMe, useWeights } from '../queries'
 import { newDayToday, QUEUED, useQueued, useUnsyncedIds, type MoveMealVars, type RemoveVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Muted, Screen, Unsynced, styles as ui, useAnimatedState } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Muted, Screen, Sheet, Unsynced, styles as ui, useAnimatedState } from '../ui'
 import LogFoodForm from './LogFoodForm'
 import TargetsForm from './TargetsForm'
 
@@ -80,11 +80,12 @@ export default function TodayScreen() {
           </View>
         )}
 
-        {ready && mode === 'view' && <Button label="Log food" icon={Utensils} onPress={() => setMode({ logMeal: nextMeal })} />}
-        {ready && typeof mode === 'object' && (
-          <LogFoodForm mealNames={mealNames} defaultMeal={mode.logMeal} onDone={() => setMode('view')} />
-        )}
+        {ready && mode !== 'targets' && <Button label="Log food" icon={Utensils} onPress={() => setMode({ logMeal: nextMeal })} />}
       </Card>
+
+      <Sheet visible={typeof mode === 'object'} title="Log food" onClose={() => setMode('view')}>
+        {typeof mode === 'object' && <LogFoodForm mealNames={mealNames} defaultMeal={mode.logMeal} onDone={() => setMode('view')} />}
+      </Sheet>
 
       {groups.map((group) => (
         <Card
