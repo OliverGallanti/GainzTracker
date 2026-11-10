@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lookupProduct, normalizeProduct } from './open-food-facts.ts'
+import { lookupProduct, normalizeProduct, normalizeSearch, searchProducts } from './open-food-facts.ts'
 
 // Shaped like a real response (Nutella, 3017620422003), trimmed to what we read.
 const nutella = {
@@ -98,5 +98,39 @@ describe('lookupProduct', () => {
     })
     expect(seen.url).toContain('/123.json?fields=')
     expect(seen.options.headers['User-Agent']).toMatch(/GainzTracker/)
+  })
+})
+
+describe('normalizeSearch', () => {
+  // Shaped like search.openfoodfacts.org hits: brands come as an array there.
+  const hit = (code, name, kcal, brands) => ({ code, product_name: name, brands, nutriments: kcal == null ? {} : { 'energy-kcal_100g': kcal, proteins_100g: 1.4 } })
+
+  it('maps hits to products, first brand from the array', () => {
+    const [banana] = normalizeSearch({ hits: [hit('2602605002502', 'Plátano de Canarias', 93, ['Masymas', 'Other'])] })
+    expect(banana).toMatchObject({ barcode: '2602605002502', name: 'Plátano de Canarias', brand: 'Masymas', per100g: { calories: 93, proteinG: 1.4 } })
+  })
+
+  it('drops hits with no calories or no usable barcode, and keeps at most 10', () => {
+    const many = Array.from({ length: 15 }, (_, i) => hit(String(10000000 + i), `Food ${i}`, 50))
+    expect(normalizeSearch({ hits: [hit('12345678', 'No table', null), hit('12345679', 'Zero', 0), hit('abc', 'Bad code', 50)] })).toEqual([])
+    expect(normalizeSearch({ hits: many })).toHaveLength(10)
+  })
+
+  it('tolerates a body with no hits', () => {
+    expect(normalizeSearch(undefined)).toEqual([])
+    expect(normalizeSearch({ hits: 'nope' })).toEqual([])
+  })
+})
+
+describe('searchProducts', () => {
+  it('sends the query encoded, identifies itself, and throws when OFF fails', async () => {
+    let seen
+    await searchProducts('plátano canario', async (url, options) => {
+      seen = { url, options }
+      return { ok: true, json: async () => ({ hits: [] }) }
+    })
+    expect(new URL(seen.url).searchParams.get('q')).toBe('plátano canario')
+    expect(seen.options.headers['User-Agent']).toMatch(/GainzTracker/)
+    await expect(searchProducts('x', async () => ({ ok: false, status: 503 }))).rejects.toThrow('503')
   })
 })

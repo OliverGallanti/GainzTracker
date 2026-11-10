@@ -1,17 +1,20 @@
 import { useRef, useState } from 'react'
-import { Linking, Modal, StyleSheet, View } from 'react-native'
+import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
+import { formatMacro } from '@gainz/shared/macros'
 import type { Product } from '@gainz/shared/types'
 import { api } from '../api'
 import { useIsOnline } from '../offline'
 import { colors } from '../theme'
-import { Text, Button, ErrorText, Field, Muted, styles as ui } from '../ui'
+import { Text, Button, ErrorText, Field, Muted, animateLayout, styles as ui } from '../ui'
 
 const BARCODE = /^\d{8,14}$/
 
-// Find a packaged food by barcode: scanned, or typed. Same server route as the
-// web (/api/products, Open Food Facts behind it). Needs a connection, since the
+// Find a food on Open Food Facts: by name (fruit, bread, anything without a
+// barcode at hand), or by barcode, scanned or typed. Server routes
+// /api/products/search and /api/products/:barcode.
+// Searches on the button, not per keystroke: OFF is a free service. Needs a connection, since the
 // product data lives on the server, not the phone.
 export default function ProductLookup({ onFound }: { onFound: (product: Product) => void }) {
   const online = useIsOnline()
@@ -19,6 +22,27 @@ export default function ProductLookup({ onFound }: { onFound: (product: Product)
   const [code, setCode] = useState('')
   const [looking, setLooking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<Product[] | null>(null)
+
+  const search = async () => {
+    setError(null)
+    setLooking(true)
+    try {
+      const found = await api<Product[]>(`/api/products/search?q=${encodeURIComponent(query.trim())}`)
+      animateLayout()
+      setResults(found)
+    } catch {
+      setError('Could not reach the food database: please try again')
+    } finally {
+      setLooking(false)
+    }
+  }
+
+  const choose = (product: Product) => {
+    setResults(null)
+    onFound(product)
+  }
 
   const lookup = async (barcode: string) => {
     setError(null)
@@ -37,9 +61,42 @@ export default function ProductLookup({ onFound }: { onFound: (product: Product)
 
   return (
     <View style={{ gap: 6 }}>
-      <Text style={ui.label}>Packaged food</Text>
+      <Text style={ui.label}>Food database</Text>
       {online ? (
         <>
+          <View style={[ui.row, { alignItems: 'flex-end' }]}>
+            <Field
+              label="Search by name"
+              value={query}
+              onChange={setQuery}
+              placeholder="e.g. plátano canario"
+              returnKeyType="search"
+              onSubmitEditing={() => query.trim().length >= 2 && void search()}
+            />
+            <Button label={looking ? 'Searching…' : 'Search'} variant="secondary" onPress={() => void search()} disabled={looking || query.trim().length < 2} />
+          </View>
+          {results && (
+            <View>
+              {results.map((product) => (
+                <Pressable
+                  key={product.barcode}
+                  onPress={() => choose(product)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${product.name}${product.brand ? `, ${product.brand}` : ''}, ${summary(product)}`}
+                  style={({ pressed }) => [styles.result, pressed && ui.dim]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={ui.text} numberOfLines={1}>
+                      {product.name}
+                    </Text>
+                    {product.brand && <Muted>{product.brand}</Muted>}
+                  </View>
+                  <Muted>{summary(product)}</Muted>
+                </Pressable>
+              ))}
+              {results.length === 0 && <Muted>Nothing found with nutrition values: try other words, or enter it manually.</Muted>}
+            </View>
+          )}
           <View style={[ui.row, { alignItems: 'flex-end' }]}>
             <Button label="Scan barcode" variant="secondary" onPress={() => setScanning(true)} disabled={looking} />
             <Field label="or type the number" value={code} onChange={(v) => setCode(v.replace(/\D/g, ''))} keyboardType="number-pad" />
@@ -49,7 +106,7 @@ export default function ProductLookup({ onFound }: { onFound: (product: Product)
           )}
         </>
       ) : (
-        <Muted>Barcode lookup needs a connection.</Muted>
+        <Muted>The food database needs a connection.</Muted>
       )}
       {error && <ErrorText>{error}</ErrorText>}
 
@@ -111,7 +168,12 @@ function Scanner({ onScanned, onClose }: { onScanned: (barcode: string) => void;
   )
 }
 
+// Per 100 g, as OFF lists them.
+const summary = (product: Product) =>
+  [`${product.per100g.calories} cal`, formatMacro(product.per100g.proteinG, 'g P')].filter(Boolean).join(' · ') + ' /100 g'
+
 const styles = StyleSheet.create({
+  result: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.border },
   full: { flex: 1, backgroundColor: '#000' },
   center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, backgroundColor: colors.main },
   message: { textAlign: 'center' },
