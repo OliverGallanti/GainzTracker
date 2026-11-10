@@ -67,7 +67,8 @@
           "image": "./assets/android-icon-foreground.png",
           "imageWidth": 288
         }
-      ]
+      ],
+      "expo-image"
     ],
     "extra": {
       "eas": {

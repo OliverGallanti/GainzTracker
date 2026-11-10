@@ -11,7 +11,7 @@ import LineChart from '../LineChart'
 import { useMe, useWeights } from '../queries'
 import { QUEUED, useQueued, useUnsyncedIds, type AddSetVars, type RemoveVars, type SetLiftGoalsVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Sheet, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Sheet, Unsynced, styles as ui, useAnimatedState } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 const describe = (set: WorkoutSet) => `${set.weightKg ?? '–'} kg${set.reps ? ` × ${set.reps}` : ''}`
@@ -24,7 +24,7 @@ export default function BigFourScreen() {
   const sets = useQuery({ queryKey: ['workoutSets'], queryFn: () => api<WorkoutSet[]>('/api/workout-sets') }) // newest first
   const goals = useQuery({ queryKey: ['liftGoals'], queryFn: () => api<Record<string, number>>('/api/lift-goals') })
   const [selected, setSelected] = useState(BIG_FOUR_LIFTS[0])
-  const [mode, setMode] = useState<'view' | 'log' | 'goals'>('view')
+  const [mode, setMode] = useAnimatedState<'view' | 'log' | 'goals'>('view')
   const [historyOpen, setHistoryOpen] = useState(false)
 
   const remove = useQueued<RemoveVars>(QUEUED.remove)

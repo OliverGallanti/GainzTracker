@@ -7,14 +7,14 @@ import { History, Scale } from '../icons'
 import LineChart from '../LineChart'
 import { QUEUED, useQueued, useUnsyncedIds, type AddWeightVars, type RemoveVars, type UpdateMeVars } from '../queue'
 import { useMe, useWeights } from '../queries'
-import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Sheet, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Sheet, Unsynced, styles as ui, useAnimatedState } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function WeightScreen() {
   const me = useMe()
   const weights = useWeights()
-  const [logging, setLogging] = useState(false)
+  const [logging, setLogging] = useAnimatedState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const remove = useQueued<RemoveVars>(QUEUED.remove)
   const unsynced = useUnsyncedIds()

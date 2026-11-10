@@ -6,7 +6,7 @@ import type { Product, SavedFood } from '@gainz/shared/types'
 import { useSavedFoods } from '../queries'
 import { QUEUED, useQueued, type AddMealVars, type SaveFoodVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Chip, Field, Muted, styles } from '../ui'
+import { Text, Button, Chip, Field, Muted, animateLayout, styles } from '../ui'
 import ProductLookup from './ProductLookup'
 
 const text = (value: number | null) => (value == null ? '' : String(value))
@@ -45,6 +45,7 @@ export default function LogFoodForm({
   }
 
   const pick = (food: SavedFood) => {
+    animateLayout()
     setPicked(food)
     setProduct(null)
     setServings('1')
@@ -60,6 +61,7 @@ export default function LogFoodForm({
   // Start from the label's serving size when it has one, otherwise 100 g.
   const pickProduct = (found: Product) => {
     const start = found.servingG ?? 100
+    animateLayout()
     setProduct(found)
     setPicked(null)
     setGrams(String(start))

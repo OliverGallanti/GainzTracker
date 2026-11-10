@@ -21,7 +21,7 @@ import {
   type UpdateSplitVars,
 } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Field, IconButton, Muted, Screen, Sheet, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, IconButton, Muted, Screen, Sheet, Unsynced, styles as ui, animateLayout, useAnimatedState } from '../ui'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 const WEEK = [1, 2, 3, 4, 5, 6, 7]
@@ -42,7 +42,7 @@ export default function TrainingScreen() {
   })
   // Shared with Big 4 (same key): a session's exercises are the sets tagged with its log.
   const sets = useQuery({ queryKey: ['workoutSets'], queryFn: () => api<WorkoutSet[]>('/api/workout-sets') })
-  const [editingRoutine, setEditingRoutine] = useState(false)
+  const [editingRoutine, setEditingRoutine] = useAnimatedState(false)
   const [openLogId, setOpenLogId] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
 
@@ -95,7 +95,7 @@ export default function TrainingScreen() {
 
 function RoutineSummary({ split, allLogs, onChange }: { split: WorkoutSplit; allLogs: SplitLog[]; onChange: () => void }) {
   const updateSplit = useQueued<UpdateSplitVars>(QUEUED.updateSplit)
-  const [editingGoal, setEditingGoal] = useState(false)
+  const [editingGoal, setEditingGoal] = useAnimatedState(false)
   const goal = weeklyGoal(split)
   const { streak, thisWeekDays } = computeWeeklyStreak(allLogs, goal)
 
@@ -243,7 +243,7 @@ function Logger({
   onOpenLog: (logId: string) => void
   onOpenHistory: () => void
 }) {
-  const [pickedDate, setPickedDate] = useState<Date | null>(null) // null: today
+  const [pickedDate, setPickedDate] = useAnimatedState<Date | null>(null) // null: today
   const [picked, setPicked] = useState<number | null>(null)
   const suggested = split.days.indexOf(split.days[suggestedDayIndex(split.days, logs)])
   const selected = picked ?? suggested
@@ -444,11 +444,11 @@ function SessionEditor({ log, sets, onDone }: { log: SplitLog; sets: WorkoutSet[
           <View style={[ui.row, { alignItems: 'flex-end' }]}>
             <Field label="kg" value={row.weightKg} onChange={(v) => edit(index, { weightKg: v })} numeric />
             <Field label="Reps" value={row.reps} onChange={(v) => edit(index, { reps: v.replace(/\D/g, '') })} keyboardType="number-pad" />
-            <IconButton icon={X} label={`Remove ${row.exerciseName || 'exercise'}`} onPress={() => setRows(rows.filter((_, i) => i !== index))} />
+            <IconButton icon={X} label={`Remove ${row.exerciseName || 'exercise'}`} onPress={() => animateLayout(() => setRows(rows.filter((_, i) => i !== index)))} />
           </View>
         </View>
       ))}
-      <Button label="Add exercise" icon={Plus} variant="secondary" onPress={() => setRows([...rows, emptyRow()])} />
+      <Button label="Add exercise" icon={Plus} variant="secondary" onPress={() => animateLayout(() => setRows([...rows, emptyRow()]))} />
       <Field label="Duration (minutes)" value={duration} onChange={(v) => setDuration(v.replace(/\D/g, ''))} keyboardType="number-pad" />
       <View style={ui.row}>
         <View style={{ flex: 1 }}>
@@ -476,10 +476,10 @@ function RoutineEditor({ onDone }: { onDone?: () => void }) {
             key={template.name}
             title={template.name}
             subtitle={template.days.join(' → ')}
-            onPress={() => setDraft({ name: template.name, days: [...template.days] })}
+            onPress={() => animateLayout(() => setDraft({ name: template.name, days: [...template.days] }))}
           />
         ))}
-        <Tile title="Custom" subtitle="Name your own days" onPress={() => setDraft({ name: '', days: ['', ''] })} />
+        <Tile title="Custom" subtitle="Name your own days" onPress={() => animateLayout(() => setDraft({ name: '', days: ['', ''] }))} />
         {onDone && <Button label="Cancel" variant="secondary" onPress={onDone} />}
       </View>
     )
@@ -523,16 +523,16 @@ function RoutineEditor({ onDone }: { onDone?: () => void }) {
             />
             <IconButton icon={ChevronUp} label={`Move day ${index + 1} up`} onPress={() => move(index, -1)} disabled={index === 0} />
             <IconButton icon={ChevronDown} label={`Move day ${index + 1} down`} onPress={() => move(index, 1)} disabled={index === days.length - 1} />
-            <IconButton icon={X} label={`Remove day ${index + 1}`} onPress={() => setDays(days.filter((_, i) => i !== index))} />
+            <IconButton icon={X} label={`Remove day ${index + 1}`} onPress={() => animateLayout(() => setDays(days.filter((_, i) => i !== index)))} />
           </View>
         ))}
-        <Button label="Add day" icon={Plus} variant="secondary" onPress={() => setDays([...days, ''])} />
+        <Button label="Add day" icon={Plus} variant="secondary" onPress={() => animateLayout(() => setDays([...days, '']))} />
       </View>
       <View style={ui.row}>
         <View style={{ flex: 1 }}>
           <Button label="Save routine" onPress={save} disabled={cleaned.length === 0} />
         </View>
-        <Button label="Back" variant="secondary" onPress={() => setDraft(null)} />
+        <Button label="Back" variant="secondary" onPress={() => animateLayout(() => setDraft(null))} />
       </View>
     </View>
   )

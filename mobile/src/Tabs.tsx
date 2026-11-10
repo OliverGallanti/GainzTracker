@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { useRef, useState } from 'react'
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from 'react-native'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { CalendarDays, Dumbbell, Scale, User, Utensils } from './icons'
 import { useIsOnline } from './offline'
@@ -13,31 +14,43 @@ import { colors } from './theme'
 import { Text, Button } from './ui'
 
 const TABS = [
-  { key: 'today', label: 'Today', Screen: TodayScreen, Icon: Utensils },
-  { key: 'weight', label: 'Weight', Screen: WeightScreen, Icon: Scale },
-  { key: 'training', label: 'Training', Screen: TrainingScreen, Icon: CalendarDays },
-  { key: 'bigFour', label: 'Big 4', Screen: BigFourScreen, Icon: Dumbbell },
-  { key: 'profile', label: 'Profile', Screen: ProfileScreen, Icon: User },
+  { key: 'today', label: 'Today', Page: TodayScreen, Icon: Utensils },
+  { key: 'weight', label: 'Weight', Page: WeightScreen, Icon: Scale },
+  { key: 'training', label: 'Training', Page: TrainingScreen, Icon: CalendarDays },
+  { key: 'bigFour', label: 'Big 4', Page: BigFourScreen, Icon: Dumbbell },
+  { key: 'profile', label: 'Profile', Page: ProfileScreen, Icon: User },
 ] as const
 
-// Five screens don't need a navigation library: a fixed header, the current
-// screen, and a bottom bar. ponytail: no back-stack or deep links; add
-// a navigator when a screen needs to push another.
+// Five screens don't need a navigation library: a fixed header, the screens side
+// by side in a paging scroll view (swipe between them, or tap the bottom bar),
+// and the bar. ponytail: no back-stack or deep links; add a navigator when a
+// screen needs to push another.
 export default function Tabs() {
-  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('today')
-  const Current = TABS.find((t) => t.key === tab)!.Screen
+  const [index, setIndex] = useState(0)
+  const pager = useRef<ScrollViewInstance>(null)
+  const { width } = useWindowDimensions()
   const online = useIsOnline()
   const sync = useSyncState()
   // Android draws the app under the status bar and the navigation bar (edge to
   // edge); these are their heights, so the header and tab bar clear them.
   const insets = useSafeAreaInsets()
 
+  const go = (i: number) => {
+    setIndex(i)
+    pager.current?.scrollTo({ x: i * width, animated: true })
+  }
+
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.brand}>
-          Gainz<Text style={styles.brandMuted}>.Tracker</Text>
-        </Text>
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <Image
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- how React Native loads a bundled image
+          source={require('../assets/GainzTrackerWordmark.svg')}
+          // The file is a square with the wordmark centred; cover crops the empty top and bottom.
+          contentFit="cover"
+          style={styles.logo}
+          accessibilityLabel="Gainz.Tracker"
+        />
       </View>
 
       {(!online || sync.waiting > 0) && (
@@ -57,22 +70,35 @@ export default function Tabs() {
         </View>
       ))}
 
-      <View style={styles.body}>
-        <Current />
-      </View>
+      <ScrollView
+        ref={pager}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onMomentumScrollEnd={(e) => setIndex(Math.min(TABS.length - 1, Math.max(0, Math.round(e.nativeEvent.contentOffset.x / width))))}
+        style={styles.body}
+      >
+        {TABS.map(({ key, Page }) => (
+          <View key={key} style={{ width }}>
+            <Page />
+          </View>
+        ))}
+      </ScrollView>
 
       <View style={[styles.bar, { paddingBottom: insets.bottom }]} accessibilityRole="tablist">
-        {TABS.map((t) => (
+        {TABS.map((t, i) => (
           <Pressable
             key={t.key}
-            onPress={() => setTab(t.key)}
+            onPress={() => go(i)}
             accessibilityRole="tab"
-            accessibilityState={{ selected: tab === t.key }}
+            accessibilityLabel={t.label}
+            accessibilityState={{ selected: index === i }}
             style={styles.tab}
           >
-            <t.Icon size={20} color={tab === t.key ? colors.text : colors.muted} />
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextSelected]}>{t.label}</Text>
-            <View style={[styles.indicator, tab === t.key && styles.indicatorSelected]} />
+            <t.Icon size={20} color={index === i ? colors.text : colors.muted} />
+            <Text style={[styles.tabText, index === i && styles.tabTextSelected]}>{t.label}</Text>
+            <View style={[styles.indicator, index === i && styles.indicatorSelected]} />
           </Pressable>
         ))}
       </View>
@@ -87,13 +113,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 6,
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  brand: { fontSize: 20, fontWeight: '700', color: colors.text },
-  brandMuted: { color: colors.muted },
+  logo: { height: 40, aspectRatio: 2.75, marginLeft: -6 }, // the wordmark starts ~6% in from the file's edge
   body: { flex: 1 },
   offline: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'rgba(251, 191, 36, 0.15)', borderBottomWidth: 1, borderBottomColor: 'rgba(251, 191, 36, 0.4)' },
   offlineText: { color: '#fcd34d', fontSize: 13 },

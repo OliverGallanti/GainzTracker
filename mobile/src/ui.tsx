@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
+  AccessibilityInfo,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Modal,
   Pressable,
   ScrollView,
@@ -17,6 +19,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { LucideIcon } from 'lucide-react-native'
 import { X } from './icons'
 import { colors, FONT } from './theme'
+
+// Call right before a state change that opens or closes a form or panel: the
+// next layout change eases in (fade plus resize) instead of jumping, so it reads
+// as the same page changing. Skipped when the phone asks for reduced motion.
+let reduceMotion = false
+void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => (reduceMotion = enabled))
+AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => (reduceMotion = enabled))
+const EASE = LayoutAnimation.create(220, 'easeInEaseOut', 'opacity')
+export function animateLayout(change?: () => void) {
+  if (!reduceMotion) LayoutAnimation.configureNext(EASE)
+  change?.()
+}
+
+// useState for a flag that shows or hides part of a screen (a form, a panel):
+// every change animates. Not for text fields, which change on every keystroke.
+export function useAnimatedState<T>(initial: T) {
+  const [value, setValue] = useState(initial)
+  const set = (next: T) => {
+    animateLayout()
+    setValue(next)
+  }
+  return [value, set] as const
+}
 
 // React Native has no app-wide default font, so every screen uses this Text,
 // which is the native one with Manrope first (a style can still override it).

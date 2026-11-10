@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { startOfLocalDay } from '@gainz/shared/dates'
@@ -10,14 +9,14 @@ import { todayKey } from '../offline'
 import { useMe, useWeights } from '../queries'
 import { newDayToday, QUEUED, useQueued, useUnsyncedIds, type MoveMealVars, type RemoveVars } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Muted, Screen, Unsynced, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Muted, Screen, Unsynced, styles as ui, useAnimatedState } from '../ui'
 import LogFoodForm from './LogFoodForm'
 import TargetsForm from './TargetsForm'
 
 // Today's macros: the same data and grouping as the web card, phone-sized.
 export default function TodayScreen() {
   const queryClient = useQueryClient()
-  const [mode, setMode] = useState<'view' | 'targets' | { logMeal: string }>('view')
+  const [mode, setMode] = useAnimatedState<'view' | 'targets' | { logMeal: string }>('view')
   const me = useMe()
   const weights = useWeights()
 
@@ -38,7 +37,7 @@ export default function TodayScreen() {
   const remove = useQueued<RemoveVars>(QUEUED.remove)
   const move = useQueued<MoveMealVars>(QUEUED.moveMeal)
   const unsynced = useUnsyncedIds()
-  const [movingId, setMovingId] = useState<string | null>(null)
+  const [movingId, setMovingId] = useAnimatedState<string | null>(null)
 
   const goal = today.data?.goal ?? null
   const meals = today.data?.meals ?? []
