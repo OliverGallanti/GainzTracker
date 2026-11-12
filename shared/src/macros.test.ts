@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMacro, groupByMeal, scaleFood, sumToday } from './macros'
+import { amountFactor, basisLabel, foodUnits, formatAmount, formatMacro, groupByMeal, scaleFood, sumToday } from './macros'
 import type { Macros, Meal } from './types'
 
 describe('sumToday', () => {
@@ -98,5 +98,35 @@ describe('scaleFood', () => {
   it('scales a per-100g product to the grams eaten', () => {
     const per100g = { calories: 539, proteinG: 6.3, fatG: 30.9, carbsG: 57.5 }
     expect(scaleFood(per100g, 15 / 100)).toEqual({ calories: 81, proteinG: 0.9, fatG: 4.6, carbsG: 8.6 })
+  })
+})
+
+describe('food amounts', () => {
+  const per100 = { basis: '100g' as const, servingG: null }
+  const labelled = { basis: '100g' as const, servingG: 30 }
+  const serving = { basis: 'serving' as const, servingG: null }
+  const bar = { basis: 'serving' as const, servingG: 60 }
+
+  it('offers grams or servings only when the weight of a serving is known', () => {
+    expect(foodUnits(per100)).toEqual(['g'])
+    expect(foodUnits(labelled)).toEqual(['g', 'serving'])
+    expect(foodUnits(serving)).toEqual(['serving'])
+    expect(foodUnits(bar)).toEqual(['serving', 'g'])
+  })
+
+  it('turns an amount into a multiplier of the food values', () => {
+    expect(amountFactor(per100, 120, 'g')).toBe(1.2)
+    expect(amountFactor(labelled, 2, 'serving')).toBe(0.6) // 2 × 30 g of a per-100 g food
+    expect(amountFactor(serving, 1.5, 'serving')).toBe(1.5)
+    expect(amountFactor(bar, 90, 'g')).toBe(1.5)
+  })
+
+  it('labels the basis and the amount', () => {
+    expect(basisLabel(per100)).toBe('per 100 g')
+    expect(basisLabel(bar)).toBe('per serving (60 g)')
+    expect(basisLabel(serving)).toBe('per serving')
+    expect(formatAmount(120, 'g')).toBe('120 g')
+    expect(formatAmount(1, 'serving')).toBe('1 serving')
+    expect(formatAmount(2.5, 'serving')).toBe('2.5 servings')
   })
 })

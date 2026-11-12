@@ -17,7 +17,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import type { LucideIcon } from 'lucide-react-native'
-import { X } from './icons'
+import { ChevronLeft, X } from './icons'
 import { colors, FONT } from './theme'
 
 // Call right before a state change that opens or closes a form or panel: the
@@ -81,16 +81,31 @@ export function Card({ title, right, children }: { title?: string; right?: React
   )
 }
 
-// A full-screen modal: what history lists open in. Android draws modals edge to
-// edge too, so it clears the status and navigation bars itself.
-export function Sheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: ReactNode }) {
+// A full-screen modal: what history lists and forms open in. Android draws
+// modals edge to edge too, so it clears the status and navigation bars itself.
+// With onBack it has a back arrow, and Android's back button goes back a step
+// instead of closing.
+export function Sheet({
+  visible,
+  title,
+  onClose,
+  onBack,
+  children,
+}: {
+  visible: boolean
+  title: string
+  onClose: () => void
+  onBack?: () => void
+  children: ReactNode
+}) {
   const insets = useSafeAreaInsets()
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={onBack ?? onClose}>
       <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
           <View style={styles.sheetHeader}>
-            <Text style={styles.cardTitle} accessibilityRole="header">
+            {onBack && <IconButton icon={ChevronLeft} label="Back" onPress={onBack} />}
+            <Text style={[styles.cardTitle, { flex: 1 }]} accessibilityRole="header" numberOfLines={1}>
               {title}
             </Text>
             <IconButton icon={X} label="Close" onPress={onClose} />
@@ -236,7 +251,7 @@ export function ErrorText({ children, onPress }: { children: ReactNode; onPress?
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.main },
   screenContent: { padding: 16, paddingBottom: 32, gap: 16 },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8 },
   card: { gap: 12, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   cardTitle: { flexShrink: 1, fontSize: 18, fontWeight: '600', color: colors.text },

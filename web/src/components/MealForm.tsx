@@ -50,11 +50,17 @@ function MealForm({
     })
   }
 
+  // A food saved per 100 g on the phone is logged here in grams instead of servings.
+  // ponytail: stopgap until the web gets the phone's amount and unit picker.
+  const inGrams = (food: SavedFood) => food.basis === '100g'
+  const factorFor = (food: SavedFood, value: number) => (inGrams(food) ? value / 100 : value)
+
   const pickFood = (food: SavedFood) => {
+    const start = inGrams(food) ? (food.servingG ?? 100) : 1
     setPicked(food)
     setProduct(null)
-    setServings('1')
-    fillFrom(food.name, food, 1)
+    setServings(String(start))
+    fillFrom(food.name, food, factorFor(food, start))
   }
 
   // Start from the label's serving size when it has one, otherwise 100 g.
@@ -73,7 +79,7 @@ function MealForm({
 
   const changeServings = (value: string) => {
     setServings(value)
-    if (picked && Number(value) > 0) fillFrom(picked.name, picked, Number(value))
+    if (picked && Number(value) > 0) fillFrom(picked.name, picked, factorFor(picked, Number(value)))
   }
 
   const macros = () => ({
@@ -206,7 +212,9 @@ function MealForm({
 
       {picked && (
         <label className="flex items-center justify-between gap-3 text-sm">
-          <span className="text-third">Servings of {picked.name}</span>
+          <span className="text-third">
+            {inGrams(picked) ? 'Grams' : 'Servings'} of {picked.name}
+          </span>
           <input
             type="number"
             min="0.1"

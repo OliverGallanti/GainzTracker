@@ -1,22 +1,25 @@
-import { StyleSheet, View } from 'react-native'
+import { useState } from 'react'
+import { Pressable, StyleSheet, View } from 'react-native'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { startOfLocalDay } from '@gainz/shared/dates'
-import { formatMacro, groupByMeal, OTHER_MEAL, sumToday } from '@gainz/shared/macros'
+import { formatAmount, formatMacro, groupByMeal, OTHER_MEAL, sumToday } from '@gainz/shared/macros'
 import type { MacroGoal, Meal } from '@gainz/shared/types'
 import { api } from '../api'
-import { Target, Utensils } from '../icons'
+import { ChevronRight, Target, Utensils } from '../icons'
 import { todayKey } from '../offline'
 import { useMe, useWeights } from '../queries'
-import { newDayToday, QUEUED, useQueued, useUnsyncedIds, type MoveMealVars, type RemoveVars } from '../queue'
+import { newDayToday, useUnsyncedIds } from '../queue'
 import { colors } from '../theme'
-import { Text, Button, Card, Chip, ErrorText, Muted, Screen, Sheet, Unsynced, styles as ui, useAnimatedState } from '../ui'
-import LogFoodForm from './LogFoodForm'
+import { Text, Button, Card, ErrorText, Muted, Screen, Unsynced, styles as ui, useAnimatedState } from '../ui'
+import LogFood from './LogFoodForm'
 import TargetsForm from './TargetsForm'
 
 // Today's macros: the same data and grouping as the web card, phone-sized.
 export default function TodayScreen() {
   const queryClient = useQueryClient()
-  const [mode, setMode] = useAnimatedState<'view' | 'targets' | { logMeal: string }>('view')
+  const [mode, setMode] = useAnimatedState<'view' | 'targets'>('view')
+  // The Log food sheet: logging into a meal, or editing a logged food.
+  const [food, setFood] = useState<{ logMeal: string } | { edit: Meal } | null>(null)
   const me = useMe()
   const weights = useWeights()
 
@@ -34,10 +37,7 @@ export default function TodayScreen() {
     initialDataUpdatedAt: 1, // always out of date, so the real day is still fetched
   })
 
-  const remove = useQueued<RemoveVars>(QUEUED.remove)
-  const move = useQueued<MoveMealVars>(QUEUED.moveMeal)
   const unsynced = useUnsyncedIds()
-  const [movingId, setMovingId] = useAnimatedState<string | null>(null)
 
   const goal = today.data?.goal ?? null
   const meals = today.data?.meals ?? []
@@ -80,12 +80,17 @@ export default function TodayScreen() {
           </View>
         )}
 
-        {ready && mode !== 'targets' && <Button label="Log food" icon={Utensils} onPress={() => setMode({ logMeal: nextMeal })} />}
+        {ready && mode === 'view' && <Button label="Log food" icon={Utensils} onPress={() => setFood({ logMeal: nextMeal })} />}
       </Card>
 
-      <Sheet visible={typeof mode === 'object'} title="Log food" onClose={() => setMode('view')}>
-        {typeof mode === 'object' && <LogFoodForm mealNames={mealNames} defaultMeal={mode.logMeal} onDone={() => setMode('view')} />}
-      </Sheet>
+      {food && (
+        <LogFood
+          mealNames={mealNames}
+          defaultMeal={'logMeal' in food ? food.logMeal : OTHER_MEAL}
+          editing={'edit' in food ? food.edit : undefined}
+          onClose={() => setFood(null)}
+        />
+      )}
 
       {groups.map((group) => (
         <Card
@@ -101,47 +106,30 @@ export default function TodayScreen() {
         >
           {group.entries.length === 0 && <Text style={styles.faint}>Nothing logged</Text>}
           {group.entries.map((meal) => (
-            <View key={meal.id} style={{ gap: 8 }}>
-              <View style={styles.mealRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={ui.text}>{meal.description}</Text>
-                  <Muted>
-                    {[`${meal.calories} cal`, formatMacro(meal.proteinG, 'g P'), formatMacro(meal.fatG, 'g F'), formatMacro(meal.carbsG, 'g C')]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Muted>
-                  {unsynced.has(meal.id) && <Unsynced />}
-                </View>
-                <Button
-                  label="Move"
-                  variant="small"
-                  onPress={() => setMovingId(movingId === meal.id ? null : meal.id)}
-                  accessibilityLabel={`Move ${meal.description} to another meal`}
-                />
-                <Button
-                  label="Remove"
-                  variant="small"
-                  onPress={() => remove.mutate({ label: `Remove ${meal.description}`, path: `/api/meals/${meal.id}`, cacheKey: ['today'], id: meal.id })}
-                  accessibilityLabel={`Remove ${meal.description}`}
-                />
+            <Pressable
+              key={meal.id}
+              onPress={() => setFood({ edit: meal })}
+              accessibilityRole="button"
+              accessibilityLabel={`${meal.description}, ${meal.calories} calories. Edit`}
+              style={({ pressed }) => [styles.mealRow, pressed && ui.dim]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={ui.text}>{meal.description}</Text>
+                <Muted>
+                  {[
+                    meal.amount != null && meal.unit ? formatAmount(meal.amount, meal.unit) : null,
+                    `${meal.calories} cal`,
+                    formatMacro(meal.proteinG, 'g P'),
+                    formatMacro(meal.fatG, 'g F'),
+                    formatMacro(meal.carbsG, 'g C'),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Muted>
+                {unsynced.has(meal.id) && <Unsynced />}
               </View>
-              {movingId === meal.id && (
-                <View style={ui.chips}>
-                  {[...mealNames, OTHER_MEAL].map((name) => (
-                    <Chip
-                      key={name}
-                      label={name}
-                      selected={group.name === name}
-                      onPress={() => {
-                        setMovingId(null)
-                        if (group.name === name) return
-                        move.mutate({ label: `Move ${meal.description}`, id: meal.id, mealName: name === OTHER_MEAL ? null : name })
-                      }}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
+              <ChevronRight size={18} color={colors.muted} />
+            </Pressable>
           ))}
         </Card>
       ))}
@@ -173,6 +161,6 @@ const styles = StyleSheet.create({
   barTrack: { height: 8, borderRadius: 4, backgroundColor: 'rgba(220, 224, 217, 0.15)', overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 4, backgroundColor: colors.text },
   barOver: { backgroundColor: '#fbbf24' },
-  mealRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  mealRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
   faint: { color: 'rgba(220, 224, 217, 0.45)' },
 })

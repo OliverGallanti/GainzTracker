@@ -2,52 +2,127 @@ import { useEffect, useState } from 'react'
 import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { randomUUID } from 'expo-crypto'
-import { formatMacro, OTHER_MEAL, scaleFood } from '@gainz/shared/macros'
-import type { Product, SavedFood } from '@gainz/shared/types'
+import { amountFactor, basisLabel, foodUnits, formatMacro, OTHER_MEAL, scaleFood, type FoodBasis } from '@gainz/shared/macros'
+import type { AmountUnit, Meal, Product, SavedFood } from '@gainz/shared/types'
+import type { LucideIcon } from 'lucide-react-native'
+import { Pencil, Search, Star, Trash2 } from '../icons'
 import { useSavedFoods } from '../queries'
-import { QUEUED, useQueued, type AddMealVars, type SaveFoodVars } from '../queue'
+import { QUEUED, useQueued, type AddMealVars, type RemoveVars, type SaveFoodVars, type UpdateMealVars, type UpdateSavedFoodVars } from '../queue'
 import { colors } from '../theme'
-import { X } from '../icons'
-import { Text, Button, Chip, Field, IconButton, Muted, animateLayout, styles } from '../ui'
+import { Text, Button, Card, Chip, Field, IconButton, Muted, Sheet, animateLayout, styles } from '../ui'
 import ProductLookup from './ProductLookup'
 
-const text = (value: number | null) => (value == null ? '' : String(value))
-const number = (value: string) => (value ? Number(value) : null)
-const summary = (food: SavedFood) => [`${food.calories} cal`, formatMacro(food.proteinG, 'g P')].filter(Boolean).join(' · ')
+// Log food, in steps inside one full-screen sheet: pick where the food comes
+// from (My foods, the food database, or typed in), then say how much was eaten.
+// Every source ends on the same Amount page, which is also where a logged food
+// is edited. Writes are queued (queue.ts): they show up straight away and are
+// sent now, or when the phone is back online.
+
+// A food's values per one serving or per 100 g, wherever it came from.
+type Draft = FoodBasis & {
+  name: string
+  calories: number | null
+  proteinG: number | null
+  fatG: number | null
+  carbsG: number | null
+  savedId?: string // from My foods
+  barcode?: string // from Open Food Facts (for the credit link)
+  brand?: string | null
+  servingSize?: string | null // the label's own text, e.g. "30 g"
+}
+
+type Step = 'source' | 'mine' | 'database' | 'values' | 'amount' | 'editSaved'
+const TITLES: Record<Step, string> = {
+  source: 'Log food',
+  mine: 'My foods',
+  database: 'Food database',
+  values: 'Food values',
+  amount: 'Amount',
+  editSaved: 'Edit saved food',
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10
+const text = (value: number | null) => (value == null ? '' : String(round1(value)))
+const numberOrNull = (value: string) => (value.trim() === '' ? null : Number(value))
+const perBasis = (food: Pick<Draft, 'calories' | 'proteinG'> & FoodBasis) =>
+  [food.calories == null ? null : `${Math.round(food.calories)} cal`, formatMacro(food.proteinG, 'g P')].filter(Boolean).join(' · ') +
+  ` ${basisLabel(food)}`
+
+const fromSaved = (food: SavedFood): Draft => ({ ...food, basis: food.basis ?? 'serving', servingG: food.servingG ?? null, savedId: food.id })
+const fromProduct = (p: Product): Draft => ({
+  name: p.name,
+  ...p.per100g,
+  basis: '100g',
+  servingG: p.servingG,
+  barcode: p.barcode,
+  brand: p.brand,
+  servingSize: p.servingSize,
+})
+// A logged food back into values per unit, so changing the amount rescales it.
+// Older entries have no amount: they count as one serving of what was logged.
+function fromMeal(meal: Meal): { draft: Draft; amount: number; unit: AmountUnit } {
+  const amount = meal.amount ?? 1
+  const unit = meal.unit ?? 'serving'
+  const per = unit === 'g' ? 100 / amount : 1 / amount
+  const scale = (v: number | null) => (v == null ? null : v * per)
+  return {
+    draft: {
+      name: meal.description,
+      calories: meal.calories * per,
+      proteinG: scale(meal.proteinG),
+      fatG: scale(meal.fatG),
+      carbsG: scale(meal.carbsG),
+      basis: unit === 'g' ? '100g' : 'serving',
+      servingG: null,
+    },
+    amount,
+    unit,
+  }
+}
+const EMPTY: Draft = { name: '', calories: null, proteinG: null, fatG: null, carbsG: null, basis: '100g', servingG: null }
+
+// Saved foods store whole calories (the server's column is an integer).
+const savedFrom = (food: Draft): Omit<SavedFood, 'id'> => ({
+  name: food.name.trim(),
+  calories: Math.round(food.calories ?? 0),
+  proteinG: food.proteinG == null ? null : round1(food.proteinG),
+  fatG: food.fatG == null ? null : round1(food.fatG),
+  carbsG: food.carbsG == null ? null : round1(food.carbsG),
+  basis: food.basis,
+  servingG: food.servingG,
+})
 
 // Saved foods last logged, newest first, kept on the phone only (the server
 // lists them by name). ponytail: per phone, not synced; move to the server if
 // the web wants the same order.
 const RECENT_KEY = 'recentFoods'
-const SHOWN = 5
 
-// Queued (see queue.ts): it shows up straight away and is sent now, or when the
-// phone is back online. Problems are reported in the header, not here.
-// A saved food fills the form (times the servings), still editable; "Save for
-// reuse" stores the entered macros as one serving, as on the web. A scanned
-// product works the same way, scaled by the grams eaten instead (its values are per 100 g).
-export default function LogFoodForm({
+export default function LogFood({
   mealNames,
   defaultMeal,
-  onDone,
+  editing,
+  onClose,
 }: {
   mealNames: string[]
   defaultMeal: string
-  onDone: () => void
+  editing?: Meal // set: edit this logged food instead of logging a new one
+  onClose: () => void
 }) {
-  const savedFoods = useSavedFoods()
-  const [description, setDescription] = useState('')
-  const [mealName, setMealName] = useState(defaultMeal)
-  const [n, setN] = useState({ calories: '', proteinG: '', fatG: '', carbsG: '' })
-  const [picked, setPicked] = useState<SavedFood | null>(null)
-  const [servings, setServings] = useState('1')
-  const [product, setProduct] = useState<Product | null>(null)
-  const [grams, setGrams] = useState('')
-  const [saveForReuse, setSaveForReuse] = useState(false)
-  const [query, setQuery] = useState('')
+  const [start] = useState(() => (editing ? fromMeal(editing) : null))
+  const [stack, setStack] = useState<Step[]>([editing ? 'amount' : 'source'])
+  const [draft, setDraft] = useState<Draft>(start?.draft ?? EMPTY)
+  const [amount, setAmount] = useState(start ? String(round1(start.amount)) : '')
+  const [unit, setUnit] = useState<AmountUnit>(start?.unit ?? 'serving')
+  const [mealName, setMealName] = useState(editing ? (editing.mealName ?? OTHER_MEAL) : defaultMeal)
+  const [saveToMine, setSaveToMine] = useState(false)
+  const [savedToEdit, setSavedToEdit] = useState<SavedFood | null>(null)
   const [recent, setRecent] = useState<string[]>([])
+
   const add = useQueued<AddMealVars>(QUEUED.addMeal)
+  const update = useQueued<UpdateMealVars>(QUEUED.updateMeal)
+  const remove = useQueued<RemoveVars>(QUEUED.remove)
   const saveFood = useQueued<SaveFoodVars>(QUEUED.saveFood)
+  const updateSaved = useQueued<UpdateSavedFoodVars>(QUEUED.updateSavedFood)
 
   useEffect(() => {
     AsyncStorage.getItem(RECENT_KEY)
@@ -55,182 +130,346 @@ export default function LogFoodForm({
       .catch(() => {})
   }, [])
 
-  const fillFrom = (name: string, food: Parameters<typeof scaleFood>[0], count: number) => {
-    const scaled = scaleFood(food, count)
-    setDescription(name)
-    setN({ calories: text(scaled.calories), proteinG: text(scaled.proteinG), fatG: text(scaled.fatG), carbsG: text(scaled.carbsG) })
+  const step = stack[stack.length - 1]
+  const previous = stack[stack.length - 2]
+  const go = (next: Step) => animateLayout(() => setStack([...stack, next]))
+  const back = stack.length > 1 ? () => animateLayout(() => setStack(stack.slice(0, -1))) : undefined
+  const units = foodUnits(draft)
+
+  // A new food on the Amount page starts at one serving, or the label's
+  // serving, or 100 g. `replace`: the step it came from is done (typed values).
+  const toAmount = (food: Draft, replace = false) => {
+    const [first] = foodUnits(food)
+    setDraft(food)
+    setUnit(first)
+    setAmount(first === 'serving' ? '1' : String(food.servingG ?? 100))
+    setSaveToMine(false)
+    animateLayout(() => setStack([...(replace ? stack.slice(0, -1) : stack), 'amount']))
   }
 
-  const pick = (food: SavedFood) => {
-    animateLayout()
-    setPicked(food)
-    setProduct(null)
-    setServings('1')
-    setSaveForReuse(false)
-    fillFrom(food.name, food, 1)
+  // From the values form: back to Amount when it was opened from there
+  // (keeping the amount), otherwise on to it.
+  const valuesDone = (food: Draft) => {
+    if (previous === 'amount') {
+      setDraft(food)
+      if (!foodUnits(food).includes(unit)) setUnit(foodUnits(food)[0])
+      back?.()
+    } else toAmount(food, true)
   }
 
-  const changeServings = (value: string) => {
-    setServings(value)
-    if (picked && Number(value) > 0) fillFrom(picked.name, picked, Number(value))
-  }
+  const factor = Number(amount) > 0 && units.includes(unit) ? amountFactor(draft, Number(amount), unit) : null
+  const eaten = factor == null ? null : scaleFood(draft, factor)
+  const valid = eaten != null && eaten.calories != null && draft.name.trim() !== ''
 
-  // Start from the label's serving size when it has one, otherwise 100 g.
-  const pickProduct = (found: Product) => {
-    const start = found.servingG ?? 100
-    animateLayout()
-    setProduct(found)
-    setPicked(null)
-    setGrams(String(start))
-    fillFrom(found.name, found.per100g, start / 100)
-  }
-
-  const changeGrams = (value: string) => {
-    setGrams(value)
-    if (product && Number(value) > 0) fillFrom(product.name, product.per100g, Number(value) / 100)
-  }
-
-  const unpick = () => {
-    animateLayout()
-    setPicked(null)
-    setServings('1')
-  }
-
-  const save = () => {
-    if (picked) {
-      void AsyncStorage.setItem(RECENT_KEY, JSON.stringify([picked.id, ...recent.filter((id) => id !== picked.id)].slice(0, 50))).catch(() => {})
+  const submit = () => {
+    if (!valid) return
+    const values = {
+      description: draft.name.trim(),
+      calories: eaten.calories!,
+      proteinG: eaten.proteinG,
+      fatG: eaten.fatG,
+      carbsG: eaten.carbsG,
+      mealName: mealName === OTHER_MEAL ? null : mealName,
+      amount: Number(amount),
+      unit,
     }
-    const macros = { calories: Math.round(Number(n.calories)), proteinG: number(n.proteinG), fatG: number(n.fatG), carbsG: number(n.carbsG) }
-    if (saveForReuse && !picked) {
-      saveFood.mutate({ label: `Save ${description.trim()}`, food: { name: description.trim(), ...macros } })
+    if (editing) {
+      update.mutate({ label: values.description, id: editing.id, changes: values })
+    } else {
+      add.mutate({ label: values.description, meal: { id: randomUUID(), ...values, loggedAt: new Date().toISOString() } })
+      if (saveToMine) saveFood.mutate({ label: `Save ${values.description}`, food: savedFrom(draft) })
+      if (draft.savedId) {
+        const ids = [draft.savedId, ...recent.filter((id) => id !== draft.savedId)].slice(0, 50)
+        void AsyncStorage.setItem(RECENT_KEY, JSON.stringify(ids)).catch(() => {})
+      }
     }
-    add.mutate({
-      label: description.trim(),
-      meal: {
-        id: randomUUID(),
-        description: description.trim(),
-        ...macros,
-        mealName: mealName === OTHER_MEAL ? null : mealName,
-        loggedAt: new Date().toISOString(),
-      },
-    })
-    onDone()
+    onClose()
   }
 
-  const valid = description.trim() !== '' && n.calories !== '' && Number(n.calories) >= 0
+  const deleteLogged = () => {
+    if (!editing) return
+    remove.mutate({ label: `Remove ${editing.description}`, path: `/api/meals/${editing.id}`, cacheKey: ['today'], id: editing.id })
+    onClose()
+  }
+
+  return (
+    <Sheet visible title={TITLES[step]} onClose={onClose} onBack={back}>
+      {step === 'source' && (
+        <>
+          <Muted>Where does the food come from?</Muted>
+          <SourceOption icon={Star} title="My foods" detail="Foods you saved before" onPress={() => go('mine')} />
+          <SourceOption icon={Search} title="Search food database" detail="By name or barcode" onPress={() => go('database')} />
+          <SourceOption
+            icon={Pencil}
+            title="Enter manually"
+            detail="Type the nutrition values yourself"
+            onPress={() => {
+              setDraft(EMPTY)
+              go('values')
+            }}
+          />
+        </>
+      )}
+
+      {step === 'mine' && (
+        <MyFoods
+          recent={recent}
+          onPick={(food) => toAmount(fromSaved(food))}
+          onEdit={(food) => {
+            setSavedToEdit(food)
+            go('editSaved')
+          }}
+        />
+      )}
+
+      {step === 'database' && <ProductLookup onFound={(product) => toAmount(fromProduct(product))} />}
+
+      {step === 'values' && <ValuesForm draft={draft} submitLabel={previous === 'amount' ? 'Done' : 'Next'} onSubmit={valuesDone} />}
+
+      {step === 'editSaved' && savedToEdit && (
+        <ValuesForm
+          draft={fromSaved(savedToEdit)}
+          submitLabel="Save"
+          onSubmit={(food) => {
+            updateSaved.mutate({ label: `Save ${food.name}`, food: { id: savedToEdit.id, ...savedFrom(food) } })
+            back?.()
+          }}
+          onDelete={() => {
+            remove.mutate({ label: `Remove ${savedToEdit.name}`, path: `/api/saved-foods/${savedToEdit.id}`, cacheKey: ['savedFoods'], id: savedToEdit.id })
+            back?.()
+          }}
+        />
+      )}
+
+      {step === 'amount' && (
+        <>
+          <Card title={draft.name || 'Unnamed food'} right={<Button label="Edit values" icon={Pencil} variant="small" onPress={() => go('values')} />}>
+            {draft.brand && <Muted>{draft.brand}</Muted>}
+            <Muted>{perBasis(draft)}</Muted>
+            {draft.barcode && (
+              <Muted>
+                {draft.servingSize ? `Label serving: ${draft.servingSize}. ` : ''}Values from{' '}
+                <Text
+                  style={{ textDecorationLine: 'underline' }}
+                  accessibilityRole="link"
+                  onPress={() => void Linking.openURL(`https://world.openfoodfacts.org/product/${draft.barcode}`)}
+                >
+                  Open Food Facts
+                </Text>
+                , which anyone can edit: check them against the pack.
+              </Muted>
+            )}
+          </Card>
+
+          <Card title="How much did you eat?">
+            <View style={[styles.row, { alignItems: 'flex-end' }]}>
+              <Field label={unit === 'g' ? 'Grams' : 'Servings'} value={amount} onChange={setAmount} numeric />
+              {units.length > 1 && (
+                <View style={styles.row}>
+                  {units.map((u) => (
+                    <Chip key={u} label={u === 'g' ? 'g' : 'servings'} selected={unit === u} onPress={() => setUnit(u)} />
+                  ))}
+                </View>
+              )}
+            </View>
+            {units.length === 1 && (
+              <Muted>
+                {draft.basis === '100g'
+                  ? 'To log it in servings, add a serving weight in Edit values.'
+                  : 'To log it in grams, add the weight of one serving in Edit values.'}
+              </Muted>
+            )}
+            <View style={local.total}>
+              {eaten && eaten.calories != null ? (
+                <>
+                  <Text style={local.totalCalories}>{eaten.calories} cal</Text>
+                  <Muted>
+                    {[formatMacro(eaten.proteinG, ' g protein'), formatMacro(eaten.fatG, ' g fat'), formatMacro(eaten.carbsG, ' g carbs')]
+                      .filter(Boolean)
+                      .join(' · ') || 'No macros listed'}
+                  </Muted>
+                </>
+              ) : (
+                <Muted>{draft.calories == null ? 'This food has no calories: add them in Edit values.' : 'Enter how much you ate.'}</Muted>
+              )}
+            </View>
+          </Card>
+
+          <Card title="Meal">
+            <View style={styles.chips}>
+              {[...mealNames, OTHER_MEAL].map((name) => (
+                <Chip key={name} label={name} selected={mealName === name} onPress={() => setMealName(name)} />
+              ))}
+            </View>
+          </Card>
+
+          {!editing && !draft.savedId && (
+            <Pressable
+              onPress={() => setSaveToMine((v) => !v)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: saveToMine }}
+              style={local.switchRow}
+            >
+              <Switch
+                value={saveToMine}
+                onValueChange={setSaveToMine}
+                trackColor={{ true: colors.text, false: colors.border }}
+                thumbColor={saveToMine ? colors.main : colors.text}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.text}>Save to My foods</Text>
+                <Muted>To log it again in two taps.</Muted>
+              </View>
+            </Pressable>
+          )}
+
+          <Button label={editing ? 'Save changes' : 'Add'} onPress={submit} disabled={!valid} />
+          {editing && <Button label="Delete this food" icon={Trash2} variant="secondary" onPress={deleteLogged} />}
+        </>
+      )}
+    </Sheet>
+  )
+}
+
+function SourceOption({ icon: Icon, title, detail, onPress }: { icon: LucideIcon; title: string; detail: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}: ${detail}`}
+      style={({ pressed }) => [local.option, pressed && styles.dim]}
+    >
+      <Icon size={22} color={colors.text} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={local.optionTitle}>{title}</Text>
+        <Muted>{detail}</Muted>
+      </View>
+    </Pressable>
+  )
+}
+
+function MyFoods({ recent, onPick, onEdit }: { recent: string[]; onPick: (food: SavedFood) => void; onEdit: (food: SavedFood) => void }) {
+  const savedFoods = useSavedFoods()
+  const [query, setQuery] = useState('')
   const foods = savedFoods.data ?? []
   const q = query.trim().toLowerCase()
   const rank = (food: SavedFood) => {
     const i = recent.indexOf(food.id)
     return i === -1 ? Infinity : i
   }
-  // Recent first, then by name (the server's order; sort is stable).
-  const shown = (q ? foods.filter((food) => food.name.toLowerCase().includes(q)) : [...foods].sort((a, b) => rank(a) - rank(b))).slice(0, SHOWN)
+  // Recently logged first, then by name (the server's order; sort is stable).
+  const shown = q ? foods.filter((food) => food.name.toLowerCase().includes(q)) : [...foods].sort((a, b) => rank(a) - rank(b))
+
+  if (savedFoods.isPending) return <Muted>Loading…</Muted>
+  if (foods.length === 0) {
+    return <Muted>No saved foods yet. When you log a food, turn on “Save to My foods” and it shows up here.</Muted>
+  }
+  return (
+    <>
+      <Field label="Search my foods" value={query} onChange={setQuery} placeholder={`${foods.length} saved`} />
+      <View>
+        {shown.map((food) => (
+          <View key={food.id} style={local.food}>
+            <Pressable
+              onPress={() => onPick(food)}
+              accessibilityRole="button"
+              accessibilityLabel={`Log ${food.name}, ${perBasis(fromSaved(food))}`}
+              style={({ pressed }) => [{ flex: 1, paddingVertical: 8 }, pressed && styles.dim]}
+            >
+              <Text style={styles.text}>{food.name}</Text>
+              <Muted>{perBasis(fromSaved(food))}</Muted>
+            </Pressable>
+            {/* A food saved offline has no server id yet, so it can't be edited until it syncs. */}
+            {!food.id.startsWith('unsent:') && <IconButton icon={Pencil} label={`Edit ${food.name}`} onPress={() => onEdit(food)} />}
+          </View>
+        ))}
+        {shown.length === 0 && <Muted>No saved food matches “{query.trim()}”.</Muted>}
+      </View>
+    </>
+  )
+}
+
+// A food's name and values: typed in, corrected, or a saved food being edited.
+function ValuesForm({
+  draft,
+  submitLabel,
+  onSubmit,
+  onDelete,
+}: {
+  draft: Draft
+  submitLabel: string
+  onSubmit: (food: Draft) => void
+  onDelete?: () => void
+}) {
+  const [name, setName] = useState(draft.name)
+  const [basis, setBasis] = useState(draft.basis)
+  const [servingG, setServingG] = useState(text(draft.servingG))
+  const [n, setN] = useState({ calories: text(draft.calories), proteinG: text(draft.proteinG), fatG: text(draft.fatG), carbsG: text(draft.carbsG) })
+
+  const valid = name.trim() !== '' && n.calories !== '' && Number(n.calories) >= 0 && (servingG === '' || Number(servingG) > 0)
+  const submit = () =>
+    onSubmit({
+      ...draft,
+      name: name.trim(),
+      basis,
+      servingG: numberOrNull(servingG),
+      calories: Number(n.calories),
+      proteinG: numberOrNull(n.proteinG),
+      fatG: numberOrNull(n.fatG),
+      carbsG: numberOrNull(n.carbsG),
+    })
 
   return (
-    <View style={{ gap: 12 }}>
-      {picked ? (
-        <View style={[local.food, local.picked]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.text}>{picked.name}</Text>
-            <Muted>{summary(picked)} per serving</Muted>
-          </View>
-          <IconButton icon={X} label={`Clear ${picked.name}`} onPress={unpick} />
+    <>
+      <Card title="Food">
+        <Field label="Name" value={name} onChange={setName} placeholder="e.g. Chicken and rice" />
+      </Card>
+
+      <Card title="Nutrition values">
+        <Text style={styles.label}>The values below are for</Text>
+        <View style={styles.row}>
+          <Chip label="100 g" selected={basis === '100g'} onPress={() => setBasis('100g')} style={local.half} />
+          <Chip label="1 serving" selected={basis === 'serving'} onPress={() => setBasis('serving')} style={local.half} />
         </View>
-      ) : (
-        foods.length > 0 && (
-          <View style={{ gap: 6 }}>
-            <Field label="Saved foods" value={query} onChange={setQuery} placeholder="Search saved foods" />
-            <View>
-              {shown.map((food) => (
-                <Pressable
-                  key={food.id}
-                  onPress={() => pick(food)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${food.name}, ${summary(food)}`}
-                  style={({ pressed }) => [local.food, pressed && styles.dim]}
-                >
-                  <Text style={[styles.text, { flex: 1 }]} numberOfLines={1}>
-                    {food.name}
-                  </Text>
-                  <Muted>{summary(food)}</Muted>
-                </Pressable>
-              ))}
-              {shown.length === 0 && <Muted>No saved food matches “{query.trim()}”.</Muted>}
-              {!q && foods.length > SHOWN && <Muted>Search to see all {foods.length}.</Muted>}
-            </View>
-          </View>
-        )
-      )}
-
-      <ProductLookup onFound={pickProduct} />
-
-      <View style={{ gap: 6 }}>
-        <Text style={styles.label}>Meal</Text>
-        <View style={styles.chips}>
-          {[...mealNames, OTHER_MEAL].map((name) => (
-            <Chip key={name} label={name} selected={mealName === name} onPress={() => setMealName(name)} />
-          ))}
+        <Field
+          label={basis === '100g' ? 'Serving weight in g (optional)' : 'Weight of one serving in g (optional)'}
+          value={servingG}
+          onChange={setServingG}
+          numeric
+          placeholder={basis === '100g' ? 'Lets you log it in servings too' : 'Lets you log it in grams too'}
+        />
+        <View style={[styles.row, { flexWrap: 'wrap' }]}>
+          <Field label="Calories" value={n.calories} onChange={(v) => setN({ ...n, calories: v })} numeric />
+          <Field label="Protein (g)" value={n.proteinG} onChange={(v) => setN({ ...n, proteinG: v })} numeric />
+          <Field label="Fat (g)" value={n.fatG} onChange={(v) => setN({ ...n, fatG: v })} numeric />
+          <Field label="Carbs (g)" value={n.carbsG} onChange={(v) => setN({ ...n, carbsG: v })} numeric />
         </View>
-      </View>
+      </Card>
 
-      <Field label="Description" value={description} onChange={setDescription} placeholder="e.g. Chicken + rice" />
-      {picked && <Field label={`Servings of ${picked.name}`} value={servings} onChange={changeServings} numeric />}
-      {product && (
-        <View style={{ gap: 4 }}>
-          <Field label={`Amount eaten (g)${product.brand ? ` · ${product.brand}` : ''}`} value={grams} onChange={changeGrams} numeric />
-          <Muted>
-            {product.servingSize ? `Label serving: ${product.servingSize}. ` : ''}Values from{' '}
-            <Text
-              style={{ textDecorationLine: 'underline' }}
-              accessibilityRole="link"
-              onPress={() => void Linking.openURL(`https://world.openfoodfacts.org/product/${product.barcode}`)}
-            >
-              Open Food Facts
-            </Text>
-            , which is community-edited: check them against the pack.
-          </Muted>
-        </View>
-      )}
-      <View style={[styles.row, { flexWrap: 'wrap' }]}>
-        <Field label="Calories" value={n.calories} onChange={(v) => setN({ ...n, calories: v })} numeric />
-        <Field label="Protein (g)" value={n.proteinG} onChange={(v) => setN({ ...n, proteinG: v })} numeric />
-        <Field label="Fat (g)" value={n.fatG} onChange={(v) => setN({ ...n, fatG: v })} numeric />
-        <Field label="Carbs (g)" value={n.carbsG} onChange={(v) => setN({ ...n, carbsG: v })} numeric />
-      </View>
-
-      {!picked && (
-        <Pressable
-          onPress={() => setSaveForReuse((v) => !v)}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: saveForReuse }}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}
-        >
-          <Switch
-            value={saveForReuse}
-            onValueChange={setSaveForReuse}
-            trackColor={{ true: colors.text, false: colors.border }}
-            thumbColor={saveForReuse ? colors.main : colors.text}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <View style={{ flex: 1 }}>
-            <Muted>Save for reuse (macros are for one serving)</Muted>
-          </View>
-        </Pressable>
-      )}
-
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <Button label="Add" onPress={save} disabled={!valid} />
-        </View>
-        <Button label="Cancel" variant="secondary" onPress={onDone} />
-      </View>
-    </View>
+      <Button label={submitLabel} onPress={submit} disabled={!valid} />
+      {onDelete && <Button label="Delete saved food" icon={Trash2} variant="secondary" onPress={onDelete} />}
+    </>
   )
 }
 
 const local = StyleSheet.create({
-  food: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, borderBottomWidth: 1, borderBottomColor: colors.border },
-  picked: { paddingLeft: 12, paddingVertical: 4, paddingRight: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 12 },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    minHeight: 72,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  optionTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
+  food: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, borderBottomWidth: 1, borderBottomColor: colors.border },
+  half: { flex: 1, alignItems: 'center' },
+  total: { gap: 2, padding: 12, borderRadius: 12, backgroundColor: colors.main },
+  totalCalories: { fontSize: 22, fontWeight: '700', color: colors.text },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
 })

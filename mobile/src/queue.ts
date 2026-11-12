@@ -17,10 +17,18 @@ import { api } from './api'
 type Label = { label: string } // what the "couldn't save" list calls it
 
 export type AddMealVars = Label & {
-  meal: Pick<Meal, 'id' | 'description' | 'calories' | 'proteinG' | 'fatG' | 'carbsG' | 'mealName' | 'loggedAt'>
+  meal: Pick<Meal, 'id' | 'description' | 'calories' | 'proteinG' | 'fatG' | 'carbsG' | 'mealName' | 'amount' | 'unit' | 'loggedAt'>
 }
 // null = "Other". A PATCH to a value: repeating it is harmless.
 export type MoveMealVars = Label & { id: string; mealName: string | null }
+// Edits a logged food (moveMeal is the older, mealName-only form: still
+// registered so a move saved by an older app version is still sent).
+export type UpdateMealVars = Label & {
+  id: string
+  changes: Pick<Meal, 'description' | 'calories' | 'proteinG' | 'fatG' | 'carbsG' | 'mealName' | 'amount' | 'unit'>
+}
+// PUT replaces the row: repeating it is harmless.
+export type UpdateSavedFoodVars = Label & { food: SavedFood }
 export type AddWeightVars = Label & { entry: WeightEntry }
 export type UpdateMeVars = Label & {
   changes: Partial<Pick<Me, 'heightCm' | 'sex' | 'age' | 'activityLevel' | 'weightGoalKg' | 'bodyFatGoalPercent'>>
@@ -59,6 +67,8 @@ export const QUEUED = {
   remove: ['queue', 'remove'],
   addMeal: ['queue', 'addMeal'],
   moveMeal: ['queue', 'moveMeal'],
+  updateMeal: ['queue', 'updateMeal'],
+  updateSavedFood: ['queue', 'updateSavedFood'],
   addWeight: ['queue', 'addWeight'],
   updateMe: ['queue', 'updateMe'],
   logDay: ['queue', 'logDay'],
@@ -125,6 +135,29 @@ export function registerQueuedMutations(queryClient: QueryClient) {
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['today'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.updateMeal, {
+    ...common,
+    mutationFn: ({ id, changes }: UpdateMealVars) => api(`/api/meals/${id}`, { method: 'PATCH', body: JSON.stringify(changes) }),
+    onMutate: ({ id, changes }: UpdateMealVars) => {
+      queryClient.setQueriesData<{ meals: Meal[] }>({ queryKey: ['today'] }, (old) =>
+        old ? { ...old, meals: old.meals.map((m) => (m.id === id ? { ...m, ...changes } : m)) } : old,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['today'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.updateSavedFood, {
+    ...common,
+    mutationFn: ({ food: { id, ...food } }: UpdateSavedFoodVars) =>
+      api(`/api/saved-foods/${id}`, { method: 'PUT', body: JSON.stringify(nullsOmitted(food)) }),
+    onMutate: ({ food }: UpdateSavedFoodVars) => {
+      queryClient.setQueryData<SavedFood[]>(['savedFoods'], (old) =>
+        old ? old.map((f) => (f.id === food.id ? food : f)).sort((a, b) => a.name.localeCompare(b.name)) : old,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['savedFoods'] }),
   })
 
   queryClient.setMutationDefaults(QUEUED.addWeight, {

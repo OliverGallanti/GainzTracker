@@ -9,7 +9,11 @@ const saveSchema = z.object({
   proteinG: z.number().nonnegative().optional(),
   carbsG: z.number().nonnegative().optional(),
   fatG: z.number().nonnegative().optional(),
+  basis: z.enum(['serving', '100g']).default('serving'),
+  servingG: z.number().positive().optional(),
 })
+
+const isDuplicateName = (err: unknown) => (err as { code?: string }).code === 'P2002'
 
 export default async function savedFoodRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)
@@ -31,14 +35,37 @@ export default async function savedFoodRoutes(app: FastifyInstance) {
     }
 
     const userId = request.userId
-    const { name, calories, proteinG = null, carbsG = null, fatG = null } = parsed.data
-    const data = { calories, proteinG, carbsG, fatG }
+    const { name, calories, proteinG = null, carbsG = null, fatG = null, basis, servingG = null } = parsed.data
+    const data = { calories, proteinG, carbsG, fatG, basis, servingG }
     const food = await prisma.savedFood.upsert({
       where: { userId_name: { userId, name } },
       create: { ...data, name, userId },
       update: data,
     })
     return reply.code(201).send(food)
+  })
+
+  // Replace a saved food, name included (a rename can collide with another one).
+  app.put<{ Params: { id: string } }>('/saved-foods/:id', async (request, reply) => {
+    const parsed = saveSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.badRequest(parsed.error.message)
+    }
+
+    const { proteinG = null, carbsG = null, fatG = null, servingG = null, ...rest } = parsed.data
+    try {
+      const { count } = await prisma.savedFood.updateMany({
+        where: { id: request.params.id, userId: request.userId },
+        data: { ...rest, proteinG, carbsG, fatG, servingG },
+      })
+      if (count === 0) {
+        return reply.notFound()
+      }
+    } catch (err) {
+      if (isDuplicateName(err)) return reply.conflict('You already have a saved food with that name')
+      throw err
+    }
+    return reply.code(204).send()
   })
 
   app.delete<{ Params: { id: string } }>('/saved-foods/:id', async (request, reply) => {

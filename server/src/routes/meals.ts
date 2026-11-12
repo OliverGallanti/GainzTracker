@@ -12,10 +12,23 @@ const createSchema = z.object({
   carbsG: z.number().nonnegative().optional(),
   fatG: z.number().nonnegative().optional(),
   mealName: z.string().trim().min(1).max(30).optional(),
+  amount: z.number().positive().optional(),
+  unit: z.enum(['g', 'serving']).optional(),
   loggedAt: z.coerce.date().optional(),
 })
 
-const moveSchema = z.object({ mealName: z.string().trim().min(1).max(30).nullable() })
+// Any subset; a macro, mealName, amount or unit sent as null is cleared
+// (mealName null = "Other").
+const updateSchema = z.object({
+  description: z.string().min(1).optional(),
+  calories: z.number().int().nonnegative().optional(),
+  proteinG: z.number().nonnegative().nullable().optional(),
+  carbsG: z.number().nonnegative().nullable().optional(),
+  fatG: z.number().nonnegative().nullable().optional(),
+  mealName: z.string().trim().min(1).max(30).nullable().optional(),
+  amount: z.number().positive().nullable().optional(),
+  unit: z.enum(['g', 'serving']).nullable().optional(),
+})
 
 const listQuerySchema = z.object({
   since: z.coerce.date().optional(),
@@ -60,9 +73,9 @@ export default async function mealRoutes(app: FastifyInstance) {
     return reply.code(201).send(entry)
   })
 
-  // Move a food to another meal slot; null = "Other".
+  // Edit a logged food: move it to another meal, change the amount or values.
   app.patch<{ Params: { id: string } }>('/meals/:id', async (request, reply) => {
-    const parsed = moveSchema.safeParse(request.body)
+    const parsed = updateSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.badRequest(parsed.error.message)
     }

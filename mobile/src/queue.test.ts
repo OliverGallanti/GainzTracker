@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryCache, QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, newDayToday, queuedItemId, reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
+import { QUEUED, newDayToday, queuedItemId, reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type UpdateMealVars, type UpdateSavedFoodVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -219,6 +219,37 @@ describe('moving a food between meals', () => {
     onlineManager.setOnline(true)
     await client.resumePausedMutations()
     expect(api.mock.calls[0]).toEqual(['/api/meals/meal-1', { method: 'PATCH', body: JSON.stringify({ mealName: null }) }])
+  })
+})
+
+describe('editing a food', () => {
+  it('changes a logged food on screen straight away and sends the changes, nulls included', async () => {
+    const client = makeClient()
+    client.setQueryData(['today', today], { goal: null, meals: [{ id: 'meal-1', description: 'Banana', calories: 93, mealName: 'Lunch' }] })
+    const changes = { description: 'Banana', calories: 140, proteinG: 2, fatG: null, carbsG: 33, mealName: 'Dinner', amount: 150, unit: 'g' as const }
+
+    void mutate<UpdateMealVars>(client, QUEUED.updateMeal, { label: 'Banana', id: 'meal-1', changes })
+    await flush()
+    expect(client.getQueryData(['today', today])).toEqual({ goal: null, meals: [{ id: 'meal-1', ...changes }] })
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls[0]).toEqual(['/api/meals/meal-1', { method: 'PATCH', body: JSON.stringify(changes) }])
+  })
+
+  it('replaces a saved food in place, keeping the list sorted, and PUTs it without the id', async () => {
+    const client = makeClient()
+    client.setQueryData(['savedFoods'], [{ id: 'a', name: 'Apple', calories: 95 }, { id: 'o', name: 'Oats', calories: 389 }])
+    const food = { id: 'o', name: 'Avena', calories: 380, proteinG: 13, fatG: null, carbsG: 60, basis: '100g' as const, servingG: 40 }
+
+    void mutate<UpdateSavedFoodVars>(client, QUEUED.updateSavedFood, { label: 'Avena', food })
+    await flush()
+    expect(client.getQueryData<{ name: string }[]>(['savedFoods'])!.map((f) => f.name)).toEqual(['Apple', 'Avena'])
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls[0][0]).toBe('/api/saved-foods/o')
+    expect(JSON.parse(api.mock.calls[0][1].body)).toEqual({ name: 'Avena', calories: 380, proteinG: 13, carbsG: 60, basis: '100g', servingG: 40 })
   })
 })
 

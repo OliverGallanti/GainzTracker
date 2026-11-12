@@ -1,4 +1,4 @@
-import type { Macros, Meal } from './types'
+import type { AmountUnit, Macros, Meal } from './types'
 
 type Totals = { calories: number; proteinG: number; fatG: number; carbsG: number }
 
@@ -62,3 +62,27 @@ export function scaleFood(food: Scalable, servings: number): Scalable {
     carbsG: scale(food.carbsG),
   }
 }
+
+// A food's values and what they're for: one serving, or 100 g; servingG is a
+// serving's weight when known.
+export type FoodBasis = { basis: 'serving' | '100g'; servingG: number | null }
+
+// The units it can be logged in, its own unit first: grams need a known weight
+// per serving, servings a known serving.
+export function foodUnits({ basis, servingG }: FoodBasis): AmountUnit[] {
+  const other: AmountUnit = basis === '100g' ? 'serving' : 'g'
+  return servingG ? [basis === '100g' ? 'g' : 'serving', other] : [basis === '100g' ? 'g' : 'serving']
+}
+
+// How many times the food's values were eaten, for scaleFood. Only call with a
+// unit foodUnits allows.
+export function amountFactor({ basis, servingG }: FoodBasis, amount: number, unit: AmountUnit) {
+  if (unit === 'g') return basis === '100g' ? amount / 100 : amount / servingG!
+  return basis === 'serving' ? amount : (amount * servingG!) / 100
+}
+
+export const basisLabel = ({ basis, servingG }: FoodBasis) =>
+  basis === '100g' ? 'per 100 g' : servingG ? `per serving (${servingG} g)` : 'per serving'
+
+export const formatAmount = (amount: number, unit: AmountUnit) =>
+  unit === 'g' ? `${amount} g` : `${amount} serving${amount === 1 ? '' : 's'}`

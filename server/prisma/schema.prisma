@@ -180,13 +180,20 @@ model MacroEntry {
   // reference: null (or a name the user has since renamed away) simply shows
   // under "Other", and the card only displays today, so nothing is orphaned for long.
   mealName    String?
+  // How much was eaten, e.g. 120 "g" or 2 "serving": shown on the row, and what
+  // an edit rescales the macros by. Null on foods logged before it existed.
+  amount      Float?
+  unit        String? // "g" | "serving"
   loggedAt    DateTime @default(now())
 
   @@index([userId, loggedAt])
 }
 
-// A food or recipe the user saved to log again: macros for ONE serving, so
-// logging it is a servings multiplier. One row per name — saving the same name
+// A food or recipe the user saved to log again. Its macros are for one serving
+// (basis "serving") or for 100 g (basis "100g"); servingG, when known, is the
+// weight of one serving, which lets it be logged in either unit. Rows from
+// before basis existed are per serving, which is what they always were.
+// One row per name — saving the same name
 // again updates it. Deliberately not ingredient-based (see server/README.md).
 model SavedFood {
   id        String   @id @default(cuid())
@@ -197,6 +204,8 @@ model SavedFood {
   proteinG  Float?
   carbsG    Float?
   fatG      Float?
+  basis     String   @default("serving") // "serving" | "100g"
+  servingG  Float?
   createdAt DateTime @default(now())
 
   @@unique([userId, name])

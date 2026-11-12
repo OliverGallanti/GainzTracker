@@ -30,10 +30,14 @@ export interface Macros {
   carbsG: number | null
 }
 
+export type AmountUnit = 'g' | 'serving'
+
 export interface Meal extends Macros {
   id: string
   description: string
   mealName: string | null
+  amount?: number | null // e.g. 120 g or 2 servings; null on older entries
+  unit?: AmountUnit | null
   loggedAt: string
 }
 
@@ -61,9 +65,13 @@ export interface MacroGoal {
   calorieTarget: number | null
 }
 
+// Macros per one serving or per 100 g; servingG = the weight of one serving,
+// when known (it's what lets a food be logged in both units).
 export interface SavedFood extends Macros {
   id: string
   name: string
+  basis?: 'serving' | '100g' // absent = 'serving', as every food was before
+  servingG?: number | null
 }
 
 // GET /api/products/:barcode (Open Food Facts, normalized by the server).
