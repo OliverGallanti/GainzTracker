@@ -75,6 +75,12 @@
         "projectId": "50f8c114-fc03-4738-a8f8-3b92515725eb"
       }
     },
-    "owner": "olivergallanti"
+    "owner": "olivergallanti",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/50f8c114-fc03-4738-a8f8-3b92515725eb"
+    }
   }
 }
