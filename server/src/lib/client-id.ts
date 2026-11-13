@@ -1,12 +1,6 @@
 import type { FastifyReply } from 'fastify'
-import { z } from 'zod'
 
-// An offline client (the mobile app) creates records with an id it made itself
-// and may send the same create again after a dropped connection. Accepting that
-// id makes the retry safe: the second request finds the first row and returns it
-// instead of creating a duplicate. The browser doesn't send one; the database
-// default id is used then.
-export const clientId = z.string().uuid().optional()
+// The client-made id itself is validated by `clientId` in @gainz/shared/schemas.
 
 // Call before creating. If a row with the client's id already exists, replies
 // (200 with that row, or 409 if it belongs to someone else) and returns true.

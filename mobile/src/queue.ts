@@ -1,5 +1,6 @@
 import { MutationObserver, useMutation, useMutationState, useQueryClient, type Mutation, type QueryClient } from '@tanstack/react-query'
 import type { MacroGoal, Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
+import type { LiftGoalsBody, UpdateLogBody, UpdateMealBody, UpdateSplitBody } from '@gainz/shared/schemas'
 import { api } from './api'
 
 // The offline write queue. Each kind of write registers its send function once
@@ -23,10 +24,7 @@ export type AddMealVars = Label & {
 export type MoveMealVars = Label & { id: string; mealName: string | null }
 // Edits a logged food (moveMeal is the older, mealName-only form: still
 // registered so a move saved by an older app version is still sent).
-export type UpdateMealVars = Label & {
-  id: string
-  changes: Pick<Meal, 'description' | 'calories' | 'proteinG' | 'fatG' | 'carbsG' | 'mealName' | 'amount' | 'unit'>
-}
+export type UpdateMealVars = Label & { id: string; changes: UpdateMealBody }
 // PUT replaces the row: repeating it is harmless.
 export type UpdateSavedFoodVars = Label & { food: SavedFood }
 export type AddWeightVars = Label & { entry: WeightEntry }
@@ -38,7 +36,7 @@ export type UpdateMeVars = Label & {
 export type SaveFoodVars = Label & { food: Omit<SavedFood, 'id'> }
 export type AddSetVars = Label & { set: WorkoutSet }
 // PUT /api/lift-goals replaces only the lifts it names: repeating it is harmless.
-export type SetLiftGoalsVars = Label & { goals: Record<string, number> }
+export type SetLiftGoalsVars = Label & { goals: LiftGoalsBody }
 export type LogDayVars = Label & {
   splitId: string
   log: Pick<SplitLog, 'id' | 'dayIndex' | 'completed' | 'loggedAt'>
@@ -49,9 +47,9 @@ export type LogDayVars = Label & {
 export type UpdateLogVars = Label & {
   splitId: string
   logId: string
-  changes: Partial<Pick<SplitLog, 'dayIndex' | 'completed' | 'durationMinutes'>>
+  changes: UpdateLogBody
 }
-export type UpdateSplitVars = Label & { splitId: string; daysPerWeek: number }
+export type UpdateSplitVars = Label & { splitId: string } & UpdateSplitBody
 // Creating a routine makes it the active one (the server deactivates the rest).
 export type CreateSplitVars = Label & { split: Pick<WorkoutSplit, 'id' | 'name' | 'days'> & { daysPerWeek: number } }
 

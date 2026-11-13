@@ -1,4 +1,4 @@
-// Must match LIFTS in server/src/routes/lift-goals.ts (a test pins this list).
+// The server accepts goals only for these (liftGoalsSchema in schemas.ts).
 // These are the same display names WorkoutSet.exerciseName and LiftGoal
 // .exerciseName use, so a lift's name is its own key everywhere — there's no
 // separate name -> field mapping to keep in sync.

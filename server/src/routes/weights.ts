@@ -1,16 +1,9 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
-import { clientId, repliedWithExisting } from '../lib/client-id.ts'
+import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
-
-const createSchema = z.object({
-  id: clientId,
-  weightKg: z.number().positive(),
-  bodyFatPercent: z.number().min(0).max(100).optional(),
-  loggedAt: z.coerce.date().optional(),
-  note: z.string().optional(),
-})
+import { createWeightSchema as createSchema } from '@gainz/shared/schemas'
 
 const listQuerySchema = z.object({
   since: z.coerce.date().optional(),

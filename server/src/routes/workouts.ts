@@ -1,33 +1,9 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
-import { clientId, repliedWithExisting } from '../lib/client-id.ts'
+import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
-
-const exerciseSchema = z.object({
-  name: z.string().min(1),
-  targetSets: z.number().int().positive().optional(),
-  targetReps: z.number().int().positive().optional(),
-  order: z.number().int().nonnegative().optional(),
-})
-
-const createRoutineSchema = z.object({
-  id: clientId,
-  name: z.string().min(1),
-  exercises: z.array(exerciseSchema),
-  notes: z.string().optional(),
-})
-
-const createSetSchema = z.object({
-  id: clientId,
-  routineId: z.string().optional(),
-  splitLogId: z.string().optional(),
-  exerciseName: z.string().min(1),
-  weightKg: z.number().nonnegative().optional(),
-  reps: z.number().int().nonnegative().optional(),
-  rpe: z.number().min(6).max(10).multipleOf(0.5).optional(), // RPE_VALUES in shared/src/lifts.ts
-  performedAt: z.coerce.date().optional(),
-})
+import { createRoutineSchema, createSetSchema } from '@gainz/shared/schemas'
 
 const listSetsQuerySchema = z.object({
   splitLogId: z.string().optional(),

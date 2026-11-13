@@ -1,42 +1,9 @@
 import type { FastifyInstance } from 'fastify'
-import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
-import { clientId, repliedWithExisting } from '../lib/client-id.ts'
+import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
+import { createLogSchema, createSplitSchema, updateLogSchema, updateSplitSchema } from '@gainz/shared/schemas'
 
-// How many completed days make a good week (the weekly streak's threshold). Optional:
-// without it the client uses the number of days the routine lists.
-const daysPerWeekSchema = z.number().int().min(1).max(7)
-
-const createSplitSchema = z.object({
-  id: clientId,
-  name: z.string().min(1),
-  days: z.array(z.string().min(1)).min(1),
-  daysPerWeek: daysPerWeekSchema.optional(),
-})
-
-const updateSplitSchema = z.object({ daysPerWeek: daysPerWeekSchema })
-
-// `dayIndex` is the user's pick from the split's days, in any order — there is
-// no forced rotation. `dayStart`/`dayEnd` bound the local calendar day being
-// logged (the client knows its own timezone); `loggedAt` places the log inside
-// it, so past days can be filled in.
-const createLogSchema = z.object({
-  id: clientId,
-  completed: z.boolean(),
-  dayIndex: z.number().int().min(0),
-  dayStart: z.coerce.date(),
-  dayEnd: z.coerce.date(),
-  loggedAt: z.coerce.date(),
-})
-
-const updateLogSchema = z
-  .object({
-    durationMinutes: z.number().int().positive().optional(),
-    completed: z.boolean().optional(),
-    dayIndex: z.number().int().min(0).optional(),
-  })
-  .refine((data) => Object.keys(data).length > 0, { message: 'No fields to update' })
 
 export default async function workoutSplitRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)

@@ -1,24 +1,8 @@
 import type { FastifyInstance } from 'fastify'
-import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
 import { prisma } from '../db.ts'
+import { liftGoalsSchema as updateSchema } from '@gainz/shared/schemas'
 
-// Must match BIG_FOUR_LIFTS in src/lib/lifts.js on the client (a client test
-// pins that list). The names are the same display names WorkoutSet.exerciseName
-// uses. Restricting to a known set keeps the table from collecting arbitrary
-// user-supplied keys; adding a lift is a one-line change here and on the
-// client, with no schema change.
-const LIFTS = ['Deadlift', 'Squat', 'Bench Press', 'Overhead Press']
-
-// { "Deadlift": 200, "Squat": 150 } — only the lifts being changed. An explicit
-// refine rather than an enum-keyed z.record, which means "every key required"
-// in zod 4 but "any subset" in zod 3.
-const updateSchema = z
-  .record(z.string(), z.number().positive())
-  .refine((goals) => Object.keys(goals).length > 0, { message: 'No goals to update' })
-  .refine((goals) => Object.keys(goals).every((name) => LIFTS.includes(name)), {
-    message: 'Unknown lift',
-  })
 
 // Rows -> { [exerciseName]: goalKg }, the shape the client looks goals up by.
 // A lift with no goal simply has no key.

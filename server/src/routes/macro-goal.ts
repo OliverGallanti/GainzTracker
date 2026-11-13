@@ -1,14 +1,8 @@
 import type { FastifyInstance } from 'fastify'
-import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
 import { prisma } from '../db.ts'
+import { macroGoalSchema as upsertSchema } from '@gainz/shared/schemas'
 
-const upsertSchema = z.object({
-  proteinG: z.number().positive(),
-  fatG: z.number().positive(),
-  carbsG: z.number().positive(),
-  calorieTarget: z.number().int().positive().optional(),
-})
 
 export default async function macroGoalRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)

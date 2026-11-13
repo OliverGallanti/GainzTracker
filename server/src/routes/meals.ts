@@ -1,34 +1,9 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
-import { clientId, repliedWithExisting } from '../lib/client-id.ts'
+import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
-
-const createSchema = z.object({
-  id: clientId,
-  description: z.string().min(1),
-  calories: z.number().int().nonnegative(),
-  proteinG: z.number().nonnegative().optional(),
-  carbsG: z.number().nonnegative().optional(),
-  fatG: z.number().nonnegative().optional(),
-  mealName: z.string().trim().min(1).max(30).optional(),
-  amount: z.number().positive().optional(),
-  unit: z.enum(['g', 'serving']).optional(),
-  loggedAt: z.coerce.date().optional(),
-})
-
-// Any subset; a macro, mealName, amount or unit sent as null is cleared
-// (mealName null = "Other").
-const updateSchema = z.object({
-  description: z.string().min(1).optional(),
-  calories: z.number().int().nonnegative().optional(),
-  proteinG: z.number().nonnegative().nullable().optional(),
-  carbsG: z.number().nonnegative().nullable().optional(),
-  fatG: z.number().nonnegative().nullable().optional(),
-  mealName: z.string().trim().min(1).max(30).nullable().optional(),
-  amount: z.number().positive().nullable().optional(),
-  unit: z.enum(['g', 'serving']).nullable().optional(),
-})
+import { createMealSchema as createSchema, updateMealSchema as updateSchema } from '@gainz/shared/schemas'
 
 const listQuerySchema = z.object({
   since: z.coerce.date().optional(),

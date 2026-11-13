@@ -1,17 +1,8 @@
 import type { FastifyInstance } from 'fastify'
-import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
 import { prisma } from '../db.ts'
+import { saveFoodSchema as saveSchema } from '@gainz/shared/schemas'
 
-const saveSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  calories: z.number().int().nonnegative(),
-  proteinG: z.number().nonnegative().optional(),
-  carbsG: z.number().nonnegative().optional(),
-  fatG: z.number().nonnegative().optional(),
-  basis: z.enum(['serving', '100g']).default('serving'),
-  servingG: z.number().positive().optional(),
-})
 
 const isDuplicateName = (err: unknown) => (err as { code?: string }).code === 'P2002'
 
