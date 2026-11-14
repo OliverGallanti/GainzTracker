@@ -3,6 +3,7 @@ import type { Me } from '@gainz/shared/types'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import Footer from './components/Footer'
+import { queryClient } from './lib/useLoad'
 
 function App() {
   const [authStatus, setAuthStatus] = useState('loading')
@@ -43,7 +44,13 @@ function App() {
   return (
     <div className="app-background flex min-h-dvh flex-col">
       {authStatus === 'authed' && user && (
-        <Dashboard user={user} onLogout={() => setAuthStatus('anon')} />
+        <Dashboard
+          user={user}
+          onLogout={() => {
+            queryClient.clear() // the next account must not see this one's data
+            setAuthStatus('anon')
+          }}
+        />
       )}
       {authStatus === 'anon' && <Login onAuthenticated={checkAuth} />}
       <Footer />

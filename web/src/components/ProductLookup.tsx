@@ -7,10 +7,13 @@ import BarcodeScanner from './BarcodeScanner'
 
 const BARCODE = /^\d{8,14}$/
 
-// Find a food on Open Food Facts: by name (for food without a barcode at hand),
-// or by barcode, scanned with the camera or typed for when there's no camera.
-// Name search runs on Enter or the button, not per keystroke: OFF is a free service. Calls onFound(product) with the Open Food Facts result.
-// Not a <form>: this sits inside the meal form, and forms can't nest.
+const SECTION = 'rounded-xl border border-secondary/30 p-4'
+
+// The Food database step of Log food (LogFoodDialog): Open Food Facts by name
+// (for food without a barcode at hand), or by barcode, scanned with the camera
+// or typed for when there's no camera. Calls onFound(product). Name search runs
+// on Enter or the button, not per keystroke: OFF is a free service.
+
 function ProductLookup({ onFound }: { onFound: (product: Product) => void }) {
   const [scanning, setScanning] = useState(false)
   const [code, setCode] = useState('')
@@ -41,16 +44,17 @@ function ProductLookup({ onFound }: { onFound: (product: Product) => void }) {
   }
 
   return (
-    <div>
-      <span className="text-xs text-third/60">Food database</span>
-      <div className="mt-1 flex gap-2">
+    <div className="flex flex-col gap-4">
+      <section className={SECTION}>
+        <h3 className="mb-2 text-sm font-semibold text-third">Search by name</h3>
+        <div className="flex gap-2">
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return
-            e.preventDefault() // Enter would otherwise submit the meal form around this
+            e.preventDefault()
             search.submit(query)
           }}
           placeholder="Search by name, e.g. plátano canario"
@@ -91,7 +95,12 @@ function ProductLookup({ onFound }: { onFound: (product: Product) => void }) {
           )}
         </ul>
       )}
-      <div className="mt-2 flex gap-2">
+        <p className="mt-2 text-xs text-third/60">Results come from Open Food Facts, which anyone can edit: check them against the pack.</p>
+      </section>
+
+      <section className={SECTION}>
+        <h3 className="mb-2 text-sm font-semibold text-third">Barcode</h3>
+        <div className="flex gap-2">
         <button
           type="button"
           onClick={() => setScanning((v) => !v)}
@@ -107,7 +116,7 @@ function ProductLookup({ onFound }: { onFound: (product: Product) => void }) {
           onChange={(e) => setCode(e.target.value.trim())}
           onKeyDown={(e) => {
             if (e.key !== 'Enter') return
-            e.preventDefault() // Enter would otherwise submit the meal form around this
+            e.preventDefault()
             lookup(code)
           }}
           placeholder="or type the number"
@@ -131,6 +140,7 @@ function ProductLookup({ onFound }: { onFound: (product: Product) => void }) {
       )}
 
       {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+      </section>
     </div>
   )
 }

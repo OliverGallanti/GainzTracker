@@ -28,7 +28,7 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
   // Saving is delete-then-recreate, so an editor that failed to read the
   // existing rows would wipe them on save. A failed load therefore blocks the
   // form entirely (see the render below) instead of showing a blank one.
-  const existing = useLoad(() => api<WorkoutSet[]>(`/api/workout-sets?splitLogId=${log.id}`), log.id)
+  const existing = useLoad(['workoutSets', log.id], () => api<WorkoutSet[]>(`/api/workout-sets?splitLogId=${log.id}`))
   const loadError = existing.error
 
   // The rows are the server's rows until the user edits; from then on the

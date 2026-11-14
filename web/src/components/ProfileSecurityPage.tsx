@@ -53,7 +53,7 @@ function ProfileSecurityPage({ user, onBack }: { user: Me; onBack: () => void })
   // A failed load is kept distinct from an empty list on purpose — "no passkeys
   // registered" and "we couldn't check" mean very different things on a
   // security screen.
-  const passkeys = useLoad(() => api<Passkey[]>('/api/passkeys'))
+  const passkeys = useLoad(['passkeys'], () => api<Passkey[]>('/api/passkeys'))
 
   const {
     submit: handleAddPasskey,

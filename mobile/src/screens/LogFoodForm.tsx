@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { randomUUID } from 'expo-crypto'
-import { amountFactor, basisLabel, foodUnits, formatMacro, OTHER_MEAL, scaleFood, type FoodBasis } from '@gainz/shared/macros'
-import type { AmountUnit, Meal, Product, SavedFood } from '@gainz/shared/types'
+import { EMPTY_FOOD, eaten as eatenFor, fromMeal, fromProduct, fromSaved, perBasis, savedFrom, sortSavedFoods, startAmount, type FoodDraft } from '@gainz/shared/foods'
+import { foodUnits, formatMacro, OTHER_MEAL } from '@gainz/shared/macros'
+import type { AmountUnit, Meal, SavedFood } from '@gainz/shared/types'
 import type { LucideIcon } from 'lucide-react-native'
 import { Pencil, Search, Star, Trash2 } from '../icons'
 import { useSavedFoods } from '../queries'
@@ -18,19 +19,6 @@ import ProductLookup from './ProductLookup'
 // is edited. Writes are queued (queue.ts): they show up straight away and are
 // sent now, or when the phone is back online.
 
-// A food's values per one serving or per 100 g, wherever it came from.
-type Draft = FoodBasis & {
-  name: string
-  calories: number | null
-  proteinG: number | null
-  fatG: number | null
-  carbsG: number | null
-  savedId?: string // from My foods
-  barcode?: string // from Open Food Facts (for the credit link)
-  brand?: string | null
-  servingSize?: string | null // the label's own text, e.g. "30 g"
-}
-
 type Step = 'source' | 'mine' | 'database' | 'values' | 'amount' | 'editSaved'
 const TITLES: Record<Step, string> = {
   source: 'Log food',
@@ -44,54 +32,6 @@ const TITLES: Record<Step, string> = {
 const round1 = (n: number) => Math.round(n * 10) / 10
 const text = (value: number | null) => (value == null ? '' : String(round1(value)))
 const numberOrNull = (value: string) => (value.trim() === '' ? null : Number(value))
-const perBasis = (food: Pick<Draft, 'calories' | 'proteinG'> & FoodBasis) =>
-  [food.calories == null ? null : `${Math.round(food.calories)} cal`, formatMacro(food.proteinG, 'g P')].filter(Boolean).join(' · ') +
-  ` ${basisLabel(food)}`
-
-const fromSaved = (food: SavedFood): Draft => ({ ...food, basis: food.basis ?? 'serving', servingG: food.servingG ?? null, savedId: food.id })
-const fromProduct = (p: Product): Draft => ({
-  name: p.name,
-  ...p.per100g,
-  basis: '100g',
-  servingG: p.servingG,
-  barcode: p.barcode,
-  brand: p.brand,
-  servingSize: p.servingSize,
-})
-// A logged food back into values per unit, so changing the amount rescales it.
-// Older entries have no amount: they count as one serving of what was logged.
-function fromMeal(meal: Meal): { draft: Draft; amount: number; unit: AmountUnit } {
-  const amount = meal.amount ?? 1
-  const unit = meal.unit ?? 'serving'
-  const per = unit === 'g' ? 100 / amount : 1 / amount
-  const scale = (v: number | null) => (v == null ? null : v * per)
-  return {
-    draft: {
-      name: meal.description,
-      calories: meal.calories * per,
-      proteinG: scale(meal.proteinG),
-      fatG: scale(meal.fatG),
-      carbsG: scale(meal.carbsG),
-      basis: unit === 'g' ? '100g' : 'serving',
-      servingG: null,
-    },
-    amount,
-    unit,
-  }
-}
-const EMPTY: Draft = { name: '', calories: null, proteinG: null, fatG: null, carbsG: null, basis: '100g', servingG: null }
-
-// Saved foods store whole calories (the server's column is an integer).
-const savedFrom = (food: Draft): Omit<SavedFood, 'id'> => ({
-  name: food.name.trim(),
-  calories: Math.round(food.calories ?? 0),
-  proteinG: food.proteinG == null ? null : round1(food.proteinG),
-  fatG: food.fatG == null ? null : round1(food.fatG),
-  carbsG: food.carbsG == null ? null : round1(food.carbsG),
-  basis: food.basis,
-  servingG: food.servingG,
-})
-
 // Saved foods last logged, newest first, kept on the phone only (the server
 // lists them by name). ponytail: per phone, not synced; move to the server if
 // the web wants the same order.
@@ -110,7 +50,7 @@ export default function LogFood({
 }) {
   const [start] = useState(() => (editing ? fromMeal(editing) : null))
   const [stack, setStack] = useState<Step[]>([editing ? 'amount' : 'source'])
-  const [draft, setDraft] = useState<Draft>(start?.draft ?? EMPTY)
+  const [draft, setDraft] = useState<FoodDraft>(start?.food ?? EMPTY_FOOD)
   const [amount, setAmount] = useState(start ? String(round1(start.amount)) : '')
   const [unit, setUnit] = useState<AmountUnit>(start?.unit ?? 'serving')
   const [mealName, setMealName] = useState(editing ? (editing.mealName ?? OTHER_MEAL) : defaultMeal)
@@ -138,18 +78,18 @@ export default function LogFood({
 
   // A new food on the Amount page starts at one serving, or the label's
   // serving, or 100 g. `replace`: the step it came from is done (typed values).
-  const toAmount = (food: Draft, replace = false) => {
-    const [first] = foodUnits(food)
+  const toAmount = (food: FoodDraft, replace = false) => {
+    const begin = startAmount(food)
     setDraft(food)
-    setUnit(first)
-    setAmount(first === 'serving' ? '1' : String(food.servingG ?? 100))
+    setUnit(begin.unit)
+    setAmount(String(begin.amount))
     setSaveToMine(false)
     animateLayout(() => setStack([...(replace ? stack.slice(0, -1) : stack), 'amount']))
   }
 
   // From the values form: back to Amount when it was opened from there
   // (keeping the amount), otherwise on to it.
-  const valuesDone = (food: Draft) => {
+  const valuesDone = (food: FoodDraft) => {
     if (previous === 'amount') {
       setDraft(food)
       if (!foodUnits(food).includes(unit)) setUnit(foodUnits(food)[0])
@@ -157,8 +97,7 @@ export default function LogFood({
     } else toAmount(food, true)
   }
 
-  const factor = Number(amount) > 0 && units.includes(unit) ? amountFactor(draft, Number(amount), unit) : null
-  const eaten = factor == null ? null : scaleFood(draft, factor)
+  const eaten = eatenFor(draft, Number(amount), unit)
   const valid = eaten != null && eaten.calories != null && draft.name.trim() !== ''
 
   const submit = () => {
@@ -193,7 +132,7 @@ export default function LogFood({
   }
 
   return (
-    <Sheet visible title={TITLES[step]} onClose={onClose} onBack={back}>
+    <Sheet visible title={editing && step === 'amount' ? 'Edit food' : TITLES[step]} onClose={onClose} onBack={back}>
       {step === 'source' && (
         <>
           <Muted>Where does the food come from?</Muted>
@@ -204,7 +143,7 @@ export default function LogFood({
             title="Enter manually"
             detail="Type the nutrition values yourself"
             onPress={() => {
-              setDraft(EMPTY)
+              setDraft(EMPTY_FOOD)
               go('values')
             }}
           />
@@ -354,13 +293,8 @@ function MyFoods({ recent, onPick, onEdit }: { recent: string[]; onPick: (food: 
   const savedFoods = useSavedFoods()
   const [query, setQuery] = useState('')
   const foods = savedFoods.data ?? []
-  const q = query.trim().toLowerCase()
-  const rank = (food: SavedFood) => {
-    const i = recent.indexOf(food.id)
-    return i === -1 ? Infinity : i
-  }
-  // Recently logged first, then by name (the server's order; sort is stable).
-  const shown = q ? foods.filter((food) => food.name.toLowerCase().includes(q)) : [...foods].sort((a, b) => rank(a) - rank(b))
+  // Recently logged first, then by name (the server's order).
+  const shown = sortSavedFoods(foods, recent, query)
 
   if (savedFoods.isPending) return <Muted>Loading…</Muted>
   if (foods.length === 0) {
@@ -398,9 +332,9 @@ function ValuesForm({
   onSubmit,
   onDelete,
 }: {
-  draft: Draft
+  draft: FoodDraft
   submitLabel: string
-  onSubmit: (food: Draft) => void
+  onSubmit: (food: FoodDraft) => void
   onDelete?: () => void
 }) {
   const [name, setName] = useState(draft.name)

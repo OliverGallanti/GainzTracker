@@ -35,7 +35,7 @@ function TrainingLogCard() {
   // weekly streak counts days across every routine (switching routine mid-week
   // shouldn't wipe it), so all splits' logs are fetched; the calendar and day
   // logger only use the active split's.
-  const { data, error: loadError, reload } = useLoad(async () => {
+  const { data, error: loadError, reload } = useLoad(['training'], async () => {
     const splits = await api<WorkoutSplit[]>('/api/workout-splits')
     const split = splits.find((s) => s.active) ?? null
     const logsBySplit = await Promise.all(splits.map((s) => api<SplitLog[]>(`/api/workout-splits/${s.id}/logs`)))

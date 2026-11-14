@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { MacroGoal, Meal, SavedFood } from '@gainz/shared/types'
+import type { MacroGoal, Meal } from '@gainz/shared/types'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '@gainz/shared/dates'
 import { computeBmr, computeTdee } from '@gainz/shared/tdee'
@@ -10,7 +10,7 @@ import { useLoad } from '../lib/useLoad'
 import { useSubmit } from '../lib/useSubmit'
 import LifeBar from './LifeBar'
 import MacroTargetsForm from './MacroTargetsForm'
-import MealForm from './MealForm'
+import LogFoodDialog from './LogFoodDialog'
 import MealList from './MealList'
 import MealSlotsForm from './MealSlotsForm'
 
@@ -21,19 +21,19 @@ const UNITS = [
 ]
 
 function MacroStatsCard() {
-  const [mode, setMode] = useState('view') // 'view' | 'editTargets' | 'logFood' | 'editMeals'
-  const [logMeal, setLogMeal] = useState<string | undefined>(undefined) // the meal slot the food form opens on
+  const [mode, setMode] = useState('view') // 'view' | 'editTargets' | 'editMeals'
+  // The Log food dialog: logging into a meal, or editing a logged food.
+  const [food, setFood] = useState<{ logMeal: string } | { edit: Meal } | null>(null)
   const [unit, setUnit] = useState('g') // 'g' | 'cal' | 'percent' — display only, never affects fill
 
-  // The card's own data: the macro target, today's meals, and saved foods.
-  const own = useLoad(async () => {
+  // The card's own data: the macro target and today's meals.
+  const own = useLoad(['today', new Date().toDateString()], async () => {
     const since = startOfLocalDay().toISOString()
-    const [goal, meals, savedFoods] = await Promise.all([
+    const [goal, meals] = await Promise.all([
       api<MacroGoal | null>('/api/macro-goal'),
       api<Meal[]>(`/api/meals?since=${encodeURIComponent(since)}`),
-      api<SavedFood[]>('/api/saved-foods'),
     ])
-    return { goal, meals, savedFoods }
+    return { goal, meals }
   })
 
   // Only read for the TDEE calculator inside the targets form.
@@ -64,10 +64,7 @@ function MacroStatsCard() {
     own.reload() // foods under a renamed or removed meal regroup
   }
 
-  const openLogFood = (mealName: string) => {
-    setLogMeal(mealName)
-    setMode('logFood')
-  }
+  const openLogFood = (mealName: string) => setFood({ logMeal: mealName })
 
   // "Other" isn't a real slot: moving there clears the food's slot.
   const { submit: moveMeal, error: moveError } = useSubmit(async (id, mealName) => {
@@ -77,11 +74,6 @@ function MacroStatsCard() {
     })
     own.reload()
   }, 'Could not move that food: please try again')
-
-  const handleRemoveMeal = async (id: string) => {
-    await api(`/api/meals/${id}`, { method: 'DELETE' })
-    own.reload()
-  }
 
   const todayTotals = sumToday(meals ?? [])
   const groups = meals ? groupByMeal(meals, mealNames) : []
@@ -198,7 +190,7 @@ function MacroStatsCard() {
 
       {!isLoading && mode === 'view' && (
         <div className="mt-5">
-          <MealList groups={groups} onAdd={openLogFood} onMove={moveMeal} onRemove={handleRemoveMeal} />
+          <MealList groups={groups} onAdd={openLogFood} onMove={moveMeal} onEdit={(meal) => setFood({ edit: meal })} />
           {moveError && <p className="mt-2 text-xs text-red-400">{moveError}</p>}
         </div>
       )}
@@ -215,14 +207,13 @@ function MacroStatsCard() {
         />
       )}
 
-      {mode === 'logFood' && (
-        <MealForm
+      {food && (
+        <LogFoodDialog
           mealNames={mealNames}
-          defaultMeal={logMeal}
-          savedFoods={own.data?.savedFoods ?? []}
-          onSaved={handleSaved}
-          onSavedFoodsChanged={own.reload}
-          onCancel={() => setMode('view')}
+          defaultMeal={'logMeal' in food ? food.logMeal : OTHER_MEAL}
+          editing={'edit' in food ? food.edit : undefined}
+          onChanged={own.reload}
+          onClose={() => setFood(null)}
         />
       )}
 

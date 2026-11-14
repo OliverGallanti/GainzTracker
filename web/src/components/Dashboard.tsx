@@ -9,11 +9,10 @@ import WeightChart from './WeightChart'
 import TrainingLogCard from './TrainingLogCard'
 import BigFourCard from './BigFourCard'
 import ProfileSecurityPage from './ProfileSecurityPage'
-import SharedDataProvider from './SharedDataProvider'
 
 type DashboardProps = { user: Me; onLogout: () => void }
 
-function DashboardShell({ user, onLogout }: DashboardProps) {
+function Dashboard({ user, onLogout }: DashboardProps) {
   const [view, setView] = useState('dashboard') // 'dashboard' | 'profile'
   const me = useMe()
 
@@ -83,14 +82,6 @@ function DashboardShell({ user, onLogout }: DashboardProps) {
         )}
       </main>
     </div>
-  )
-}
-
-function Dashboard(props: DashboardProps) {
-  return (
-    <SharedDataProvider>
-      <DashboardShell {...props} />
-    </SharedDataProvider>
   )
 }
 

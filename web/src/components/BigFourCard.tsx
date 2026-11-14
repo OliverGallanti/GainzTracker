@@ -30,8 +30,8 @@ function BigFourCard() {
   const [showStandards, setShowStandards] = useState(true)
   const [logsExpanded, setLogsExpanded] = useState(true) // the side panel has room; the list scrolls
 
-  const lifts = useLoad(() => api<WorkoutSet[]>('/api/workout-sets'))
-  const goalsResource = useLoad(() => api<Record<string, number>>('/api/lift-goals')) // { [liftName]: kg }
+  const lifts = useLoad(['workoutSets'], () => api<WorkoutSet[]>('/api/workout-sets'))
+  const goalsResource = useLoad(['liftGoals'], () => api<Record<string, number>>('/api/lift-goals')) // { [liftName]: kg }
   const me = useMe()
   const weights = useWeights()
 

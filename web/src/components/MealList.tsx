@@ -1,24 +1,27 @@
 import { useState } from 'react'
-import { OTHER_MEAL, formatMacro, type MealGroup } from '@gainz/shared/macros'
+import { ChevronRight } from 'lucide-react'
+import { OTHER_MEAL, formatAmount, formatMacro, type MealGroup } from '@gainz/shared/macros'
+import type { Meal } from '@gainz/shared/types'
 
 const summary = ({ calories, proteinG, fatG, carbsG }: MealGroup['totals']) =>
   [`${Math.round(calories)} cal`, `${Math.round(proteinG)}g P`, `${Math.round(fatG)}g F`, `${Math.round(carbsG)}g C`].join(' · ')
 
 // Today's foods grouped by meal (see groupByMeal). Each real meal offers its own
 // "Add"; "Other" holds foods with no matching meal, so it has none.
-// Foods move between meals by drag and drop (mouse), or with the "Move to"
-// select on each food, which is what touch screens and keyboards use: native
-// HTML drag and drop doesn't fire on touch.
+// Clicking a food opens it in Log food to change its amount, values or meal, or
+// delete it (that's also how touch screens and keyboards move a food: native
+// HTML drag and drop doesn't fire on touch). With a mouse, foods can also be
+// dragged between meals.
 function MealList({
   groups,
   onAdd,
   onMove,
-  onRemove,
+  onEdit,
 }: {
   groups: MealGroup[]
   onAdd: (mealName: string) => void
   onMove: (id: string, mealName: string) => void
-  onRemove: (id: string) => void
+  onEdit: (meal: Meal) => void
 }) {
   const [dragging, setDragging] = useState<{ id: string; from: string } | null>(null)
   const [over, setOver] = useState<string | null>(null) // meal name under the pointer
@@ -77,7 +80,9 @@ function MealList({
           ) : (
             <ul className="flex flex-col gap-2">
               {group.entries.map((meal) => {
-                const macros = [
+                const details = [
+                  meal.amount != null && meal.unit ? formatAmount(meal.amount, meal.unit) : null,
+                  `${meal.calories} cal`,
                   formatMacro(meal.proteinG, 'g P'),
                   formatMacro(meal.fatG, 'g F'),
                   formatMacro(meal.carbsG, 'g C'),
@@ -96,38 +101,20 @@ function MealList({
                       setDragging(null)
                       setOver(null)
                     }}
-                    className={`flex cursor-grab items-center justify-between gap-2 rounded-lg border border-secondary/25 px-3 py-2 text-sm active:cursor-grabbing ${
-                      dragging?.id === meal.id ? 'opacity-50' : ''
-                    }`}
+                    className={dragging?.id === meal.id ? 'opacity-50' : ''}
                   >
-                    <div>
-                      <p className="text-third">{meal.description}</p>
-                      <p className="text-xs text-third/60">
-                        {meal.calories} cal{macros.length > 0 ? ` · ${macros.join(' · ')}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <select
-                        value={group.name}
-                        onChange={(e) => onMove(meal.id, e.target.value)}
-                        aria-label={`Move ${meal.description} to another meal`}
-                        className="max-w-24 rounded-md border border-secondary/40 bg-main px-1 py-0.5 text-xs text-third/80 outline-none focus:border-secondary"
-                      >
-                        {groups.map((g) => (
-                          <option key={g.name} value={g.name}>
-                            {g.name}
-                          </option>
-                        ))}
-                        {!groups.some((g) => g.name === OTHER_MEAL) && <option value={OTHER_MEAL}>{OTHER_MEAL}</option>}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => onRemove(meal.id)}
-                        className="text-xs font-medium text-third/60 transition hover:text-red-400"
-                      >
-                        Remove
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onEdit(meal)}
+                      aria-label={`${meal.description}, ${meal.calories} calories. Edit`}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg border border-secondary/25 px-3 py-2 text-left text-sm transition hover:border-secondary/60"
+                    >
+                      <span>
+                        <span className="block text-third">{meal.description}</span>
+                        <span className="block text-xs text-third/60">{details.join(' · ')}</span>
+                      </span>
+                      <ChevronRight size={16} className="shrink-0 text-third/40" />
+                    </button>
                   </li>
                 )
               })}
