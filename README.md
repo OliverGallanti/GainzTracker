@@ -111,6 +111,16 @@ Things that behave differently from local:
 - **The camera scanner needs https**, which Render provides, so barcode scanning works from a phone there.
 - Changing `SESSION_SECRET` signs everyone out. Changing the site's domain later means updating `FRONTEND_URL`, `GOOGLE_REDIRECT_URI` and the Google console entry together.
 
+## Releasing
+
+Web, server and the phone app are released together under one version (`v1.1.0`), following semver: a patch for fixes, a minor for new features. The version is in the root `package.json` and in `shared/src/about.ts`; a test fails if the two differ. The web footer and the phone's Profile → About show it.
+
+1. Bump both (`npm version minor --no-git-tag-version` for the root, then edit `about.ts`), commit, push, and wait for Render to show the deploy as Live.
+2. Phone: `npm run update -w mobile -- "v1.2.0: what changed"`. Profile → About → "Check for updates" pulls it on the spot.
+3. Tag and release: `git tag v1.2.0 && git push origin v1.2.0`, then `gh release create v1.2.0 --generate-notes`.
+
+The APK's own version (`app.json` `version` and `android.versionCode`, shown in Android's settings) changes only when a new APK is built, which is needed only when native code or `app.json` changes (the fingerprint changes; `npx expo-updates runtimeversion:resolve --platform android` in `mobile` shows it).
+
 ## TypeScript
 
 The whole app is TypeScript. `npm run typecheck` (root, and in `server/`) runs `tsc` with no output; it's a check, not a build:

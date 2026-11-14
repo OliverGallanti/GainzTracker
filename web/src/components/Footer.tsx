@@ -1,45 +1,24 @@
 import { useRef } from 'react'
+import { APP_VERSION, AUTHOR, AUTHOR_LINKS, FOOD_DATA_CREDITS, SERVER_CREDITS } from '@gainz/shared/about'
 
-// Everything the app stands on. Open Food Facts is listed with its licence
-// because ODbL requires attribution; the rest is credit where it's due.
+// Everything the app stands on (shared/src/about.ts has the parts the phone app
+// lists too).
 const CREDITS = [
-  {
-    title: 'Food data',
-    items: [
-      {
-        name: 'Open Food Facts',
-        url: 'https://world.openfoodfacts.org',
-        note: 'Barcode lookups. Community-edited data, available under the Open Database License (ODbL).',
-      },
-    ],
-  },
+  { title: 'Food data', items: FOOD_DATA_CREDITS },
   {
     title: 'App',
     items: [
       { name: 'React', url: 'https://react.dev' },
       { name: 'Vite', url: 'https://vite.dev' },
       { name: 'Tailwind CSS', url: 'https://tailwindcss.com' },
+      { name: 'TanStack Query', url: 'https://tanstack.com/query' },
       { name: 'Recharts', url: 'https://recharts.org' },
       { name: 'Lucide', url: 'https://lucide.dev', note: 'icons' },
       { name: 'Manrope', url: 'https://fonts.google.com/specimen/Manrope', note: 'typeface' },
       { name: 'ZXing', url: 'https://github.com/zxing-js/library', note: 'barcode scanning' },
     ],
   },
-  {
-    title: 'Server',
-    items: [
-      { name: 'Fastify', url: 'https://fastify.dev' },
-      { name: 'Prisma', url: 'https://www.prisma.io' },
-      { name: 'PostgreSQL', url: 'https://www.postgresql.org' },
-      { name: 'Zod', url: 'https://zod.dev' },
-      { name: 'SimpleWebAuthn', url: 'https://simplewebauthn.dev', note: 'passkeys' },
-    ],
-  },
-]
-
-const AUTHOR_LINKS = [
-  { name: 'Portfolio', url: 'https://olivergallanti.vercel.app/' },
-  { name: 'LinkedIn', url: 'https://www.linkedin.com/in/olivergallanti/' },
+  { title: 'Server', items: SERVER_CREDITS },
 ]
 
 const linkClass = 'underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary'
@@ -49,7 +28,7 @@ function Footer() {
 
   return (
     <footer className="mt-auto px-4 py-6 text-center text-xs text-third/60 sm:px-6">
-      Made by Oliver Gallanti
+      Gainz.Tracker v{APP_VERSION} · Made by {AUTHOR}
       {AUTHOR_LINKS.map((link) => (
         <span key={link.name}>
           {' · '}
@@ -74,7 +53,7 @@ function Footer() {
           Credits
         </h2>
         <p className="mt-2 text-xs text-third/60">
-          Made by Oliver Gallanti, standing on a lot of open-source work.
+          Gainz.Tracker v{APP_VERSION}. Made by {AUTHOR}, standing on a lot of open-source work.
         </p>
 
         <div className="mt-4 flex flex-col gap-4">

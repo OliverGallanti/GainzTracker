@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { View } from 'react-native'
+import { Linking, View } from 'react-native'
+import * as Updates from 'expo-updates'
+import { APP_VERSION, AUTHOR, AUTHOR_LINKS, FOOD_DATA_CREDITS, SERVER_CREDITS } from '@gainz/shared/about'
 import { missingProfileFields } from '@gainz/shared/onboarding'
 import { ACTIVITY_LEVELS } from '@gainz/shared/tdee'
 import type { Me, Sex } from '@gainz/shared/types'
 import { useAuth } from '../auth'
 import { useMe } from '../queries'
 import { QUEUED, useQueued, type UpdateMeVars } from '../queue'
-import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, styles as ui } from '../ui'
+import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Sheet, styles as ui } from '../ui'
 
 const text = (value: number | null | undefined) => (value == null ? '' : String(value))
 
@@ -26,7 +28,90 @@ export default function ProfileScreen() {
         {me.data && <Muted>Signed in as {me.data.email}</Muted>}
         <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
       </Card>
+
+      <About />
     </Screen>
+  )
+}
+
+const APP_CREDITS = [
+  { name: 'React Native', url: 'https://reactnative.dev' },
+  { name: 'Expo', url: 'https://expo.dev' },
+  { name: 'TanStack Query', url: 'https://tanstack.com/query' },
+  { name: 'Lucide', url: 'https://lucide.dev', note: 'icons' },
+  { name: 'Manrope', url: 'https://fonts.google.com/specimen/Manrope', note: 'typeface' },
+]
+const CREDITS = [
+  { title: 'Food data', items: FOOD_DATA_CREDITS },
+  { title: 'App', items: APP_CREDITS },
+  { title: 'Server', items: SERVER_CREDITS },
+]
+
+// Which code this phone is running: the release, and the over-the-air update on
+// top of the installed app (or none: the code the app was built with). Checking
+// downloads a waiting update and restarts into it, instead of waiting for the
+// next two launches.
+function About() {
+  const [status, setStatus] = useState<string | null>(null)
+  const [creditsOpen, setCreditsOpen] = useState(false)
+  const running = !Updates.isEnabled
+    ? 'Development build: updates are off'
+    : Updates.isEmbeddedLaunch || !Updates.createdAt
+      ? 'Running the code the app was installed with'
+      : `Update from ${Updates.createdAt.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+
+  const check = async () => {
+    try {
+      setStatus('Checking…')
+      const { isAvailable } = await Updates.checkForUpdateAsync()
+      if (!isAvailable) return setStatus('You have the latest version.')
+      setStatus('Downloading the update…')
+      await Updates.fetchUpdateAsync()
+      await Updates.reloadAsync()
+    } catch {
+      setStatus('Could not check for updates: are you online?')
+    }
+  }
+
+  return (
+    <Card title="About">
+      <Text style={ui.text}>
+        Gainz.Tracker v{APP_VERSION} · Made by {AUTHOR}
+      </Text>
+      <Muted>{running}</Muted>
+      {Updates.updateId && (
+        <Muted>
+          Update {Updates.updateId.slice(0, 8)} · {Updates.channel ?? 'no channel'} · runtime {Updates.runtimeVersion?.slice(0, 7)}
+        </Muted>
+      )}
+      {Updates.isEnabled && <Button label="Check for updates" variant="secondary" onPress={() => void check()} />}
+      {status && <Muted>{status}</Muted>}
+      <View style={ui.chips}>
+        {AUTHOR_LINKS.map((link) => (
+          <Button key={link.name} label={link.name} variant="small" onPress={() => void Linking.openURL(link.url)} />
+        ))}
+        <Button label="Credits" variant="small" onPress={() => setCreditsOpen(true)} />
+      </View>
+
+      <Sheet visible={creditsOpen} title="Credits" onClose={() => setCreditsOpen(false)}>
+        <Muted>Made by {AUTHOR}, standing on a lot of open-source work.</Muted>
+        {CREDITS.map((group) => (
+          <View key={group.title} style={{ gap: 6 }}>
+            <Text style={[ui.text, { fontWeight: '600' }]} accessibilityRole="header">
+              {group.title}
+            </Text>
+            {group.items.map((item) => (
+              <Text key={item.name} style={ui.muted}>
+                <Text style={[ui.text, { textDecorationLine: 'underline' }]} accessibilityRole="link" onPress={() => void Linking.openURL(item.url)}>
+                  {item.name}
+                </Text>
+                {'note' in item && item.note ? ` - ${item.note}` : ''}
+              </Text>
+            ))}
+          </View>
+        ))}
+      </Sheet>
+    </Card>
   )
 }
 
