@@ -1,0 +1,188 @@
+import { randomUUID } from 'node:crypto'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { startTestApp, testDatabaseUrl } from '../test-app.ts'
+
+// The API end to end against a real (test) Postgres: validation, the client-id
+// retry rules, and above all that one user can never read or change another's
+// data. See test-app.ts for which database this uses; without one it's skipped.
+
+const url = testDatabaseUrl()
+
+describe.skipIf(!url)('API routes', () => {
+  let t: Awaited<ReturnType<typeof startTestApp>>
+
+  beforeAll(async () => {
+    t = await startTestApp(url!)
+  }, 120_000)
+
+  afterAll(async () => {
+    await t?.app.close()
+    await t?.prisma.$disconnect()
+  })
+
+  type Auth = { authorization: string }
+  const call = (method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, auth?: Auth, payload?: object) =>
+    t.app.inject({ method, url: path, headers: auth, ...(payload && { payload }) })
+
+  it('refuses requests without a valid token', async () => {
+    expect((await call('GET', '/api/meals')).statusCode).toBe(401)
+    expect((await call('GET', '/api/meals', { authorization: 'Bearer not-a-real-token' })).statusCode).toBe(401)
+  })
+
+  describe('meals', () => {
+    it('logs a food with its amount, and refuses invalid values', async () => {
+      const a = await t.newUser()
+      const res = await call('POST', '/api/meals', a.auth, { description: 'Banana', calories: 112, proteinG: 1.7, amount: 120, unit: 'g', mealName: 'Lunch' })
+      expect(res.statusCode).toBe(201)
+      expect(res.json()).toMatchObject({ description: 'Banana', calories: 112, amount: 120, unit: 'g', mealName: 'Lunch', userId: a.id })
+      expect((await call('POST', '/api/meals', a.auth, { description: 'Banana', calories: -1 })).statusCode).toBe(400)
+      expect((await call('POST', '/api/meals', a.auth, { description: 'Banana', calories: 90, unit: 'cups' })).statusCode).toBe(400)
+    })
+
+    it('returns the existing row when the phone resends the same id, and refuses an id someone else used', async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const id = randomUUID()
+      const meal = { id, description: 'Oats', calories: 380 }
+      expect((await call('POST', '/api/meals', a.auth, meal)).statusCode).toBe(201)
+      const again = await call('POST', '/api/meals', a.auth, { ...meal, calories: 999 })
+      expect(again.statusCode).toBe(200)
+      expect(again.json().calories).toBe(380) // the first one, not a second row
+      expect((await call('POST', '/api/meals', b.auth, meal)).statusCode).toBe(409)
+      expect(await t.prisma.macroEntry.count({ where: { id } })).toBe(1)
+    })
+
+    it("lists only the user's own foods, and only from the requested time on", async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      await call('POST', '/api/meals', a.auth, { description: 'Yesterday', calories: 100, loggedAt: '2026-01-01T10:00:00Z' })
+      await call('POST', '/api/meals', a.auth, { description: 'Today', calories: 200, loggedAt: '2026-01-02T10:00:00Z' })
+      await call('POST', '/api/meals', b.auth, { description: 'Not yours', calories: 300, loggedAt: '2026-01-02T10:00:00Z' })
+      const res = await call('GET', '/api/meals?since=2026-01-02T00:00:00Z', a.auth)
+      expect(res.json().map((m: { description: string }) => m.description)).toEqual(['Today'])
+    })
+
+    it("edits and deletes only the user's own foods", async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const { id } = (await call('POST', '/api/meals', a.auth, { description: 'Rice', calories: 300, proteinG: 6, mealName: 'Lunch' })).json()
+
+      expect((await call('PATCH', `/api/meals/${id}`, b.auth, { calories: 1 })).statusCode).toBe(404)
+      expect((await call('DELETE', `/api/meals/${id}`, b.auth)).statusCode).toBe(404)
+
+      expect((await call('PATCH', `/api/meals/${id}`, a.auth, { calories: 450, proteinG: null, mealName: null, amount: 150, unit: 'g' })).statusCode).toBe(204)
+      expect(await t.prisma.macroEntry.findUnique({ where: { id } })).toMatchObject({ calories: 450, proteinG: null, mealName: null, amount: 150, unit: 'g', description: 'Rice' })
+
+      expect((await call('DELETE', `/api/meals/${id}`, a.auth)).statusCode).toBe(204)
+      expect((await call('DELETE', `/api/meals/${id}`, a.auth)).statusCode).toBe(404)
+    })
+  })
+
+  describe('saved foods', () => {
+    it('saves per serving by default and replaces a food saved again under the same name', async () => {
+      const a = await t.newUser()
+      expect((await call('POST', '/api/saved-foods', a.auth, { name: 'Oats', calories: 380 })).json()).toMatchObject({ basis: 'serving', servingG: null })
+      await call('POST', '/api/saved-foods', a.auth, { name: 'Oats', calories: 389, basis: '100g', servingG: 40 })
+      const list = (await call('GET', '/api/saved-foods', a.auth)).json()
+      expect(list).toHaveLength(1)
+      expect(list[0]).toMatchObject({ name: 'Oats', calories: 389, basis: '100g', servingG: 40 })
+    })
+
+    it("edits only the user's own foods, and won't rename onto another saved food", async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const oats = (await call('POST', '/api/saved-foods', a.auth, { name: 'Oats', calories: 380 })).json()
+      await call('POST', '/api/saved-foods', a.auth, { name: 'Rice', calories: 130 })
+
+      expect((await call('PUT', `/api/saved-foods/${oats.id}`, b.auth, { name: 'Mine now', calories: 1 })).statusCode).toBe(404)
+      expect((await call('DELETE', `/api/saved-foods/${oats.id}`, b.auth)).statusCode).toBe(404)
+      expect((await call('PUT', `/api/saved-foods/${oats.id}`, a.auth, { name: 'Rice', calories: 380 })).statusCode).toBe(409)
+
+      expect((await call('PUT', `/api/saved-foods/${oats.id}`, a.auth, { name: 'Rolled oats', calories: 389, basis: '100g' })).statusCode).toBe(204)
+      expect(await t.prisma.savedFood.findUnique({ where: { id: oats.id } })).toMatchObject({ name: 'Rolled oats', calories: 389, basis: '100g' })
+      expect((await call('DELETE', `/api/saved-foods/${oats.id}`, a.auth)).statusCode).toBe(204)
+    })
+
+    it('lets two users each save a food with the same name', async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      expect((await call('POST', '/api/saved-foods', a.auth, { name: 'Chili', calories: 450 })).statusCode).toBe(201)
+      expect((await call('POST', '/api/saved-foods', b.auth, { name: 'Chili', calories: 500 })).statusCode).toBe(201)
+      expect((await call('GET', '/api/saved-foods', a.auth)).json()[0].calories).toBe(450)
+    })
+  })
+
+  describe('profile and goals', () => {
+    it('updates only the fields sent, and refuses bad meal slots', async () => {
+      const a = await t.newUser()
+      expect((await call('PUT', '/api/me', a.auth, { heightCm: 180 })).statusCode).toBe(200)
+      expect((await call('PUT', '/api/me', a.auth, { age: 30 })).statusCode).toBe(200)
+      expect((await call('GET', '/api/me', a.auth)).json()).toMatchObject({ heightCm: 180, age: 30, mealNames: ['Breakfast', 'Lunch', 'Dinner'] })
+      expect((await call('PUT', '/api/me', a.auth, { mealNames: ['Lunch', 'Lunch'] })).statusCode).toBe(400)
+      expect((await call('PUT', '/api/me', a.auth, {})).statusCode).toBe(400)
+    })
+
+    it('keeps lift goals per user and only for the Big 4', async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      expect((await call('PUT', '/api/lift-goals', a.auth, { Squat: 150 })).statusCode).toBe(200)
+      expect((await call('PUT', '/api/lift-goals', a.auth, { Curl: 40 })).statusCode).toBe(400)
+      expect((await call('GET', '/api/lift-goals', a.auth)).json()).toEqual({ Squat: 150 })
+      expect((await call('GET', '/api/lift-goals', b.auth)).json()).toEqual({})
+    })
+
+    it("keeps each user's weights to themselves", async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const entry = (await call('POST', '/api/weights', a.auth, { weightKg: 80 })).json()
+      expect((await call('GET', '/api/weights', b.auth)).json()).toEqual([])
+      expect((await call('DELETE', `/api/weights/${entry.id}`, b.auth)).statusCode).toBe(404)
+      expect((await call('GET', '/api/weights', a.auth)).json()).toHaveLength(1)
+    })
+  })
+
+  describe('training', () => {
+    const day = { dayStart: '2026-03-02T00:00:00Z', dayEnd: '2026-03-03T00:00:00Z', loggedAt: '2026-03-02T18:00:00Z' }
+
+    it("logs one day per calendar day, and only on the user's own routine", async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const split = (await call('POST', '/api/workout-splits', a.auth, { name: 'PPL', days: ['Push', 'Pull', 'Legs'] })).json()
+
+      expect((await call('POST', `/api/workout-splits/${split.id}/logs`, b.auth, { completed: true, dayIndex: 0, ...day })).statusCode).toBe(404)
+      expect((await call('POST', `/api/workout-splits/${split.id}/logs`, a.auth, { completed: true, dayIndex: 5, ...day })).statusCode).toBe(400)
+      expect((await call('POST', `/api/workout-splits/${split.id}/logs`, a.auth, { completed: true, dayIndex: 0, ...day })).statusCode).toBe(201)
+      expect((await call('POST', `/api/workout-splits/${split.id}/logs`, a.auth, { completed: false, dayIndex: 1, ...day })).statusCode).toBe(409)
+      expect((await call('GET', `/api/workout-splits/${split.id}/logs`, b.auth)).statusCode).toBe(404)
+    })
+
+    it("won't attach a set to someone else's training day, and takes RPE in half steps", async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const split = (await call('POST', '/api/workout-splits', a.auth, { name: 'Full body', days: ['A'] })).json()
+      const log = (await call('POST', `/api/workout-splits/${split.id}/logs`, a.auth, { completed: true, dayIndex: 0, ...day })).json()
+      const set = { exerciseName: 'Squat', weightKg: 100, reps: 5 }
+
+      expect((await call('POST', '/api/workout-sets', b.auth, { ...set, splitLogId: log.id })).statusCode).toBe(400)
+      expect((await call('POST', '/api/workout-sets', a.auth, { ...set, rpe: 8.3 })).statusCode).toBe(400)
+      expect((await call('POST', '/api/workout-sets', a.auth, { ...set, rpe: 8.5, splitLogId: log.id })).statusCode).toBe(201)
+      expect((await call('GET', `/api/workout-sets?splitLogId=${log.id}`, b.auth)).json()).toEqual([])
+      expect((await call('GET', `/api/workout-sets?splitLogId=${log.id}`, a.auth)).json()[0]).toMatchObject({ rpe: 8.5 })
+    })
+
+    it('removes a training day together with its sets', async () => {
+      const a = await t.newUser()
+      const split = (await call('POST', '/api/workout-splits', a.auth, { name: 'Upper', days: ['A'] })).json()
+      const log = (await call('POST', `/api/workout-splits/${split.id}/logs`, a.auth, { completed: true, dayIndex: 0, ...day })).json()
+      await call('POST', '/api/workout-sets', a.auth, { exerciseName: 'Bench Press', reps: 8, splitLogId: log.id })
+      expect((await call('DELETE', `/api/workout-splits/${split.id}/logs/${log.id}`, a.auth)).statusCode).toBe(204)
+      expect(await t.prisma.workoutSet.count({ where: { splitLogId: log.id } })).toBe(0)
+    })
+  })
+
+  it('checks the food search before calling Open Food Facts', async () => {
+    const a = await t.newUser()
+    expect((await call('GET', '/api/products/search?q=a', a.auth)).statusCode).toBe(400)
+    expect((await call('GET', '/api/products/not-a-barcode', a.auth)).statusCode).toBe(400)
+  })
+})
