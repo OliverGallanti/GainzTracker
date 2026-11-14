@@ -90,6 +90,8 @@ export interface WorkoutSet {
   weightKg: number | null
   reps: number | null
   rpe?: number | null // how hard it was, 6 to 10 (see RPE_VALUES)
+  durationSeconds?: number | null // from the live workout timer: the set itself
+  restSeconds?: number | null // and the rest before it
   performedAt: string
   splitLogId?: string | null // the training day it was logged in, if any
 }

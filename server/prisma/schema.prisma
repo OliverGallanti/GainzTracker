@@ -240,6 +240,10 @@ model WorkoutSet {
   weightKg     Float?
   reps         Int?
   rpe          Float? // optional effort, 6 to 10; reps in reserve is 10 - rpe
+  // From the live workout timer, when the set was timed: how long the set took
+  // and the rest before it.
+  durationSeconds Int?
+  restSeconds     Int?
   performedAt  DateTime        @default(now())
 
   @@index([userId, performedAt])

@@ -124,28 +124,17 @@ export const updateLogSchema = z
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'No fields to update' })
 
-const exerciseSchema = z.object({
-  name: z.string().min(1),
-  targetSets: z.number().int().positive().optional(),
-  targetReps: z.number().int().positive().optional(),
-  order: z.number().int().nonnegative().optional(),
-})
-
-export const createRoutineSchema = z.object({
-  id: clientId,
-  name: z.string().min(1),
-  exercises: z.array(exerciseSchema),
-  notes: z.string().optional(),
-})
+const seconds = z.number().int().min(0).max(86400).optional() // a day at most
 
 export const createSetSchema = z.object({
   id: clientId,
-  routineId: z.string().optional(),
   splitLogId: z.string().optional(),
   exerciseName: z.string().min(1),
   weightKg: z.number().nonnegative().optional(),
   reps: z.number().int().nonnegative().optional(),
   rpe: z.number().min(6).max(10).multipleOf(0.5).optional(), // RPE_VALUES in lifts.ts
+  durationSeconds: seconds,
+  restSeconds: seconds,
   performedAt: z.coerce.date().optional(),
 })
 

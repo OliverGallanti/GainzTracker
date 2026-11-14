@@ -3,11 +3,12 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
 import { buildMonthGrid, startOfLocalDay } from '@gainz/shared/dates'
+import { describeTiming } from '@gainz/shared/sessions'
 import { computeWeeklyStreak, suggestedDayIndex, uniqueDays, weeklyGoal } from '@gainz/shared/splits'
 import { SPLIT_TEMPLATES } from '@gainz/shared/templates'
 import type { SplitLog, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
 import { api } from '../api'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, History, Plus, Repeat, Target, X } from '../icons'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, History, Plus, Repeat, Target, Timer, X } from '../icons'
 import {
   QUEUED,
   useQueued,
@@ -22,6 +23,7 @@ import {
 } from '../queue'
 import { colors } from '../theme'
 import { Text, Button, Card, Chip, ErrorText, Field, IconButton, Muted, Screen, Sheet, Unsynced, styles as ui, animateLayout, useAnimatedState } from '../ui'
+import { setWorkout, startWorkout, useWorkout } from '../workout'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 const WEEK = [1, 2, 3, 4, 5, 6, 7]
@@ -70,7 +72,7 @@ export default function TrainingScreen() {
       {split && !editingRoutine && training.data && (
         <>
           <RoutineSummary split={split} allLogs={training.data.allLogs} onChange={() => setEditingRoutine(true)} />
-          <Logger split={split} logs={logs} onOpenLog={setOpenLogId} onOpenHistory={() => setHistoryOpen(true)} />
+          <Logger split={split} logs={logs} sets={sets.data} onOpenLog={setOpenLogId} onOpenHistory={() => setHistoryOpen(true)} />
         </>
       )}
 
@@ -234,11 +236,13 @@ function Calendar({ logs, selected, onSelect }: { logs: SplitLog[]; selected: Da
 function Logger({
   split,
   logs,
+  sets,
   onOpenLog,
   onOpenHistory,
 }: {
   split: WorkoutSplit
   logs: SplitLog[]
+  sets: WorkoutSet[] | undefined
   onOpenLog: (logId: string) => void
   onOpenHistory: () => void
 }) {
@@ -247,6 +251,7 @@ function Logger({
   const suggested = split.days.indexOf(split.days[suggestedDayIndex(split.days, logs)])
   const selected = picked ?? suggested
   const logDay = useQueued<LogDayVars>(QUEUED.logDay)
+  const workout = useWorkout()
 
   const target = pickedDate ?? startOfLocalDay()
   const targetLog = logs.find((log) => new Date(log.loggedAt).toDateString() === target.toDateString())
@@ -254,7 +259,7 @@ function Logger({
   // Queued (see queue.ts). The day's bounds are fixed now, on the phone: sent
   // after midnight, it still counts for the day it was meant for. A past day is
   // logged at its noon, as on the web.
-  const log = (completed: boolean) => {
+  const log = (completed: boolean, live = false) => {
     const dayEnd = new Date(target.getFullYear(), target.getMonth(), target.getDate() + 1)
     const loggedAt = pickedDate ? new Date(target.getFullYear(), target.getMonth(), target.getDate(), 12) : new Date()
     const id = randomUUID()
@@ -265,9 +270,24 @@ function Logger({
       dayStart: target.toISOString(),
       dayEnd: dayEnd.toISOString(),
     })
-    // Straight on to the exercises, as on the web.
-    if (completed) onOpenLog(id)
+    // Straight on to the exercises, as on the web, or the live workout.
+    if (live) startWorkout(split, { id, dayIndex: selected, durationMinutes: null }, logs, sets ?? [])
+    else if (completed) onOpenLog(id)
   }
+
+  // Only today can be trained live. One workout at a time: while one is going,
+  // this takes you back to it.
+  const live = !pickedDate && (!targetLog || targetLog.completed)
+  const liveButton = workout ? (
+    <Button label={`Back to ${workout.day} workout`} icon={Timer} onPress={() => setWorkout({ ...workout, open: true })} />
+  ) : (
+    <Button
+      label={targetLog ? 'Continue workout' : 'Start workout'}
+      icon={Timer}
+      disabled={!sets}
+      onPress={() => (targetLog ? startWorkout(split, targetLog, logs, sets ?? []) : log(true, true))}
+    />
+  )
 
   return (
     <Card>
@@ -286,6 +306,7 @@ function Logger({
       {targetLog ? (
         <>
           <LogRow split={split} log={targetLog} onEdit={() => onOpenLog(targetLog.id)} />
+          {live && liveButton}
           <Muted>{REMOVE_NOTE}</Muted>
         </>
       ) : (
@@ -305,9 +326,10 @@ function Logger({
               />
             ))}
           </View>
+          {live && liveButton}
           <View style={ui.row}>
             <View style={{ flex: 1 }}>
-              <Button label="Mark done" icon={Check} onPress={() => log(true)} />
+              <Button label="Mark done" icon={Check} variant={live ? 'secondary' : 'primary'} onPress={() => log(true)} />
             </View>
             <View style={{ flex: 1 }}>
               <Button label="Mark skipped" variant="secondary" onPress={() => log(false)} />
@@ -392,7 +414,7 @@ function LogEditor({
 // Form rows hold the inputs' text. A row keeps its set's id until it's edited;
 // saving removes the sets whose rows were edited or deleted and adds the new
 // rows, so unchanged sets are left alone (and nothing is lost if offline).
-type Row = { id?: string; exerciseName: string; weightKg: string; reps: string }
+type Row = { id?: string; exerciseName: string; weightKg: string; reps: string; kept?: Pick<WorkoutSet, 'rpe' | 'durationSeconds' | 'restSeconds' | 'performedAt'> }
 const emptyRow = (): Row => ({ exerciseName: '', weightKg: '', reps: '' })
 
 function SessionEditor({ log, sets, onDone }: { log: SplitLog; sets: WorkoutSet[]; onDone: () => void }) {
@@ -401,7 +423,13 @@ function SessionEditor({ log, sets, onDone }: { log: SplitLog; sets: WorkoutSet[
   const updateLog = useQueued<UpdateLogVars>(QUEUED.updateLog)
   const [rows, setRows] = useState<Row[]>(() =>
     sets.length > 0
-      ? [...sets].reverse().map((s) => ({ id: s.id, exerciseName: s.exerciseName, weightKg: s.weightKg == null ? '' : String(s.weightKg), reps: s.reps == null ? '' : String(s.reps) }))
+      ? [...sets].reverse().map((s) => ({
+          id: s.id,
+          exerciseName: s.exerciseName,
+          weightKg: s.weightKg == null ? '' : String(s.weightKg),
+          reps: s.reps == null ? '' : String(s.reps),
+          kept: { rpe: s.rpe, durationSeconds: s.durationSeconds, restSeconds: s.restSeconds, performedAt: s.performedAt }, // what the form doesn't show, kept through an edit
+        }))
       : [emptyRow()],
   )
   const [duration, setDuration] = useState(log.durationMinutes ? String(log.durationMinutes) : '')
@@ -424,6 +452,7 @@ function SessionEditor({ log, sets, onDone }: { log: SplitLog; sets: WorkoutSet[
         weightKg: r.weightKg ? Number(r.weightKg) : null,
         reps: r.reps ? Number(r.reps) : null,
         performedAt: log.loggedAt, // the session's day, so a past day's lifts chart on that day
+        ...r.kept,
       }
       addSet.mutate({ label: set.exerciseName, set })
     }
@@ -445,6 +474,7 @@ function SessionEditor({ log, sets, onDone }: { log: SplitLog; sets: WorkoutSet[
             <Field label="Reps" value={row.reps} onChange={(v) => edit(index, { reps: v.replace(/\D/g, '') })} keyboardType="number-pad" />
             <IconButton icon={X} label={`Remove ${row.exerciseName || 'exercise'}`} onPress={() => animateLayout(() => setRows(rows.filter((_, i) => i !== index)))} />
           </View>
+          {row.kept && describeTiming(row.kept) !== '' && <Muted>{describeTiming(row.kept)}</Muted>}
         </View>
       ))}
       <Button label="Add exercise" icon={Plus} variant="secondary" onPress={() => animateLayout(() => setRows([...rows, emptyRow()]))} />

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
 import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
-import { createRoutineSchema, createSetSchema } from '@gainz/shared/schemas'
+import { createSetSchema } from '@gainz/shared/schemas'
 
 const listSetsQuerySchema = z.object({
   splitLogId: z.string().optional(),
@@ -11,40 +11,6 @@ const listSetsQuerySchema = z.object({
 
 export default async function workoutRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)
-
-  app.get('/workouts', async (request) => {
-    return prisma.workoutRoutine.findMany({
-      where: { userId: request.userId },
-      orderBy: { createdAt: 'desc' },
-    })
-  })
-
-  app.post('/workouts', async (request, reply) => {
-    const parsed = createRoutineSchema.safeParse(request.body)
-    if (!parsed.success) {
-      return reply.badRequest(parsed.error.message)
-    }
-
-    if (parsed.data.id) {
-      const existing = await prisma.workoutRoutine.findUnique({ where: { id: parsed.data.id } })
-      if (repliedWithExisting(reply, request.userId, existing)) return reply
-    }
-
-    const routine = await prisma.workoutRoutine.create({
-      data: { ...parsed.data, userId: request.userId },
-    })
-    return reply.code(201).send(routine)
-  })
-
-  app.delete<{ Params: { id: string } }>('/workouts/:id', async (request, reply) => {
-    const { count } = await prisma.workoutRoutine.deleteMany({
-      where: { id: request.params.id, userId: request.userId },
-    })
-    if (count === 0) {
-      return reply.notFound()
-    }
-    return reply.code(204).send()
-  })
 
   app.get('/workout-sets', async (request, reply) => {
     const parsedQuery = listSetsQuerySchema.safeParse(request.query)
@@ -70,16 +36,6 @@ export default async function workoutRoutes(app: FastifyInstance) {
     if (parsed.data.id) {
       const existing = await prisma.workoutSet.findUnique({ where: { id: parsed.data.id } })
       if (repliedWithExisting(reply, request.userId, existing)) return reply
-    }
-
-    if (parsed.data.routineId) {
-      const routine = await prisma.workoutRoutine.findFirst({
-        where: { id: parsed.data.routineId, userId: request.userId },
-        select: { id: true },
-      })
-      if (!routine) {
-        return reply.badRequest('routineId does not belong to a routine you own')
-      }
     }
 
     if (parsed.data.splitLogId) {

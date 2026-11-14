@@ -185,6 +185,21 @@ describe.skipIf(!url)('API routes', () => {
       expect((await call('GET', `/api/workout-sets?splitLogId=${log.id}`, a.auth)).json()[0]).toMatchObject({ rpe: 8.5 })
     })
 
+    it("keeps a timed set's set and rest seconds, and refuses nonsense times", async () => {
+      const a = await t.newUser()
+      const set = { exerciseName: 'Squat', weightKg: 100, reps: 5 }
+      expect((await call('POST', '/api/workout-sets', a.auth, { ...set, durationSeconds: -1 })).statusCode).toBe(400)
+      expect((await call('POST', '/api/workout-sets', a.auth, { ...set, restSeconds: 1.5 })).statusCode).toBe(400)
+      const saved = await call('POST', '/api/workout-sets', a.auth, { ...set, durationSeconds: 42, restSeconds: 95 })
+      expect(saved.statusCode).toBe(201)
+      expect((await call('GET', '/api/workout-sets', a.auth)).json()[0]).toMatchObject({ durationSeconds: 42, restSeconds: 95 })
+    })
+
+    it('no longer serves the unused workout routines', async () => {
+      const a = await t.newUser()
+      expect((await call('GET', '/api/workouts', a.auth)).statusCode).toBe(404)
+    })
+
     it('removes a training day together with its sets', async () => {
       const a = await t.newUser()
       const split = (await call('POST', '/api/workout-splits', a.auth, { name: 'Upper', days: ['A'] })).json()

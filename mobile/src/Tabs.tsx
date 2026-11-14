@@ -2,16 +2,19 @@ import { useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { CalendarDays, Dumbbell, Scale, User, Utensils } from './icons'
+import { formatSeconds } from '@gainz/shared/sessions'
+import { CalendarDays, Dumbbell, Scale, Timer, User, Utensils } from './icons'
 import { useIsOnline } from './offline'
 import { useSyncState } from './queue'
 import BigFourScreen from './screens/BigFourScreen'
+import LiveWorkout from './screens/LiveWorkout'
 import ProfileScreen from './screens/ProfileScreen'
 import TodayScreen from './screens/TodayScreen'
 import TrainingScreen from './screens/TrainingScreen'
 import WeightScreen from './screens/WeightScreen'
 import { colors } from './theme'
 import { Text, Button } from './ui'
+import { setWorkout, since, useNow, useWorkout } from './workout'
 
 const TABS = [
   { key: 'today', label: 'Today', Page: TodayScreen, Icon: Utensils },
@@ -86,6 +89,9 @@ export default function Tabs() {
         ))}
       </ScrollView>
 
+      <WorkoutBar onOpen={() => go(TABS.findIndex((t) => t.key === 'training'))} />
+      <LiveWorkout />
+
       <View style={[styles.bar, { paddingBottom: insets.bottom }]} accessibilityRole="tablist">
         {TABS.map((t, i) => (
           <Pressable
@@ -103,6 +109,35 @@ export default function Tabs() {
         ))}
       </View>
     </View>
+  )
+}
+
+// A minimised workout, on every tab: tap to go back to it.
+function WorkoutBar({ onOpen }: { onOpen: () => void }) {
+  const workout = useWorkout()
+  if (!workout || workout.open) return null
+  return (
+    <WorkoutBarClock
+      startedAt={workout.startedAt}
+      day={workout.day}
+      onPress={() => {
+        onOpen()
+        setWorkout({ ...workout, open: true })
+      }}
+    />
+  )
+}
+
+// Its own component, so the clock only ticks while the bar is showing.
+function WorkoutBarClock({ startedAt, day, onPress }: { startedAt: number; day: string; onPress: () => void }) {
+  const now = useNow()
+  const time = formatSeconds(since(startedAt, now))
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${day} workout in progress, ${time}. Open`} style={styles.workoutBar}>
+      <Timer size={18} color={colors.main} />
+      <Text style={styles.workoutBarText}>{day} in progress</Text>
+      <Text style={[styles.workoutBarText, { fontVariant: ['tabular-nums'] }]}>{time}</Text>
+    </Pressable>
   )
 }
 
@@ -130,4 +165,6 @@ const styles = StyleSheet.create({
   tabTextSelected: { color: colors.text, fontWeight: '700' },
   indicator: { width: 24, height: 3, borderRadius: 2, backgroundColor: 'transparent' },
   indicatorSelected: { backgroundColor: colors.text },
+  workoutBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, minHeight: 44, backgroundColor: colors.text },
+  workoutBarText: { color: colors.main, fontWeight: '700' },
 })

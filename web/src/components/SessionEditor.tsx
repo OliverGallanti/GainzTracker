@@ -1,20 +1,26 @@
 import { useState } from 'react'
+import { describeTiming } from '@gainz/shared/sessions'
 import type { SplitLog, WorkoutSet } from '@gainz/shared/types'
 import { api } from '../lib/api'
 import { useLoad } from '../lib/useLoad'
 import { useSubmit } from '../lib/useSubmit'
 
-// Form rows: every field is the input's text, numbers included.
-type Row = { exerciseName: string; weightKg: string; reps: string }
+// Form rows: every field is the input's text, numbers included. `kept` is what
+// the form doesn't show (effort, the live timer's times, when it was done), so
+// saving, which recreates every set, doesn't lose it.
+type Kept = Pick<WorkoutSet, 'rpe' | 'durationSeconds' | 'restSeconds' | 'performedAt'>
+type Row = { exerciseName: string; weightKg: string; reps: string; kept?: Kept }
 
 const emptyRow = (): Row => ({ exerciseName: '', weightKg: '', reps: '' })
 
 const toRows = (sets: WorkoutSet[]): Row[] =>
   sets.length > 0
-    ? sets.map((s) => ({
+    ? [...sets].reverse().map((s) => ({
+        // the API lists newest first; the form shows them in the order done
         exerciseName: s.exerciseName,
         weightKg: s.weightKg == null ? '' : String(s.weightKg),
         reps: s.reps == null ? '' : String(s.reps),
+        kept: { rpe: s.rpe, durationSeconds: s.durationSeconds, restSeconds: s.restSeconds, performedAt: s.performedAt },
       }))
     : [emptyRow()]
 
@@ -42,7 +48,7 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
   // The form only renders once rows exist (a failed or pending load blocks it).
   const currentRows = rows ?? []
 
-  const updateRow = (index: number, field: keyof Row, value: string) => {
+  const updateRow = (index: number, field: 'exerciseName' | 'weightKg' | 'reps', value: string) => {
     setRows(currentRows.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
   }
 
@@ -55,9 +61,8 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
   }
 
   const { submit, saving, error } = useSubmit(async () => {
-    // Delete-then-recreate rather than diffing — simpler, and these sets
-    // are only ever queried by splitLogId, never by their own timestamp,
-    // so resetting performedAt/id on every save costs nothing here.
+    // Delete-then-recreate rather than diffing: simpler. Each row carries its
+    // set's other fields (see Row), so only the id changes.
     const existing = await api<WorkoutSet[]>(`/api/workout-sets?splitLogId=${log.id}`)
     await Promise.all(existing.map((s) => api(`/api/workout-sets/${s.id}`, { method: 'DELETE' })))
 
@@ -71,6 +76,7 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
             exerciseName: r.exerciseName.trim(),
             ...(r.weightKg ? { weightKg: Number(r.weightKg) } : {}),
             ...(r.reps ? { reps: Number(r.reps) } : {}),
+            ...Object.fromEntries(Object.entries(r.kept ?? {}).filter(([, v]) => v != null)), // the API takes a missing field, not null
           }),
         }),
       ),
@@ -113,7 +119,7 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
         <>
           <div className="flex flex-col gap-2">
             {rows.map((row, index) => (
-              <div key={index} className="flex items-center gap-2">
+              <div key={index} className="flex flex-wrap items-center gap-2">
                 <input
                   type="text"
                   value={row.exerciseName}
@@ -147,6 +153,7 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
                 >
                   ✕
                 </button>
+                {row.kept && describeTiming(row.kept) && <p className="w-full text-xs text-third/60">{describeTiming(row.kept)}</p>}
               </div>
             ))}
             <button
