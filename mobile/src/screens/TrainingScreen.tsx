@@ -34,10 +34,9 @@ export default function TrainingScreen() {
   const training = useQuery({
     queryKey: ['training'],
     queryFn: async (): Promise<TrainingData> => {
-      const splits = await api<WorkoutSplit[]>('/api/workout-splits')
+      const [splits, allLogs] = await Promise.all([api<WorkoutSplit[]>('/api/workout-splits'), api<SplitLog[]>('/api/workout-splits/logs')])
       const split = splits.find((s) => s.active) ?? null
-      const logsBySplit = await Promise.all(splits.map((s) => api<SplitLog[]>(`/api/workout-splits/${s.id}/logs`)))
-      return { split, logs: split ? logsBySplit[splits.indexOf(split)] : [], allLogs: logsBySplit.flat() }
+      return { split, logs: split ? allLogs.filter((log) => log.splitId === split.id) : [], allLogs }
     },
   })
   // Shared with Big 4 (same key): a session's exercises are the sets tagged with its log.

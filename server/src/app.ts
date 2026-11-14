@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import sensible from '@fastify/sensible'
+import rateLimit from '@fastify/rate-limit'
 import { isProduction } from './config.ts'
 import cookiePlugin from './plugins/cookie.ts'
 import corsPlugin from './plugins/cors.ts'
@@ -31,8 +32,17 @@ export function buildApp() {
   app.register(corsPlugin)
   app.register(sessionPlugin)
 
-  app.register(authRoutes, { prefix: '/auth' })
-  app.register(passkeyRoutes, { prefix: '/auth/passkey' })
+  // Limits only where they're registered (sign-in here, food lookups in
+  // products.ts), kept in memory: there's one server process.
+  app.register(rateLimit, { global: false })
+
+  // Sign-in, per IP (trustProxy makes that the visitor's, not Render's proxy):
+  // enough for any person, not for guessing at scale.
+  app.register(async (auth) => {
+    auth.addHook('onRequest', auth.rateLimit({ max: 30, timeWindow: '1 minute' }))
+    auth.register(authRoutes, { prefix: '/auth' })
+    auth.register(passkeyRoutes, { prefix: '/auth/passkey' })
+  })
   app.register(meRoutes, { prefix: '/api' })
   app.register(weightRoutes, { prefix: '/api' })
   app.register(mealRoutes, { prefix: '/api' })
@@ -52,7 +62,17 @@ export function buildApp() {
   // sees a single origin: no CORS, first-party cookies, and the passkey origin
   // is simply the site itself. In dev, Vite serves the client and proxies here.
   if (isProduction) {
-    app.register(fastifyStatic, { root: fileURLToPath(new URL('../../web/dist', import.meta.url)) })
+    // Vite names every file in /assets after its content hash, so a new build
+    // means new names: those are cached for good. Everything else (index.html,
+    // the logo) is checked again on each visit, so a deploy shows up at once.
+    app.register(fastifyStatic, {
+      root: fileURLToPath(new URL('../../web/dist', import.meta.url)),
+      cacheControl: false,
+      setHeaders: (reply, filePath) => {
+        const hashed = /[\\/]assets[\\/]/.test(filePath) // either path separator
+        reply.header('cache-control', hashed ? 'public, max-age=31536000, immutable' : 'no-cache')
+      },
+    })
     // Client-side routes get the app shell. A path that looks like a file (has an
     // extension) or belongs to /api or /auth is a real 404 — in particular a stale
     // hashed asset after a deploy must not come back as HTML pretending to be JS.

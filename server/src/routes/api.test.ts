@@ -156,6 +156,21 @@ describe.skipIf(!url)('API routes', () => {
       expect((await call('GET', `/api/workout-splits/${split.id}/logs`, b.auth)).statusCode).toBe(404)
     })
 
+    it("lists every routine's logs in one request, and only the user's own", async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const first = (await call('POST', '/api/workout-splits', a.auth, { name: 'Old', days: ['A'] })).json()
+      const second = (await call('POST', '/api/workout-splits', a.auth, { name: 'New', days: ['A'] })).json()
+      const other = (await call('POST', '/api/workout-splits', b.auth, { name: 'Theirs', days: ['A'] })).json()
+      const next = { dayStart: '2026-03-03T00:00:00Z', dayEnd: '2026-03-04T00:00:00Z', loggedAt: '2026-03-03T18:00:00Z' }
+      await call('POST', `/api/workout-splits/${first.id}/logs`, a.auth, { completed: true, dayIndex: 0, ...day })
+      await call('POST', `/api/workout-splits/${second.id}/logs`, a.auth, { completed: true, dayIndex: 0, ...next })
+      await call('POST', `/api/workout-splits/${other.id}/logs`, b.auth, { completed: true, dayIndex: 0, ...day })
+
+      const logs = (await call('GET', '/api/workout-splits/logs', a.auth)).json()
+      expect(logs.map((l: { splitId: string }) => l.splitId)).toEqual([second.id, first.id]) // newest first
+    })
+
     it("won't attach a set to someone else's training day, and takes RPE in half steps", async () => {
       const a = await t.newUser()
       const b = await t.newUser()
@@ -178,6 +193,25 @@ describe.skipIf(!url)('API routes', () => {
       expect((await call('DELETE', `/api/workout-splits/${split.id}/logs/${log.id}`, a.auth)).statusCode).toBe(204)
       expect(await t.prisma.workoutSet.count({ where: { splitLogId: log.id } })).toBe(0)
     })
+  })
+
+  it('limits sign-in requests to 30 a minute per address', async () => {
+    const codes = []
+    for (let i = 0; i < 31; i++) codes.push((await t.app.inject({ method: 'POST', url: '/auth/logout', remoteAddress: '203.0.113.7' })).statusCode)
+    expect(codes.slice(0, 30).includes(429)).toBe(false)
+    expect(codes[30]).toBe(429)
+    expect((await t.app.inject({ method: 'POST', url: '/auth/logout', remoteAddress: '203.0.113.8' })).statusCode).not.toBe(429)
+  })
+
+  it('limits food lookups to 30 a minute per user', async () => {
+    const a = await t.newUser()
+    const b = await t.newUser()
+    // q=x is refused before Open Food Facts is called, but still counts.
+    const codes = []
+    for (let i = 0; i < 31; i++) codes.push((await call('GET', '/api/products/search?q=x', a.auth)).statusCode)
+    expect(codes.slice(0, 30).every((c) => c === 400)).toBe(true)
+    expect(codes[30]).toBe(429)
+    expect((await call('GET', '/api/products/search?q=x', b.auth)).statusCode).toBe(400) // someone else isn't limited
   })
 
   it('checks the food search before calling Open Food Facts', async () => {

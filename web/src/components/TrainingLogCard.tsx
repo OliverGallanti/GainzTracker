@@ -36,10 +36,9 @@ function TrainingLogCard() {
   // shouldn't wipe it), so all splits' logs are fetched; the calendar and day
   // logger only use the active split's.
   const { data, error: loadError, reload } = useLoad(['training'], async () => {
-    const splits = await api<WorkoutSplit[]>('/api/workout-splits')
+    const [splits, allLogs] = await Promise.all([api<WorkoutSplit[]>('/api/workout-splits'), api<SplitLog[]>('/api/workout-splits/logs')])
     const split = splits.find((s) => s.active) ?? null
-    const logsBySplit = await Promise.all(splits.map((s) => api<SplitLog[]>(`/api/workout-splits/${s.id}/logs`)))
-    return { splits, split, logs: split ? logsBySplit[splits.indexOf(split)] : null, allLogs: logsBySplit.flat() }
+    return { splits, split, logs: split ? allLogs.filter((log) => log.splitId === split.id) : null, allLogs }
   })
 
   const splits = data?.splits ?? []

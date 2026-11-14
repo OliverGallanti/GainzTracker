@@ -8,6 +8,9 @@ const BARCODE = /^\d{8,14}$/
 
 export default async function productRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)
+  // Every lookup is a request to Open Food Facts, a free service: 30 a minute
+  // per user is plenty for logging food by hand.
+  app.addHook('onRequest', app.rateLimit({ max: 30, timeWindow: '1 minute', keyGenerator: (request) => request.userId || request.ip }))
 
   // Proxied through the BFF rather than called from the browser so the upstream
   // User-Agent is ours and the provider can be swapped without touching the client.

@@ -4,7 +4,6 @@ import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
 import { createLogSchema, createSplitSchema, updateLogSchema, updateSplitSchema } from '@gainz/shared/schemas'
 
-
 export default async function workoutSplitRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)
 
@@ -12,6 +11,15 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
     return prisma.workoutSplit.findMany({
       where: { userId: request.userId },
       orderBy: { createdAt: 'desc' },
+    })
+  })
+
+  // Every log of every routine, newest first: what the training screens load
+  // (the streak counts all of them), in one request rather than one per routine.
+  app.get('/workout-splits/logs', async (request) => {
+    return prisma.splitLog.findMany({
+      where: { userId: request.userId },
+      orderBy: { loggedAt: 'desc' },
     })
   })
 
