@@ -32,7 +32,3 @@ focusManager.setEventListener((setFocused) => {
 export function useIsOnline() {
   return useSyncExternalStore(onlineManager.subscribe.bind(onlineManager), () => onlineManager.isOnline())
 }
-
-// "today" is a calendar day, so it's part of the query key: offline the next
-// morning, the saved cache must not present yesterday's meals as today's.
-export const todayKey = () => ['today', new Date().toDateString()] as const

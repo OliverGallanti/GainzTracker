@@ -1,19 +1,34 @@
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { buildMonthGrid, startOfLocalDay } from '@gainz/shared/dates'
-import type { SplitLog } from '@gainz/shared/types'
 import { ChevronLeft, ChevronRight } from '../../icons'
 import { Text, IconButton, styles as ui } from '../../ui'
 import { formatDate, WEEKDAY_LABELS, styles } from './styles'
 
-// The month, as on the web: done and skipped days filled in, any past day can be
-// picked, future ones can't. Tapping today or the picked day goes back to today.
-export default function Calendar({ logs, selected, onSelect }: { logs: SplitLog[]; selected: Date; onSelect: (date: Date | null) => void }) {
+export type DayMark = { filled: boolean; note: string } // note: what TalkBack adds, e.g. 'done'
+
+// The month, as on the web: marked days filled in (amber when not `filled`), any
+// past day can be picked, future ones can't. Tapping today or the picked day
+// goes back to today. `onMonth` says which month is shown, to load its marks.
+export default function Calendar({
+  mark,
+  selected,
+  onSelect,
+  onMonth,
+}: {
+  mark: (date: Date) => DayMark | undefined
+  selected: Date
+  onSelect: (date: Date | null) => void
+  onMonth?: (month: Date) => void
+}) {
   const today = startOfLocalDay()
-  const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
-  const logsByDate = new Map(logs.map((log) => [new Date(log.loggedAt).toDateString(), log]))
+  const [month, setMonth] = useState(new Date(selected.getFullYear(), selected.getMonth(), 1))
   const isCurrentMonth = month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth()
-  const turn = (by: number) => setMonth(new Date(month.getFullYear(), month.getMonth() + by, 1))
+  const turn = (by: number) => {
+    const next = new Date(month.getFullYear(), month.getMonth() + by, 1)
+    setMonth(next)
+    onMonth?.(next)
+  }
 
   return (
     <View>
@@ -33,7 +48,7 @@ export default function Calendar({ logs, selected, onSelect }: { logs: SplitLog[
         {buildMonthGrid(month).map((date, i) => {
           if (!date) return <View key={i} style={styles.cell} />
           const key = date.toDateString()
-          const log = logsByDate.get(key)
+          const log = mark(date)
           const isToday = key === today.toDateString()
           const isSelected = key === selected.toDateString()
           const future = date > today
@@ -43,11 +58,11 @@ export default function Calendar({ logs, selected, onSelect }: { logs: SplitLog[
               onPress={() => onSelect(isToday || isSelected ? null : date)}
               disabled={future}
               accessibilityRole="button"
-              accessibilityLabel={`${formatDate(date.toISOString())}${log ? (log.completed ? ', done' : ', skipped') : ''}`}
+              accessibilityLabel={`${formatDate(date.toISOString())}${log ? `, ${log.note}` : ''}`}
               accessibilityState={{ selected: isSelected, disabled: future }}
               style={[styles.cell, styles.day, isToday && styles.dayToday, isSelected && styles.daySelected]}
             >
-              <View style={[styles.dayFill, log && (log.completed ? styles.dayDone : styles.daySkipped)]}>
+              <View style={[styles.dayFill, log && (log.filled ? styles.dayDone : styles.daySkipped)]}>
                 <Text style={log ? styles.dayTextLogged : future ? styles.dayTextFuture : ui.muted}>{date.getDate()}</Text>
               </View>
             </Pressable>

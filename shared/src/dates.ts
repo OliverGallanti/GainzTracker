@@ -23,3 +23,34 @@ export function startOfLocalWeek(date: Date = new Date()) {
   start.setDate(start.getDate() - daysSinceMonday)
   return start
 }
+
+// n days from a date (negative goes back), local time and DST safe like the week.
+export function addDays(date: Date, n: number) {
+  const day = new Date(date)
+  day.setDate(day.getDate() + n)
+  return day
+}
+
+// A local day as an API range: ?since=…&until=… on /api/meals.
+export function dayRange(date: Date) {
+  const since = startOfLocalDay(date)
+  const until = new Date(addDays(since, 1).getTime() - 1)
+  return { since: since.toISOString(), until: until.toISOString() }
+}
+
+// When a food logged "on" a day happened: now for today, midday for a past day
+// (filled in later, so the hour isn't known; midday stays inside the day).
+export function loggedAtOn(day: Date, now = new Date()) {
+  if (startOfLocalDay(day).getTime() === startOfLocalDay(now).getTime()) return now.toISOString()
+  const midday = startOfLocalDay(day)
+  midday.setHours(12)
+  return midday.toISOString()
+}
+
+// "Today", "Yesterday", or "Mon 16 Nov".
+export function dayLabel(day: Date, today = new Date()) {
+  const key = startOfLocalDay(day).getTime()
+  if (key === startOfLocalDay(today).getTime()) return 'Today'
+  if (key === startOfLocalDay(addDays(today, -1)).getTime()) return 'Yesterday'
+  return day.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+}

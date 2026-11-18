@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import type { SplitLog } from '@gainz/shared/types'
-import { buildMonthGrid, startOfLocalDay } from '@gainz/shared/dates'
 import { uniqueDays } from '@gainz/shared/splits'
+import MonthGrid from './MonthGrid'
 import SessionEditor from './SessionEditor'
-
-const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 // Details of one logged day. Keyed by log id at the call site, so the
 // confirm-remove prompt and session editor never carry over to another log.
@@ -140,90 +138,20 @@ function TrainingCalendar({
   selectedDate: Date
   onSelectDate: (date: Date | null) => void
 } & LogActions) {
-  const today = new Date()
-  const tomorrowStart = new Date(startOfLocalDay(today).getTime() + 24 * 60 * 60 * 1000)
-  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
-
   // Enforced once-per-day server-side, so this map is always at most one log per key.
   const logsByDate = new Map<string, SplitLog>(logs.map((log) => [new Date(log.loggedAt).toDateString(), log]))
-
-  const cells = buildMonthGrid(viewDate)
-  const isCurrentMonth =
-    viewDate.getFullYear() === today.getFullYear() && viewDate.getMonth() === today.getMonth()
-  const selectedKey = selectedDate.toDateString()
-  const selectedLog = logsByDate.get(selectedKey) ?? null
-
-  // Today and re-clicking the selected day both mean "back to the default".
-  const selectCell = (date: Date) => {
-    const key = date.toDateString()
-    onSelectDate(key === today.toDateString() || key === selectedKey ? null : date)
-  }
+  const selectedLog = logsByDate.get(selectedDate.toDateString()) ?? null
 
   return (
     <div className="mt-5 border-t border-secondary/25 pt-4">
-      <div className="mb-3 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
-          className="px-1 text-third/60 transition hover:text-third"
-          aria-label="Previous month"
-        >
-          ←
-        </button>
-        <p className="text-xs font-medium text-third">
-          {viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
-        </p>
-        <button
-          type="button"
-          onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
-          disabled={isCurrentMonth}
-          className="px-1 text-third/60 transition hover:text-third disabled:opacity-30"
-          aria-label="Next month"
-        >
-          →
-        </button>
-      </div>
-
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-third/60">
-        {WEEKDAY_LABELS.map((label, i) => (
-          <span key={i}>{label}</span>
-        ))}
-      </div>
-
-      <div className="mt-1 grid grid-cols-7 gap-1">
-        {cells.map((date, i) => {
-          if (!date) return <span key={i} />
-
+      <MonthGrid
+        mark={(date) => {
           const log = logsByDate.get(date.toDateString())
-          const isToday = date.toDateString() === today.toDateString()
-          const isSelected = date.toDateString() === selectedKey
-          const selectable = date < tomorrowStart
-
-          let classes = 'flex h-8 items-center justify-center rounded-lg text-xs transition'
-          if (log?.completed) {
-            classes += ' bg-third font-medium text-main'
-          } else if (log) {
-            classes += ' bg-amber-400/80 font-medium text-main'
-          } else {
-            classes += selectable ? ' text-third/60 hover:bg-third/10' : ' text-third/30'
-          }
-          if (isToday) classes += ' ring-1 ring-secondary'
-          if (isSelected) classes += ' ring-2 ring-third'
-
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => selectCell(date)}
-              disabled={!selectable}
-              aria-pressed={isSelected}
-              className={classes}
-            >
-              {date.getDate()}
-            </button>
-          )
-        })}
-      </div>
+          return log && { filled: log.completed, note: log.completed ? 'done' : 'skipped' }
+        }}
+        selected={selectedDate}
+        onSelect={onSelectDate}
+      />
 
       {selectedLog && (
         <LogDetail

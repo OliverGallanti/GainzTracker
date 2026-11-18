@@ -23,7 +23,7 @@ React single-page app in `web/`, built with Vite and styled with Tailwind CSS.
 
 | Card | What it does |
 | --- | --- |
-| `MacroStatsCard` | Today's macros and calories against your targets, and the foods logged under each meal. Food is logged in `LogFoodDialog` (the same steps as the phone), with name search and barcodes in `ProductLookup` and `BarcodeScanner` (ZXing, loaded only when opened). |
+| `MacroStatsCard` | Today's macros and calories against your targets, and the foods logged under each meal. Food is logged in `LogFoodDialog` (the same steps as the phone), with name search and barcodes in `ProductLookup` and `BarcodeScanner` (ZXing, loaded only when opened). Arrows and a calendar (`MonthGrid`, shared with the training calendar) move to earlier days. |
 | `GettingStarted` | Shown to new users only, until the profile, height and a weight exist (`shared/src/onboarding.ts`). |
 | `WeightChart` | Weight and body fat charts, BMI, goals, and the first measurements form. |
 | `TrainingLogCard` | Routine, weekly streak, the month calendar (`TrainingCalendar`) and sessions (`SessionEditor`). |

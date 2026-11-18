@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildMonthGrid, startOfLocalDay, startOfLocalWeek } from './dates'
+import { addDays, buildMonthGrid, dayLabel, dayRange, loggedAtOn, startOfLocalDay, startOfLocalWeek } from './dates'
 
 describe('buildMonthGrid', () => {
   it('pads to the weekday of the 1st and has every day of the month', () => {
@@ -69,5 +69,27 @@ describe('startOfLocalWeek', () => {
     const copy = new Date(original)
     startOfLocalWeek(original)
     expect(original.getTime()).toBe(copy.getTime())
+  })
+})
+
+describe('day history helpers', () => {
+  it('moves by calendar days and gives the whole local day as a range', () => {
+    expect(addDays(new Date(2026, 10, 1), -1).getDate()).toBe(31)
+    const { since, until } = dayRange(new Date(2026, 10, 16, 15, 30))
+    expect(new Date(since)).toEqual(new Date(2026, 10, 16))
+    expect(new Date(until)).toEqual(new Date(2026, 10, 16, 23, 59, 59, 999))
+  })
+
+  it('logs a past day at midday and today at now', () => {
+    const now = new Date(2026, 10, 18, 9, 15)
+    expect(loggedAtOn(new Date(2026, 10, 18), now)).toBe(now.toISOString())
+    expect(new Date(loggedAtOn(new Date(2026, 10, 16), now))).toEqual(new Date(2026, 10, 16, 12))
+  })
+
+  it('names today and yesterday', () => {
+    const today = new Date(2026, 10, 18, 9)
+    expect(dayLabel(new Date(2026, 10, 18), today)).toBe('Today')
+    expect(dayLabel(new Date(2026, 10, 17), today)).toBe('Yesterday')
+    expect(dayLabel(new Date(2026, 10, 16), today)).not.toMatch(/day$/)
   })
 })

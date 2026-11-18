@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, Pencil, Search, Star, Trash2, X } from 'lucide-react'
+import { loggedAtOn } from '@gainz/shared/dates'
 import { EMPTY_FOOD, eaten as eatenFor, fromMeal, fromProduct, fromSaved, perBasis, savedFrom, startAmount, type FoodDraft } from '@gainz/shared/foods'
 import { foodUnits, formatMacro, OTHER_MEAL } from '@gainz/shared/macros'
 import type { AmountUnit, Meal, SavedFood } from '@gainz/shared/types'
@@ -31,12 +32,14 @@ function LogFoodDialog({
   mealNames,
   defaultMeal,
   editing,
+  day,
   onChanged,
   onClose,
 }: {
   mealNames: string[]
   defaultMeal: string
   editing?: Meal // set: edit this logged food instead of logging a new one
+  day: Date // the day a new food is logged on
   onChanged: () => void // today's foods changed: reload them
   onClose: () => void
 }) {
@@ -105,7 +108,7 @@ function LogFoodDialog({
         await api('/api/saved-foods', { method: 'POST', body: JSON.stringify(withoutNulls(savedFrom(draft))) })
         savedFoods.reload()
       }
-      await api('/api/meals', { method: 'POST', body: JSON.stringify(withoutNulls(values)) })
+      await api('/api/meals', { method: 'POST', body: JSON.stringify(withoutNulls({ ...values, loggedAt: loggedAtOn(day) })) })
       if (draft.savedId) {
         const recent = [draft.savedId, ...readRecent().filter((id) => id !== draft.savedId)].slice(0, 50)
         try {

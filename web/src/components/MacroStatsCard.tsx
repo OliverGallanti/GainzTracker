@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { MacroGoal, Meal } from '@gainz/shared/types'
 import { api } from '../lib/api'
-import { startOfLocalDay } from '@gainz/shared/dates'
+import { addDays, dayLabel, dayRange, startOfLocalDay } from '@gainz/shared/dates'
 import { computeBmr, computeTdee } from '@gainz/shared/tdee'
-import { LayoutList, Target, Utensils } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, LayoutList, Target, Utensils } from 'lucide-react'
 import { OTHER_MEAL, groupByMeal, sumToday } from '@gainz/shared/macros'
 import { useMe, useWeights } from '../lib/sharedData'
 import { useLoad } from '../lib/useLoad'
@@ -13,6 +13,7 @@ import MacroTargetsForm from './MacroTargetsForm'
 import LogFoodDialog from './LogFoodDialog'
 import MealList from './MealList'
 import MealSlotsForm from './MealSlotsForm'
+import MonthGrid from './MonthGrid'
 
 const UNITS = [
   { key: 'g', label: 'g' },
@@ -26,12 +27,19 @@ function MacroStatsCard() {
   const [food, setFood] = useState<{ logMeal: string } | { edit: Meal } | null>(null)
   const [unit, setUnit] = useState('g') // 'g' | 'cal' | 'percent' — display only, never affects fill
 
-  // The card's own data: the macro target and today's meals.
-  const own = useLoad(['today', new Date().toDateString()], async () => {
-    const since = startOfLocalDay().toISOString()
+  // The day shown: null = today, so the card moves on to the new day at midnight.
+  const [picked, setPicked] = useState<Date | null>(null)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const day = picked ?? startOfLocalDay()
+  const isToday = picked == null
+  const go = (date: Date | null) => setPicked(date && startOfLocalDay(date) < startOfLocalDay() ? startOfLocalDay(date) : null)
+
+  // The card's own data: the macro target and that day's meals.
+  const own = useLoad(['today', day.toDateString()], async () => {
+    const { since, until } = dayRange(day)
     const [goal, meals] = await Promise.all([
       api<MacroGoal | null>('/api/macro-goal'),
-      api<Meal[]>(`/api/meals?since=${encodeURIComponent(since)}`),
+      api<Meal[]>(`/api/meals?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`),
     ])
     return { goal, meals }
   })
@@ -91,7 +99,7 @@ function MacroStatsCard() {
   return (
     <div className="glow-card w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <h2 className="card-title">Today's macros</h2>
+        <h2 className="card-title">{isToday ? "Today's macros" : `Macros · ${dayLabel(day)}`}</h2>
         {mode === 'view' && (
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2">
@@ -104,7 +112,8 @@ function MacroStatsCard() {
                 Meals
               </button>
             </div>
-            {goal && (
+            {/* Targets aren't kept per day: a past day is shown against today's. */}
+            {goal && isToday && (
               <button type="button" onClick={() => setMode('editTargets')} className="btn btn-primary">
                 <Target size={14} />
                 Edit targets
@@ -113,6 +122,43 @@ function MacroStatsCard() {
           </div>
         )}
       </div>
+
+      {mode === 'view' && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between">
+            <button type="button" onClick={() => go(addDays(day, -1))} aria-label="Previous day" className="rounded-lg p-2 text-third/60 transition hover:text-third">
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalendarOpen((open) => !open)}
+              aria-expanded={calendarOpen}
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-third transition hover:bg-third/10"
+            >
+              <CalendarDays size={16} className="text-third/60" />
+              {dayLabel(day)}
+            </button>
+            <button
+              type="button"
+              onClick={() => go(addDays(day, 1))}
+              disabled={isToday}
+              aria-label="Next day"
+              className="rounded-lg p-2 text-third/60 transition hover:text-third disabled:opacity-30"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+          {calendarOpen && (
+            <FoodCalendar
+              selected={day}
+              onSelect={(date) => {
+                go(date)
+                setCalendarOpen(false)
+              }}
+            />
+          )}
+        </div>
+      )}
 
       {isLoading && !loadError && <p className="text-xs text-third/60">Loading…</p>}
 
@@ -212,6 +258,7 @@ function MacroStatsCard() {
           mealNames={mealNames}
           defaultMeal={'logMeal' in food ? food.logMeal : OTHER_MEAL}
           editing={'edit' in food ? food.edit : undefined}
+          day={day}
           onChanged={own.reload}
           onClose={() => setFood(null)}
         />
@@ -219,6 +266,40 @@ function MacroStatsCard() {
 
       {mode === 'editMeals' && (
         <MealSlotsForm mealNames={mealNames} onSaved={handleMealsSaved} onCancel={() => setMode('view')} />
+      )}
+    </div>
+  )
+}
+
+// The month with the days that have food filled in. Only mounted while open,
+// so each open refetches the month.
+function FoodCalendar({ selected, onSelect }: { selected: Date; onSelect: (date: Date | null) => void }) {
+  const [month, setMonth] = useState(new Date(selected.getFullYear(), selected.getMonth(), 1))
+  const days = useLoad(['mealDays', month.toDateString()], async () => {
+    const since = month.toISOString()
+    const until = new Date(new Date(month.getFullYear(), month.getMonth() + 1, 1).getTime() - 1).toISOString()
+    const meals = await api<Meal[]>(`/api/meals?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}`)
+    return [...new Set(meals.map((m) => new Date(m.loggedAt).toDateString()))]
+  })
+  const logged = new Set(days.data)
+
+  return (
+    <div className="mt-3 rounded-lg border border-secondary/25 p-3">
+      <MonthGrid
+        mark={(date) => (logged.has(date.toDateString()) ? { filled: true, note: 'food logged' } : undefined)}
+        selected={selected}
+        onSelect={onSelect}
+        onMonth={setMonth}
+      />
+      {days.error ? (
+        <p className="mt-2 text-xs text-red-400">
+          Could not load the logged days:{' '}
+          <button type="button" onClick={days.reload} className="underline hover:no-underline">
+            retry
+          </button>
+        </p>
+      ) : (
+        <p className="mt-2 text-[10px] text-third/60">Filled days have food logged.</p>
       )}
     </div>
   )

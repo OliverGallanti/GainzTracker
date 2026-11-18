@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Linking, Pressable, StyleSheet, Switch, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { randomUUID } from 'expo-crypto'
+import { loggedAtOn } from '@gainz/shared/dates'
 import { EMPTY_FOOD, eaten as eatenFor, fromMeal, fromProduct, fromSaved, perBasis, savedFrom, sortSavedFoods, startAmount, type FoodDraft } from '@gainz/shared/foods'
 import { foodUnits, formatMacro, OTHER_MEAL } from '@gainz/shared/macros'
 import type { AmountUnit, Meal, SavedFood } from '@gainz/shared/types'
@@ -41,11 +42,13 @@ export default function LogFood({
   mealNames,
   defaultMeal,
   editing,
+  day,
   onClose,
 }: {
   mealNames: string[]
   defaultMeal: string
   editing?: Meal // set: edit this logged food instead of logging a new one
+  day: Date // the day a new food is logged on
   onClose: () => void
 }) {
   const [start] = useState(() => (editing ? fromMeal(editing) : null))
@@ -115,7 +118,7 @@ export default function LogFood({
     if (editing) {
       update.mutate({ label: values.description, id: editing.id, changes: values })
     } else {
-      add.mutate({ label: values.description, meal: { id: randomUUID(), ...values, loggedAt: new Date().toISOString() } })
+      add.mutate({ label: values.description, meal: { id: randomUUID(), ...values, loggedAt: loggedAtOn(day) } })
       if (saveToMine) saveFood.mutate({ label: `Save ${values.description}`, food: savedFrom(draft) })
       if (draft.savedId) {
         const ids = [draft.savedId, ...recent.filter((id) => id !== draft.savedId)].slice(0, 50)

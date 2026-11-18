@@ -13,6 +13,7 @@ Track what you eat, what you weigh and how you train, in one place: a web app an
 - **Log food in a few steps:** pick a saved food, search the [Open Food Facts](https://world.openfoodfacts.org) database by name, scan or type a barcode, or enter the values yourself. Then say how much you ate, in grams or servings, and see what it comes to.
 - **Your own meals:** foods are grouped under meals you name and order yourself (Breakfast, Lunch, Dinner, Dessert…), each with its subtotal. Tap a logged food to change or delete it.
 - **My foods:** foods you save, with values per serving or per 100 g, searchable, most recently used first.
+- **Past days:** step back a day at a time, or pick one on a calendar that shows the days with food, then see or fill in what you ate.
 
 ### Weight and body
 

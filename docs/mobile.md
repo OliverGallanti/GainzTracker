@@ -6,7 +6,7 @@ An Expo (React Native) app in `mobile/`. It uses the same server and the same `s
 
 Five tabs, which you can tap or swipe between (`mobile/src/Tabs.tsx`):
 
-- **Today:** macros, targets, and foods by meal. Food is logged step by step (`LogFoodForm.tsx`); barcodes are scanned with `expo-camera`.
+- **Today:** macros, targets, and foods by meal. Food is logged step by step (`LogFoodForm.tsx`); barcodes are scanned with `expo-camera`. Arrows and a calendar move to earlier days, each cached on its own.
 - **Weight:** latest weight, BMI, a chart, and the history.
 - **Training:** streak, weekly goal, the month calendar, sessions, and the live workout (`LiveWorkout.tsx`, state in `workout.ts`).
 - **Big 4:** the four lifts with charts, goals and strength levels.

@@ -71,7 +71,14 @@ export default function Logger({
 
   return (
     <Card>
-      <Calendar logs={logs} selected={target} onSelect={setPickedDate} />
+      <Calendar
+        mark={(date) => {
+          const day = logOnDay(logs, date)
+          return day && { filled: day.completed, note: day.completed ? 'done' : 'skipped' }
+        }}
+        selected={target}
+        onSelect={setPickedDate}
+      />
       <View style={styles.legend}>
         <View style={[styles.legendSwatch, styles.dayDone]} />
         <Muted>Done</Muted>
