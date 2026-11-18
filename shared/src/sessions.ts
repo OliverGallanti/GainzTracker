@@ -1,3 +1,4 @@
+import type { ReplaceSetsBody } from './schemas.ts'
 import type { SplitLog, WorkoutSet, WorkoutSplit } from './types.ts'
 
 export type PlannedSet = { weightKg: number | null; reps: number | null }
@@ -53,4 +54,34 @@ export function describeTiming(set: Pick<WorkoutSet, 'durationSeconds' | 'restSe
   ]
     .filter(Boolean)
     .join(' · ')
+}
+
+// A session form's row: the inputs' text, plus what the form doesn't show
+// (effort, the live timer's times, when it was done), carried through an edit.
+export type SetRow = {
+  exerciseName: string
+  weightKg: string
+  reps: string
+  kept?: Pick<WorkoutSet, 'rpe' | 'durationSeconds' | 'restSeconds' | 'performedAt'>
+}
+
+export const setRow = (set: WorkoutSet): SetRow => ({
+  exerciseName: set.exerciseName,
+  weightKg: set.weightKg == null ? '' : String(set.weightKg),
+  reps: set.reps == null ? '' : String(set.reps),
+  kept: { rpe: set.rpe, durationSeconds: set.durationSeconds, restSeconds: set.restSeconds, performedAt: set.performedAt },
+})
+
+// The rows as the body of a session save (PUT .../logs/:logId/sets): rows with
+// no exercise are left out, and empty values are left out, not sent as null.
+export function setsBody(rows: SetRow[]): ReplaceSetsBody {
+  const number = (text: string) => (text.trim() && Number.isFinite(Number(text)) ? Number(text) : null)
+  return {
+    sets: rows
+      .filter((r) => r.exerciseName.trim())
+      .map((r) => {
+        const set = { exerciseName: r.exerciseName.trim(), weightKg: number(r.weightKg), reps: number(r.reps), ...r.kept }
+        return Object.fromEntries(Object.entries(set).filter(([, v]) => v != null)) as ReplaceSetsBody['sets'][number]
+      }),
+  }
 }

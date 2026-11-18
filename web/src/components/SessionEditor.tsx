@@ -1,28 +1,18 @@
 import { useState } from 'react'
-import { describeTiming } from '@gainz/shared/sessions'
+import { describeTiming, setRow, setsBody, type SetRow } from '@gainz/shared/sessions'
 import type { SplitLog, WorkoutSet } from '@gainz/shared/types'
 import { api } from '../lib/api'
 import { useLoad } from '../lib/useLoad'
 import { useSubmit } from '../lib/useSubmit'
 
-// Form rows: every field is the input's text, numbers included. `kept` is what
-// the form doesn't show (effort, the live timer's times, when it was done), so
-// saving, which recreates every set, doesn't lose it.
-type Kept = Pick<WorkoutSet, 'rpe' | 'durationSeconds' | 'restSeconds' | 'performedAt'>
-type Row = { exerciseName: string; weightKg: string; reps: string; kept?: Kept }
+// Form rows (SetRow): the inputs' text, plus what the form doesn't show, kept
+// through a save.
+type Row = SetRow
 
 const emptyRow = (): Row => ({ exerciseName: '', weightKg: '', reps: '' })
 
-const toRows = (sets: WorkoutSet[]): Row[] =>
-  sets.length > 0
-    ? [...sets].reverse().map((s) => ({
-        // the API lists newest first; the form shows them in the order done
-        exerciseName: s.exerciseName,
-        weightKg: s.weightKg == null ? '' : String(s.weightKg),
-        reps: s.reps == null ? '' : String(s.reps),
-        kept: { rpe: s.rpe, durationSeconds: s.durationSeconds, restSeconds: s.restSeconds, performedAt: s.performedAt },
-      }))
-    : [emptyRow()]
+// The API lists newest first; the form shows them in the order done.
+const toRows = (sets: WorkoutSet[]): Row[] => (sets.length > 0 ? [...sets].reverse().map(setRow) : [emptyRow()])
 
 // Reused from both TrainingLogCard (right after marking a day done) and
 // TrainingCalendar (editing a past day's session). `log` is the full
@@ -31,8 +21,8 @@ const toRows = (sets: WorkoutSet[]): Row[] =>
 function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void }) {
   const [durationMinutes, setDurationMinutes] = useState(log.durationMinutes == null ? '' : String(log.durationMinutes))
 
-  // Saving is delete-then-recreate, so an editor that failed to read the
-  // existing rows would wipe them on save. A failed load therefore blocks the
+  // Saving replaces the day's sets with the form's rows, so an editor that
+  // failed to read the existing rows would wipe them on save. A failed load therefore blocks the
   // form entirely (see the render below) instead of showing a blank one.
   const existing = useLoad(['workoutSets', log.id], () => api<WorkoutSet[]>(`/api/workout-sets?splitLogId=${log.id}`))
   const loadError = existing.error
@@ -61,26 +51,9 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
   }
 
   const { submit, saving, error } = useSubmit(async () => {
-    // Delete-then-recreate rather than diffing: simpler. Each row carries its
-    // set's other fields (see Row), so only the id changes.
-    const existing = await api<WorkoutSet[]>(`/api/workout-sets?splitLogId=${log.id}`)
-    await Promise.all(existing.map((s) => api(`/api/workout-sets/${s.id}`, { method: 'DELETE' })))
-
-    const cleanedRows = currentRows.filter((r) => r.exerciseName.trim())
-    await Promise.all(
-      cleanedRows.map((r) =>
-        api('/api/workout-sets', {
-          method: 'POST',
-          body: JSON.stringify({
-            splitLogId: log.id,
-            exerciseName: r.exerciseName.trim(),
-            ...(r.weightKg ? { weightKg: Number(r.weightKg) } : {}),
-            ...(r.reps ? { reps: Number(r.reps) } : {}),
-            ...Object.fromEntries(Object.entries(r.kept ?? {}).filter(([, v]) => v != null)), // the API takes a missing field, not null
-          }),
-        }),
-      ),
-    )
+    // One request: the server swaps the day's sets in a single transaction, so
+    // a failure leaves them as they were.
+    await api(`/api/workout-splits/${log.splitId}/logs/${log.id}/sets`, { method: 'PUT', body: JSON.stringify(setsBody(currentRows)) })
 
     if (durationMinutes) {
       await api(`/api/workout-splits/${log.splitId}/logs/${log.id}`, {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeWeeklyStreak, suggestedDayIndex, uniqueDays, weeklyGoal } from './splits'
+import { computeWeeklyStreak, logOnDay, suggestedDayIndex, uniqueDays, weeklyGoal } from './splits'
 
 // "Now" is Wed 16 Sep 2026; weeks run Monday to Sunday, so this week is 14-20 Sep.
 const NOW = new Date(2026, 8, 16, 12)
@@ -120,5 +120,14 @@ describe('uniqueDays', () => {
       { label: 'A', index: 0 },
       { label: 'B', index: 1 },
     ])
+  })
+})
+
+describe('logOnDay', () => {
+  it("finds the log on that calendar day, whatever the time, and nothing on another day", () => {
+    const logs = [{ id: 'a', loggedAt: new Date(2026, 8, 16, 23, 30).toISOString() }, { id: 'b', loggedAt: new Date(2026, 8, 14, 0, 5).toISOString() }]
+    expect(logOnDay(logs, new Date(2026, 8, 16, 8))?.id).toBe('a')
+    expect(logOnDay(logs, new Date(2026, 8, 14))?.id).toBe('b')
+    expect(logOnDay(logs, new Date(2026, 8, 15))).toBeUndefined()
   })
 })

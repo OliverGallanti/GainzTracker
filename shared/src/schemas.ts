@@ -138,6 +138,13 @@ export const createSetSchema = z.object({
   performedAt: z.coerce.date().optional(),
 })
 
+// A training day's sets, all of them: the server replaces the day's sets with
+// these in one transaction, so a save can't stop halfway. Ids and the day come
+// from the server and the URL.
+export const replaceSetsSchema = z.object({
+  sets: z.array(createSetSchema.omit({ id: true, splitLogId: true })).max(200),
+})
+
 // { "Deadlift": 200, "Squat": 150 }: only the lifts being changed, and only the
 // Big 4 (so the table can't collect arbitrary keys). A refine rather than an
 // enum-keyed record, which zod 4 reads as "every key required".
@@ -151,3 +158,4 @@ export type UpdateMealBody = z.input<typeof updateMealSchema>
 export type UpdateLogBody = z.input<typeof updateLogSchema>
 export type UpdateSplitBody = z.input<typeof updateSplitSchema>
 export type LiftGoalsBody = z.input<typeof liftGoalsSchema>
+export type ReplaceSetsBody = z.input<typeof replaceSetsSchema>

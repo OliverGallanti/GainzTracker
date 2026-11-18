@@ -2,9 +2,8 @@ import { useState } from 'react'
 import type { WorkoutSet } from '@gainz/shared/types'
 import { Dumbbell } from 'lucide-react'
 import { api } from '../lib/api'
-import { BIG_FOUR_LIFTS } from '@gainz/shared/lifts'
+import { BIG_FOUR_LIFTS, rankBigFour } from '@gainz/shared/lifts'
 import { useMe, useWeights } from '../lib/sharedData'
-import { getStrengthTier } from '@gainz/shared/strength'
 import { useLoad } from '../lib/useLoad'
 import BigFourProgress from './BigFourProgress'
 import BigFourLogList from './BigFourLogList'
@@ -67,14 +66,8 @@ function BigFourCard() {
   const isLoading =
     sets === null || goals === undefined || sex === undefined || bodyweight === undefined
 
-  // The API already returns sets newest-first, so the first match per lift
-  // is its most recent entry — the "current" number the ranking and the
-  // strength-tier rating are both built on, not the all-time best.
-  const latestByLift = BIG_FOUR_LIFTS.map((name) => {
-    const entry = sets?.find((s) => s.exerciseName === name) ?? null
-    return { name, entry, tier: getStrengthTier(name, entry?.weightKg, bodyweight, sex) }
-  })
-  const ranked = [...latestByLift].sort((a, b) => (b.entry?.weightKg ?? -1) - (a.entry?.weightKg ?? -1))
+  // Ranked by each lift's most recent entry, not the all-time best (rankBigFour).
+  const ranked = rankBigFour(sets ?? [], bodyweight, sex)
   const loggedEntries = sets?.filter((s) => BIG_FOUR_LIFTS.includes(s.exerciseName)) ?? []
 
   return (
@@ -125,7 +118,7 @@ function BigFourCard() {
         <>
           {/* The ranking doubles as the lift picker for the chart below. */}
           <ol className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {ranked.map(({ name, entry, tier }, i) => (
+            {ranked.map(({ name, latest, tier }, i) => (
               <li key={name} className="flex">
                 <button
                   type="button"
@@ -138,14 +131,14 @@ function BigFourCard() {
                   }`}
                 >
                   <span className="flex items-center justify-between text-xs">
-                    <span className={`font-semibold ${entry ? 'text-third' : 'text-third/40'}`}>
-                      {entry ? `#${i + 1}` : '—'}
+                    <span className={`font-semibold ${latest ? 'text-third' : 'text-third/40'}`}>
+                      {latest ? `#${i + 1}` : '—'}
                     </span>
                     {tier && <span title={tier.label}>{tier.icon}</span>}
                   </span>
-                  <span className={`text-sm ${entry ? 'text-third' : 'text-third/60'}`}>{name}</span>
-                  <span className={entry ? 'text-lg font-semibold text-third' : 'text-xs text-third/60'}>
-                    {entry ? `${entry.weightKg}kg${entry.reps ? ` × ${entry.reps}` : ''}` : 'Not logged yet'}
+                  <span className={`text-sm ${latest ? 'text-third' : 'text-third/60'}`}>{name}</span>
+                  <span className={latest ? 'text-lg font-semibold text-third' : 'text-xs text-third/60'}>
+                    {latest ? `${latest.weightKg}kg${latest.reps ? ` × ${latest.reps}` : ''}` : 'Not logged yet'}
                   </span>
                 </button>
               </li>

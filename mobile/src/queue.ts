@@ -1,6 +1,6 @@
 import { MutationObserver, useMutation, useMutationState, useQueryClient, type Mutation, type QueryClient } from '@tanstack/react-query'
 import type { MacroGoal, Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
-import type { LiftGoalsBody, UpdateLogBody, UpdateMealBody, UpdateSplitBody } from '@gainz/shared/schemas'
+import type { LiftGoalsBody, ReplaceSetsBody, UpdateLogBody, UpdateMealBody, UpdateSplitBody } from '@gainz/shared/schemas'
 import { api } from './api'
 
 // The offline write queue. Each kind of write registers its send function once
@@ -35,6 +35,9 @@ export type UpdateMeVars = Label & {
 // which makes a repeat harmless without a client id.
 export type SaveFoodVars = Label & { food: Omit<SavedFood, 'id'> }
 export type AddSetVars = Label & { set: WorkoutSet }
+// A session save: the day's sets become exactly these (a PUT, in one
+// transaction on the server), so repeating it is harmless.
+export type ReplaceSetsVars = Label & { splitId: string; log: Pick<SplitLog, 'id' | 'loggedAt'>; body: ReplaceSetsBody }
 // PUT /api/lift-goals replaces only the lifts it names: repeating it is harmless.
 export type SetLiftGoalsVars = Label & { goals: LiftGoalsBody }
 export type LogDayVars = Label & {
@@ -75,6 +78,7 @@ export const QUEUED = {
   createSplit: ['queue', 'createSplit'],
   saveFood: ['queue', 'saveFood'],
   addSet: ['queue', 'addSet'],
+  replaceSets: ['queue', 'replaceSets'],
   setLiftGoals: ['queue', 'setLiftGoals'],
 } as const
 
@@ -195,6 +199,28 @@ export function registerQueuedMutations(queryClient: QueryClient) {
     mutationFn: ({ set }: AddSetVars) => api('/api/workout-sets', { method: 'POST', body: JSON.stringify(nullsOmitted(set)) }),
     onMutate: ({ set }: AddSetVars) => {
       queryClient.setQueryData<WorkoutSet[]>(['workoutSets'], (old) => (old ? [set, ...without(old, set.id)] : old))
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['workoutSets'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.replaceSets, {
+    ...common,
+    mutationFn: ({ splitId, log, body }: ReplaceSetsVars) =>
+      api(`/api/workout-splits/${splitId}/logs/${log.id}/sets`, { method: 'PUT', body: JSON.stringify(body) }),
+    // On screen straight away, as the server will store them (a set without a
+    // time goes on the day, a millisecond apart, newest first in the list).
+    onMutate: ({ log, body }: ReplaceSetsVars) => {
+      const sets: WorkoutSet[] = body.sets.map((set, i) => ({
+        weightKg: null,
+        reps: null,
+        ...set,
+        id: `unsent:${log.id}:${i}`,
+        splitLogId: log.id,
+        performedAt: set.performedAt ? String(set.performedAt) : new Date(new Date(log.loggedAt).getTime() + i).toISOString(),
+      }))
+      queryClient.setQueryData<WorkoutSet[]>(['workoutSets'], (old) =>
+        old ? [...old.filter((s) => s.splitLogId !== log.id), ...sets].sort((a, b) => b.performedAt.localeCompare(a.performedAt)) : old,
+      )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['workoutSets'] }),
   })

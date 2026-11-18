@@ -1,3 +1,6 @@
+import { getStrengthTier } from './strength.ts'
+import type { Sex, WorkoutSet } from './types.ts'
+
 // The server accepts goals only for these (liftGoalsSchema in schemas.ts).
 // These are the same display names WorkoutSet.exerciseName and LiftGoal
 // .exerciseName use, so a lift's name is its own key everywhere — there's no
@@ -7,3 +10,14 @@ export const BIG_FOUR_LIFTS = ['Deadlift', 'Squat', 'Bench Press', 'Overhead Pre
 // Only RPE is stored: reps in reserve is the same scale read the other way.
 export const RPE_VALUES = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
 export const formatEffort = (rpe: number) => `RPE ${rpe} · RIR ${10 - rpe}`
+
+// The Big 4 ranked by each lift's most recent entry (the "current" number,
+// not the all-time best), heaviest first, each with its strength tier. A lift
+// never logged has no `latest` and goes last. `sets` newest first, as the API
+// lists them.
+export function rankBigFour(sets: WorkoutSet[], bodyweightKg: number | null | undefined, sex: Sex | null | undefined) {
+  return BIG_FOUR_LIFTS.map((name) => {
+    const latest = sets.find((s) => s.exerciseName === name) ?? null
+    return { name, latest, tier: getStrengthTier(name, latest?.weightKg, bodyweightKg, sex) }
+  }).sort((a, b) => (b.latest?.weightKg ?? -1) - (a.latest?.weightKg ?? -1))
+}

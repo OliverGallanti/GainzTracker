@@ -195,6 +195,35 @@ describe.skipIf(!url)('API routes', () => {
       expect((await call('GET', '/api/workout-sets', a.auth)).json()[0]).toMatchObject({ durationSeconds: 42, restSeconds: 95 })
     })
 
+    it("replaces a day's sets all at once, keeps them on a bad request, and only on the user's own day", async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const split = (await call('POST', '/api/workout-splits', a.auth, { name: 'Push', days: ['A'] })).json()
+      const log = (await call('POST', `/api/workout-splits/${split.id}/logs`, a.auth, { completed: true, dayIndex: 0, ...day })).json()
+      const url = `/api/workout-splits/${split.id}/logs/${log.id}/sets`
+      await call('POST', '/api/workout-sets', a.auth, { exerciseName: 'Old', reps: 1, splitLogId: log.id })
+      const names = async () => (await call('GET', `/api/workout-sets?splitLogId=${log.id}`, a.auth)).json().map((s: { exerciseName: string }) => s.exerciseName)
+
+      const sets = [
+        { exerciseName: 'Bench Press', weightKg: 80, reps: 8, rpe: 8, durationSeconds: 40 },
+        { exerciseName: 'Bench Press', weightKg: 82.5, reps: 6 },
+        { exerciseName: 'Dips', reps: 12 },
+      ]
+      const saved = await call('PUT', url, a.auth, { sets })
+      expect(saved.statusCode).toBe(200)
+      expect(saved.json()).toHaveLength(3)
+      expect((await names()).reverse()).toEqual(['Bench Press', 'Bench Press', 'Dips']) // in the order sent
+      expect((await call('PUT', url, a.auth, { sets })).json()).toHaveLength(3) // a retry changes nothing
+      expect(await names()).toHaveLength(3)
+
+      // One bad set: refused as a whole, the saved ones untouched.
+      expect((await call('PUT', url, a.auth, { sets: [{ exerciseName: 'Squat', reps: 5 }, { exerciseName: '' }] })).statusCode).toBe(400)
+      expect(await names()).toHaveLength(3)
+
+      expect((await call('PUT', url, b.auth, { sets: [] })).statusCode).toBe(404)
+      expect((await call('PUT', url, a.auth, { sets: [] })).json()).toEqual([])
+    })
+
     it('no longer serves the unused workout routines', async () => {
       const a = await t.newUser()
       expect((await call('GET', '/api/workouts', a.auth)).statusCode).toBe(404)

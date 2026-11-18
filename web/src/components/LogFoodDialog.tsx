@@ -1,23 +1,16 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ChevronLeft, Pencil, Search, Star, Trash2, X, type LucideIcon } from 'lucide-react'
-import {
-  EMPTY_FOOD,
-  eaten as eatenFor,
-  fromMeal,
-  fromProduct,
-  fromSaved,
-  perBasis,
-  savedFrom,
-  sortSavedFoods,
-  startAmount,
-  type FoodDraft,
-} from '@gainz/shared/foods'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronLeft, Pencil, Search, Star, Trash2, X } from 'lucide-react'
+import { EMPTY_FOOD, eaten as eatenFor, fromMeal, fromProduct, fromSaved, perBasis, savedFrom, startAmount, type FoodDraft } from '@gainz/shared/foods'
 import { foodUnits, formatMacro, OTHER_MEAL } from '@gainz/shared/macros'
 import type { AmountUnit, Meal, SavedFood } from '@gainz/shared/types'
 import { api } from '../lib/api'
 import { useLoad } from '../lib/useLoad'
 import { useSubmit, ValidationError } from '../lib/useSubmit'
 import ProductLookup from './ProductLookup'
+import { INPUT, SECTION, round1, withoutNulls, RECENT_KEY, readRecent, SAVED_FOODS_KEY } from './logFood/common'
+import { IconButton, Toggle, SourceOption } from './logFood/parts'
+import MyFoods from './logFood/MyFoods'
+import ValuesForm from './logFood/ValuesForm'
 
 // Log food, in steps inside one dialog, like the phone: pick where the food
 // comes from (My foods, the food database, or typed in), then say how much was
@@ -34,28 +27,6 @@ const TITLES: Record<Step, string> = {
   amount: 'Amount',
   editSaved: 'Edit saved food',
 }
-
-const INPUT = 'rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-sm text-third outline-none focus:border-secondary'
-const SECTION = 'rounded-xl border border-secondary/30 p-4'
-const round1 = (n: number) => Math.round(n * 10) / 10
-const text = (value: number | null) => (value == null ? '' : String(round1(value)))
-const numberOrNull = (value: string) => (value.trim() === '' ? null : Number(value))
-// The API's optional fields are "absent", not null.
-const withoutNulls = <T extends object>(value: T) => Object.fromEntries(Object.entries(value).filter(([, v]) => v != null))
-
-// Saved foods last logged, newest first, kept in this browser only (the server
-// lists them by name). ponytail: per browser, not synced with the phone's list.
-const RECENT_KEY = 'recentFoods'
-const readRecent = (): string[] => {
-  try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]')
-  } catch {
-    return []
-  }
-}
-
-const SAVED_FOODS_KEY = ['savedFoods']
-
 function LogFoodDialog({
   mealNames,
   defaultMeal,
@@ -340,201 +311,6 @@ function LogFoodDialog({
         </form>
       )}
     </dialog>
-  )
-}
-
-function IconButton({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-secondary/40 text-third transition hover:border-secondary"
-    >
-      <Icon size={16} />
-    </button>
-  )
-}
-
-function Toggle({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-        selected ? 'border-third bg-third font-semibold text-main' : 'border-secondary/40 text-third hover:border-secondary'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
-function SourceOption({ icon: Icon, title, detail, onClick }: { icon: LucideIcon; title: string; detail: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-4 rounded-xl border border-secondary/40 bg-main/40 px-4 py-3.5 text-left transition hover:border-secondary active:scale-[0.99]"
-    >
-      <Icon size={20} className="shrink-0" />
-      <span>
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="block text-xs text-third/60">{detail}</span>
-      </span>
-    </button>
-  )
-}
-
-function MyFoods({
-  foods,
-  failed,
-  onRetry,
-  onPick,
-  onEdit,
-}: {
-  foods: SavedFood[] | undefined
-  failed: boolean
-  onRetry: () => void
-  onPick: (food: SavedFood) => void
-  onEdit: (food: SavedFood) => void
-}) {
-  const [query, setQuery] = useState('')
-  const [recent] = useState(readRecent)
-
-  if (failed && !foods) {
-    return (
-      <p className="text-xs text-red-400">
-        Could not load your saved foods:{' '}
-        <button type="button" onClick={onRetry} className="underline hover:no-underline">
-          retry
-        </button>
-      </p>
-    )
-  }
-  if (!foods) return <p className="text-xs text-third/60">Loading…</p>
-  if (foods.length === 0) {
-    return <p className="text-sm text-third/60">No saved foods yet. When you log a food, tick “Save to My foods” and it shows up here.</p>
-  }
-
-  const shown = sortSavedFoods(foods, recent, query)
-  return (
-    <div className="flex flex-col gap-2">
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={`Search ${foods.length} saved foods`}
-        aria-label="Search my foods"
-        className={INPUT}
-      />
-      <ul className="divide-y divide-secondary/20">
-        {shown.map((food) => (
-          <li key={food.id} className="flex items-center gap-2">
-            <button type="button" onClick={() => onPick(food)} className="min-w-0 flex-1 py-2.5 text-left transition hover:opacity-80">
-              <span className="block truncate text-sm">{food.name}</span>
-              <span className="block text-xs text-third/60">{perBasis(fromSaved(food))}</span>
-            </button>
-            <IconButton icon={Pencil} label={`Edit ${food.name}`} onClick={() => onEdit(food)} />
-          </li>
-        ))}
-        {shown.length === 0 && <li className="py-2 text-xs text-third/60">No saved food matches “{query.trim()}”.</li>}
-      </ul>
-    </div>
-  )
-}
-
-// A food's name and values: typed in, corrected, or a saved food being edited.
-function ValuesForm({
-  draft,
-  submitLabel,
-  onSubmit,
-  onDelete,
-  error,
-}: {
-  draft: FoodDraft
-  submitLabel: string
-  onSubmit: (food: FoodDraft) => void
-  onDelete?: () => void
-  error?: string | null
-}) {
-  const [name, setName] = useState(draft.name)
-  const [basis, setBasis] = useState(draft.basis)
-  const [servingG, setServingG] = useState(text(draft.servingG))
-  const [n, setN] = useState({ calories: text(draft.calories), proteinG: text(draft.proteinG), fatG: text(draft.fatG), carbsG: text(draft.carbsG) })
-
-  const valid = name.trim() !== '' && n.calories !== '' && Number(n.calories) >= 0 && (servingG === '' || Number(servingG) > 0)
-  const field = (key: keyof typeof n, label: string) => (
-    <label className="flex flex-col gap-1 text-xs text-third/60">
-      {label}
-      <input type="number" min="0" step="any" value={n[key]} onChange={(e) => setN({ ...n, [key]: e.target.value })} className={INPUT} />
-    </label>
-  )
-
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (!valid) return
-        onSubmit({
-          ...draft,
-          name: name.trim(),
-          basis,
-          servingG: numberOrNull(servingG),
-          calories: Number(n.calories),
-          proteinG: numberOrNull(n.proteinG),
-          fatG: numberOrNull(n.fatG),
-          carbsG: numberOrNull(n.carbsG),
-        })
-      }}
-      className="flex flex-col gap-4"
-    >
-      <section className={SECTION}>
-        <label className="flex flex-col gap-1 text-sm font-semibold">
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chicken and rice" className={`font-normal ${INPUT}`} />
-        </label>
-      </section>
-
-      <section className={`flex flex-col gap-3 ${SECTION}`}>
-        <h3 className="text-sm font-semibold">Nutrition values</h3>
-        <div>
-          <p className="mb-1 text-xs text-third/60">The values below are for</p>
-          <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="The values are for">
-            <Toggle selected={basis === '100g'} onClick={() => setBasis('100g')}>
-              100 g
-            </Toggle>
-            <Toggle selected={basis === 'serving'} onClick={() => setBasis('serving')}>
-              1 serving
-            </Toggle>
-          </div>
-        </div>
-        <label className="flex flex-col gap-1 text-xs text-third/60">
-          {basis === '100g' ? 'Serving weight in g (optional): lets you log it in servings too' : 'Weight of one serving in g (optional): lets you log it in grams too'}
-          <input type="number" min="0" step="any" value={servingG} onChange={(e) => setServingG(e.target.value)} className={INPUT} />
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          {field('calories', 'Calories')}
-          {field('proteinG', 'Protein (g)')}
-          {field('fatG', 'Fat (g)')}
-          {field('carbsG', 'Carbs (g)')}
-        </div>
-      </section>
-
-      {error && <p className="text-xs text-red-400">{error}</p>}
-      <div className="flex gap-2">
-        <button type="submit" disabled={!valid} className="btn btn-primary flex-1 py-2 text-sm disabled:opacity-60">
-          {submitLabel}
-        </button>
-        {onDelete && (
-          <button type="button" onClick={onDelete} className="btn btn-secondary py-2 text-sm hover:text-red-400">
-            <Trash2 size={14} />
-            Delete saved food
-          </button>
-        )}
-      </div>
-    </form>
   )
 }
 

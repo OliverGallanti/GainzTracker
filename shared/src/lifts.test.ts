@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BIG_FOUR_LIFTS, formatEffort, RPE_VALUES } from './lifts'
+import { BIG_FOUR_LIFTS, formatEffort, rankBigFour, RPE_VALUES } from './lifts'
 import { STRENGTH_STANDARDS } from './strength'
 
 describe('RPE', () => {
@@ -35,5 +35,24 @@ describe('BIG_FOUR_LIFTS', () => {
 
   it('has no duplicates', () => {
     expect(new Set(BIG_FOUR_LIFTS).size).toBe(BIG_FOUR_LIFTS.length)
+  })
+})
+
+describe('rankBigFour', () => {
+  const set = (exerciseName, weightKg, day) => ({ id: `${exerciseName}${day}`, exerciseName, weightKg, reps: 5, performedAt: `2026-11-${day}T18:00:00.000Z` })
+
+  it("ranks by each lift's latest entry, not its best, and puts unlogged lifts last", () => {
+    // newest first, as the API lists them
+    const sets = [set('Squat', 120, '10'), set('Bench Press', 90, '09'), set('Squat', 140, '01'), set('Curl', 30, '08')]
+    const ranked = rankBigFour(sets, 80, 'male')
+    expect(ranked.map((r) => r.name).slice(0, 2)).toEqual(['Squat', 'Bench Press'])
+    expect(ranked[0].latest?.weightKg).toBe(120)
+    expect(ranked.slice(2).every((r) => r.latest === null)).toBe(true)
+    expect(ranked[0].tier).not.toBeNull()
+  })
+
+  it('has no tier without a bodyweight or sex', () => {
+    expect(rankBigFour([set('Squat', 120, '10')], null, 'male')[0].tier).toBeNull()
+    expect(rankBigFour([set('Squat', 120, '10')], 80, null)[0].tier).toBeNull()
   })
 })

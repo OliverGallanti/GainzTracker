@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { requireAuth } from '../middleware/require-auth.ts'
 import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
-import { createLogSchema, createSplitSchema, updateLogSchema, updateSplitSchema } from '@gainz/shared/schemas'
+import { createLogSchema, createSplitSchema, replaceSetsSchema, updateLogSchema, updateSplitSchema } from '@gainz/shared/schemas'
 
 export default async function workoutSplitRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)
@@ -164,6 +164,38 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
       return reply.notFound()
     }
     return reply.code(204).send()
+  })
+
+  // Saving a session: the day's sets become exactly these, in one transaction,
+  // so a failure leaves the old ones in place. Repeating it gives the same
+  // result, so a retry is safe. A set without a time is placed on the day,
+  // a millisecond apart, so the sets keep the order they were sent in.
+  app.put<{ Params: { id: string; logId: string } }>('/workout-splits/:id/logs/:logId/sets', async (request, reply) => {
+    const parsed = replaceSetsSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.badRequest(parsed.error.message)
+    }
+
+    const log = await prisma.splitLog.findFirst({
+      where: { id: request.params.logId, splitId: request.params.id, userId: request.userId },
+      select: { id: true, loggedAt: true },
+    })
+    if (!log) {
+      return reply.notFound()
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await tx.workoutSet.deleteMany({ where: { splitLogId: log.id, userId: request.userId } })
+      await tx.workoutSet.createMany({
+        data: parsed.data.sets.map((set, i) => ({
+          ...set,
+          performedAt: set.performedAt ?? new Date(log.loggedAt.getTime() + i),
+          userId: request.userId,
+          splitLogId: log.id,
+        })),
+      })
+      return tx.workoutSet.findMany({ where: { splitLogId: log.id }, orderBy: { performedAt: 'desc' } })
+    })
   })
 
   app.delete<{ Params: { id: string; logId: string } }>('/workout-splits/:id/logs/:logId', async (request, reply) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeTiming, formatSeconds, lastSessionPlan } from './sessions'
+import { describeTiming, formatSeconds, lastSessionPlan, setRow, setsBody } from './sessions'
 
 const split = { id: 's', name: 'PPL', days: ['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs'], daysPerWeek: 6, active: true }
 const log = (id, dayIndex, day, completed = true) => ({ id, splitId: 's', dayIndex, completed, loggedAt: `2026-11-${day}T18:00:00.000Z`, durationMinutes: null })
@@ -61,5 +61,25 @@ describe('describeTiming', () => {
     expect(describeTiming({ durationSeconds: 45, restSeconds: 90 })).toBe('0:45 · rest 1:30')
     expect(describeTiming({ durationSeconds: 45, restSeconds: null })).toBe('0:45')
     expect(describeTiming({})).toBe('')
+  })
+})
+
+describe('setsBody', () => {
+  it('sends the filled rows, numbers as numbers, and keeps what the form hides', () => {
+    const timed = { id: 'x', exerciseName: 'Squat', weightKg: 100, reps: 5, rpe: 8, durationSeconds: 40, restSeconds: null, performedAt: '2026-11-14T18:00:00.000Z' }
+    expect(
+      setsBody([
+        setRow(timed),
+        { exerciseName: ' Dips ', weightKg: '', reps: '12' },
+        { exerciseName: '', weightKg: '20', reps: '5' },
+        { exerciseName: 'Row', weightKg: 'abc', reps: '' },
+      ]),
+    ).toEqual({
+      sets: [
+        { exerciseName: 'Squat', weightKg: 100, reps: 5, rpe: 8, durationSeconds: 40, performedAt: '2026-11-14T18:00:00.000Z' },
+        { exerciseName: 'Dips', reps: 12 },
+        { exerciseName: 'Row' },
+      ],
+    })
   })
 })

@@ -1,7 +1,7 @@
 // Bodyweight-ratio strength standards for the Big 4 lifts. Each threshold is
 // where that tier begins (ratio = lift / bodyweight); below the first
 // threshold is Beginner. Source: user-supplied standard, not derived.
-import type { Sex } from './types'
+import type { Sex } from './types.ts'
 
 export const STRENGTH_STANDARDS: Record<Sex, Record<string, number[]>> = {
   male: {

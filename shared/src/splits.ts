@@ -53,3 +53,9 @@ export function suggestedDayIndex(days: string[], logs: Pick<SplitLog, 'dayIndex
 export function uniqueDays(days: string[]) {
   return days.flatMap((label, index) => (days.indexOf(label) === index ? [{ label, index }] : []))
 }
+
+// The log on a calendar day (this device's day), if there is one: at most one
+// per day, which the server enforces.
+export function logOnDay<T extends Pick<SplitLog, 'loggedAt'>>(logs: T[], date: Date): T | undefined {
+  return logs.find((log) => new Date(log.loggedAt).toDateString() === date.toDateString())
+}

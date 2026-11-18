@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import { randomUUID } from 'expo-crypto'
-import { BIG_FOUR_LIFTS, formatEffort, RPE_VALUES } from '@gainz/shared/lifts'
-import { getStrengthReferenceLines, getStrengthTier } from '@gainz/shared/strength'
+import { BIG_FOUR_LIFTS, formatEffort, rankBigFour, RPE_VALUES } from '@gainz/shared/lifts'
+import { getStrengthReferenceLines } from '@gainz/shared/strength'
 import type { WorkoutSet } from '@gainz/shared/types'
 import { api } from '../api'
 import { Dumbbell, History, Pencil, Plus } from '../icons'
@@ -34,10 +34,7 @@ export default function BigFourScreen() {
   const sex = me.data?.sex ?? null
   const bodyweight = weights.data?.[0]?.weightKg ?? null
   const bigFourSets = (sets.data ?? []).filter((s) => BIG_FOUR_LIFTS.includes(s.exerciseName))
-  const ranked = BIG_FOUR_LIFTS.map((name) => {
-    const latest = bigFourSets.find((s) => s.exerciseName === name) ?? null
-    return { name, latest, tier: getStrengthTier(name, latest?.weightKg, bodyweight, sex) }
-  }).sort((a, b) => (b.latest?.weightKg ?? -1) - (a.latest?.weightKg ?? -1))
+  const ranked = rankBigFour(bigFourSets, bodyweight, sex)
 
   const current = ranked.find((r) => r.name === selected)!
   const goal = goals.data?.[selected]

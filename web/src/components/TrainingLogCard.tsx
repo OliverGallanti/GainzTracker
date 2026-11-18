@@ -3,7 +3,7 @@ import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
 import { Check, Repeat } from 'lucide-react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '@gainz/shared/dates'
-import { computeWeeklyStreak, suggestedDayIndex, weeklyGoal } from '@gainz/shared/splits'
+import { computeWeeklyStreak, logOnDay, suggestedDayIndex, weeklyGoal } from '@gainz/shared/splits'
 import { useLoad } from '../lib/useLoad'
 import { useSubmit } from '../lib/useSubmit'
 import DayLogForm from './DayLogForm'
@@ -115,7 +115,7 @@ function TrainingLogCard() {
 
   const target = selectedDate ?? new Date()
   const targetIsToday = !selectedDate
-  const targetLogged = logs?.some((log) => new Date(log.loggedAt).toDateString() === target.toDateString()) ?? false
+  const targetLogged = !!logs && logOnDay(logs, target) !== undefined
 
   return (
     <div ref={cardRef} className="glow-card w-full md:col-span-2 xl:col-span-1 rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
