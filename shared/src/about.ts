@@ -1,7 +1,7 @@
 // What the web footer and the phone's About card show. The version is the whole
 // product's (web, server and phone release together); it must match the root
 // package.json, which about.test.ts checks. See "Releasing" in the README.
-export const APP_VERSION = '1.1.1'
+export const APP_VERSION = '1.2.0'
 
 export const AUTHOR = 'Oliver Gallanti'
 export const AUTHOR_LINKS = [
