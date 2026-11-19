@@ -8,7 +8,7 @@ Five tabs, which you can tap or swipe between (`mobile/src/Tabs.tsx`):
 
 - **Today:** macros, targets, and foods by meal. Food is logged step by step (`LogFoodForm.tsx`); barcodes are scanned with `expo-camera`. Arrows and a calendar move to earlier days, each cached on its own.
 - **Weight:** latest weight, BMI, a calendar of weigh-ins (log, edit or remove on any day), a chart, and the history.
-- **Training:** streak, weekly goal, day pills with a colour and an icon each (`training/dayStyle.tsx`), the month calendar, sessions, and the live workout (`LiveWorkout.tsx`, state in `workout.ts`).
+- **Training:** streak, weekly goal, edit or start a routine (`training/RoutineEditor.tsx`), every routine's days on the calendar, day pills with a colour and an icon each (`training/dayStyle.tsx`), the month calendar, sessions, and the live workout (`LiveWorkout.tsx`, state in `workout.ts`).
 - **Big 4:** the four lifts with charts, goals and strength levels.
 - **Profile:** profile fields, sign out, delete account (`deleteAccount` in `auth.tsx`), and About (version, running update, "Check for updates", credits).
 

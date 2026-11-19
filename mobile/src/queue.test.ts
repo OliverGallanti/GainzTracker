@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryCache, QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, newDayToday, queuedItemId, reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type UpdateMealVars, type UpdateSavedFoodVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars, type UpdateWeightVars } from './queue'
+import { QUEUED, newDayToday, queuedItemId, reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type UpdateMealVars, type UpdateSavedFoodVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type EditSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars, type UpdateWeightVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -114,13 +114,13 @@ describe('removes', () => {
   it('takes the item off screen straight away and sends the DELETE after a restart', async () => {
     const client = makeClient()
     client.setQueryData(['today', today], { goal: null, meals: [{ id: 'meal-1' }, { id: 'meal-2' }] })
-    client.setQueryData(['training'], { split: null, logs: [{ id: 'log-1' }], allLogs: [{ id: 'log-1' }] })
+    client.setQueryData(['training'], { split: null, splits: [], logs: [{ id: 'log-1' }] })
 
     void mutate<RemoveVars>(client, QUEUED.remove, { label: 'Remove Oats', path: '/api/meals/meal-1', cacheKey: ['today'], id: 'meal-1' })
     void mutate<RemoveVars>(client, QUEUED.remove, { label: 'Remove day', path: '/api/workout-splits/s/logs/log-1', cacheKey: ['training'], id: 'log-1' })
     await flush()
     expect(client.getQueryData(['today', today])).toEqual({ goal: null, meals: [{ id: 'meal-2' }] })
-    expect(client.getQueryData(['training'])).toEqual({ split: null, logs: [], allLogs: [] })
+    expect(client.getQueryData(['training'])).toEqual({ split: null, splits: [], logs: [] })
 
     const restarted = restart(client)
     onlineManager.setOnline(true)
@@ -158,7 +158,7 @@ describe('training', () => {
 
   it('puts a filled-in past day in date order, and edits a logged day in place', async () => {
     const client = makeClient()
-    client.setQueryData(['training'], { split, logs: [log('new', '2026-10-10T12:00:00.000Z'), log('old', '2026-10-01T12:00:00.000Z')], allLogs: [] })
+    client.setQueryData(['training'], { split, splits: [split], logs: [log('new', '2026-10-10T12:00:00.000Z'), log('old', '2026-10-01T12:00:00.000Z')] })
 
     void mutate<LogDayVars>(client, QUEUED.logDay, {
       label: 'Push',
@@ -177,7 +177,7 @@ describe('training', () => {
 
   it('switches to a new routine straight away and sends it, then the goal change, in order', async () => {
     const client = makeClient()
-    client.setQueryData(['training'], { split, logs: [log('a', '2026-10-10T12:00:00.000Z')], allLogs: [log('a', '2026-10-10T12:00:00.000Z')] })
+    client.setQueryData(['training'], { split, splits: [split], logs: [log('a', '2026-10-10T12:00:00.000Z')] })
 
     const routine = { id: 'r2', name: 'Upper/Lower', days: ['Upper', 'Lower'], daysPerWeek: 4 }
     void mutate<CreateSplitVars>(client, QUEUED.createSplit, { label: 'Routine', split: routine })
@@ -185,9 +185,9 @@ describe('training', () => {
     await flush()
 
     const data = client.getQueryData<TrainingData>(['training'])!
-    expect(data.split).toEqual({ ...routine, daysPerWeek: 2, active: true })
-    expect(data.logs).toEqual([])
-    expect(data.allLogs).toHaveLength(1) // the old routine's days still count toward the streak
+    expect(data.split).toMatchObject({ ...routine, daysPerWeek: 2, active: true })
+    expect(data.splits.map((s) => [s.id, s.active, s.daysPerWeek])).toEqual([['r2', true, 2], ['s', false, 3]])
+    expect(data.logs).toHaveLength(1) // the old routine's days stay on the calendar and in the streak
 
     onlineManager.setOnline(true)
     await client.resumePausedMutations()
@@ -197,9 +197,27 @@ describe('training', () => {
     ])
   })
 
+  it('edits a routine in place straight away, moving its past days with their day, and PUTs it', async () => {
+    const client = makeClient()
+    const pull = { ...log('p', '2026-10-10T12:00:00.000Z'), dayIndex: 1 }
+    const other = { ...log('o', '2026-09-10T12:00:00.000Z'), splitId: 'old', dayIndex: 1 }
+    client.setQueryData(['training'], { split, splits: [split], logs: [pull, other] })
+    const body = { name: 'PPL+', days: [{ name: 'Pull', from: 1 }, { name: 'Push', from: 0 }, { name: 'Arms', from: null }] }
+
+    void mutate<EditSplitVars>(client, QUEUED.editSplit, { label: 'PPL+', splitId: 's', body })
+    await flush()
+    const data = client.getQueryData<TrainingData>(['training'])!
+    expect(data.split).toMatchObject({ name: 'PPL+', days: ['Pull', 'Push', 'Arms'], daysPerWeek: 3 })
+    expect(data.logs.map((l) => [l.id, l.dayIndex])).toEqual([['p', 0], ['o', 1]]) // another routine's log untouched
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls).toEqual([['/api/workout-splits/s', { method: 'PUT', body: JSON.stringify(body) }]])
+  })
+
   it("restyles a day straight away, keeping the weekly goal, and sends only the styles", async () => {
     const client = makeClient()
-    client.setQueryData(['training'], { split: { ...split, daysPerWeek: 3 }, logs: [], allLogs: [] })
+    client.setQueryData(['training'], { split: { ...split, daysPerWeek: 3 }, splits: [split], logs: [] })
     const styles = { dayColors: { Push: 'red' as const }, dayIcons: { Push: 'dumbbell' as const } }
 
     void mutate<UpdateSplitVars>(client, QUEUED.updateSplit, { label: 'Push', splitId: split.id, ...styles })

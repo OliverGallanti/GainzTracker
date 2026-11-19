@@ -28,7 +28,7 @@ export default function LogRow({ split, log, onEdit }: { split: WorkoutSplit; lo
         label="Remove"
         variant="small"
         onPress={() =>
-          remove.mutate({ label: `Remove ${name}`, path: `/api/workout-splits/${split.id}/logs/${log.id}`, cacheKey: ['training'], id: log.id })
+          remove.mutate({ label: `Remove ${name}`, path: `/api/workout-splits/${log.splitId}/logs/${log.id}`, cacheKey: ['training'], id: log.id })
         }
         accessibilityLabel={`Remove ${name}`}
       />

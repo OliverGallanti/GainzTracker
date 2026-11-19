@@ -119,6 +119,17 @@ export const createSplitSchema = z.object({
   dayIcons: dayIcons.optional(),
 })
 
+// Editing a routine in place. Each day says where it was before (`from`, its old
+// position; null = a new day), so past training days can be renumbered to keep
+// meaning the same day. A day with training logged can't be left out.
+export const editSplitSchema = z.object({
+  name: z.string().min(1),
+  days: z.array(z.object({ name: z.string().min(1), from: z.number().int().min(0).nullable() })).min(1),
+  daysPerWeek: daysPerWeek.optional(),
+  dayColors: dayColors.optional(),
+  dayIcons: dayIcons.optional(),
+})
+
 export const updateSplitSchema = z.object({ daysPerWeek: daysPerWeek.optional(), dayColors: dayColors.optional(), dayIcons: dayIcons.optional() })
 
 // `dayIndex` is the user's pick from the split's days, in any order. `dayStart`
@@ -175,5 +186,6 @@ export type UpdateMealBody = z.input<typeof updateMealSchema>
 export type UpdateWeightBody = z.input<typeof updateWeightSchema>
 export type UpdateLogBody = z.input<typeof updateLogSchema>
 export type UpdateSplitBody = z.input<typeof updateSplitSchema>
+export type EditSplitBody = z.input<typeof editSplitSchema>
 export type LiftGoalsBody = z.input<typeof liftGoalsSchema>
 export type ReplaceSetsBody = z.input<typeof replaceSetsSchema>

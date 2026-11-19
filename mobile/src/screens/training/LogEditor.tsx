@@ -22,7 +22,7 @@ export default function LogEditor({
   const updateLog = useQueued<UpdateLogVars>(QUEUED.updateLog)
   const day = split.days[log.dayIndex]
   const update = (changes: UpdateLogVars['changes'], what: string) =>
-    updateLog.mutate({ label: `${day} on ${formatDate(log.loggedAt)}: ${what}`, splitId: split.id, logId: log.id, changes })
+    updateLog.mutate({ label: `${day} on ${formatDate(log.loggedAt)}: ${what}`, splitId: log.splitId, logId: log.id, changes })
 
   return (
     <View style={{ gap: 12 }}>

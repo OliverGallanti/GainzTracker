@@ -2,28 +2,63 @@ import { useState } from 'react'
 import { api } from '../lib/api'
 import { SPLIT_TEMPLATES } from '@gainz/shared/templates'
 import { colorFor, dayColorKey, dayIcon, withDayStyle } from '@gainz/shared/dayColors'
+import type { WorkoutSplit } from '@gainz/shared/types'
 import { DayStyleButton, DayStylePicker } from './DayStyle'
 import { useSubmit, ValidationError } from '../lib/useSubmit'
 
-// Template picker → day builder. Mounted only while the user is creating or
-// changing a routine, so its state resets every time it opens.
-function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
-  const [step, setStep] = useState('pick') // 'pick' | 'build'
-  const [name, setName] = useState('')
-  const [days, setDays] = useState<string[]>([])
-  const [perWeek, setPerWeek] = useState<number | null>(null) // null until touched: then it follows the number of days listed
+// Template picker → day builder, for a new routine; or, with `editing`, the day
+// builder for the current routine, changed in place. Each day remembers where it
+// was (`froms`, null = new) so the server can move past training days with it;
+// a day with training logged (`loggedDays`, by position) can't be removed.
+// Mounted only while open, so its state resets every time.
+function RoutineEditor({
+  editing,
+  loggedDays,
+  onSaved,
+  onCancel,
+}: {
+  editing?: WorkoutSplit
+  loggedDays: Set<number>
+  onSaved: () => void
+  onCancel: () => void
+}) {
+  const [step, setStep] = useState(editing ? 'build' : 'pick') // 'pick' | 'build'
+  const [name, setName] = useState(editing?.name ?? '')
+  const [days, setDays] = useState<string[]>(editing?.days ?? [])
+  const [froms, setFroms] = useState<(number | null)[]>(editing ? editing.days.map((_, i) => i) : [])
+  const [perWeek, setPerWeek] = useState<number | null>(editing?.daysPerWeek ?? null) // null until touched: then it follows the number of days listed
   // Colours and icons by day name, as saved; the row whose picker is open.
-  const [styles, setStyles] = useState<{ dayColors: Record<string, string>; dayIcons: Record<string, string> }>({ dayColors: {}, dayIcons: {} })
+  const [styles, setStyles] = useState<{ dayColors: Record<string, string>; dayIcons: Record<string, string> }>({
+    dayColors: { ...editing?.dayColors },
+    dayIcons: { ...editing?.dayIcons },
+  })
   const [styling, setStyling] = useState<number | null>(null)
 
   const filledDays = days.filter((d) => d.trim()).length
+  const hasHistory = (from: number | null | undefined) => from != null && loggedDays.has(from)
   const daysPerWeek = perWeek ?? Math.min(7, Math.max(1, filledDays))
 
   const { submit, saving, error } = useSubmit(async () => {
-    const cleanedDays = days.map((d) => d.trim()).filter(Boolean)
+    const rows = days.map((d, i) => ({ name: d.trim(), from: froms[i] ?? null }))
+    if (rows.some((r) => !r.name && hasHistory(r.from))) throw new ValidationError('A day with training logged needs a name')
+    const cleanedDays = rows.filter((r) => r.name).map((r) => r.name)
     if (cleanedDays.length === 0) throw new ValidationError('Add at least one day')
     // Only the days still in the routine (a renamed day leaves its old name behind).
     const kept = (map: Record<string, string>) => Object.fromEntries(Object.entries(map).filter(([day]) => cleanedDays.includes(day)))
+    if (editing) {
+      await api(`/api/workout-splits/${editing.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: name.trim() || editing.name,
+          days: rows.filter((r) => r.name),
+          daysPerWeek,
+          dayColors: kept(styles.dayColors),
+          dayIcons: kept(styles.dayIcons),
+        }),
+      })
+      onSaved()
+      return
+    }
     await api('/api/workout-splits', {
       method: 'POST',
       body: JSON.stringify({
@@ -40,12 +75,14 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
   const pickTemplate = (template: { name: string; days: string[] }) => {
     setName(template.name)
     setDays(template.days)
+    setFroms(template.days.map(() => null))
     setStep('build')
   }
 
   const startCustom = () => {
     setName('')
     setDays(['', ''])
+    setFroms([null, null])
     setStep('build')
   }
 
@@ -55,19 +92,25 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
 
   const removeDay = (index: number) => {
     setDays(days.filter((_, i) => i !== index))
+    setFroms(froms.filter((_, i) => i !== index))
     setStyling(null) // rows shift: close the picker rather than show it on another day
   }
 
   const addDay = () => {
     setDays([...days, ''])
+    setFroms([...froms, null])
   }
 
   const moveDay = (index: number, direction: number) => {
     const target = index + direction
     if (target < 0 || target >= days.length) return
-    const next = [...days]
-    ;[next[index], next[target]] = [next[target], next[index]]
-    setDays(next)
+    const swap = <T,>(list: T[]) => {
+      const next = [...list]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    }
+    setDays(swap(days))
+    setFroms(swap(froms))
     setStyling(null)
   }
 
@@ -175,8 +218,10 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
               <button
                 type="button"
                 onClick={() => removeDay(index)}
-                className="text-third/60 hover:text-red-400"
-                aria-label="Remove day"
+                disabled={hasHistory(froms[index])}
+                title={hasHistory(froms[index]) ? "Has training logged: it can be renamed or moved, not removed" : 'Remove day'}
+                className="text-third/60 hover:text-red-400 disabled:opacity-30 disabled:hover:text-third/60"
+                aria-label={hasHistory(froms[index]) ? "Has training logged: can't be removed" : 'Remove day'}
               >
                 ✕
               </button>
@@ -197,6 +242,11 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
         >
           + Add day
         </button>
+        {froms.some(hasHistory) && (
+          <p className="text-[10px] text-third/60">
+            Days with training logged can be renamed or moved, not removed. Their past days move with them.
+          </p>
+        )}
       </div>
 
       <div className="mt-1 flex gap-2">

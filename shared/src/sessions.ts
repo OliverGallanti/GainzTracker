@@ -5,7 +5,7 @@ export type PlannedSet = { weightKg: number | null; reps: number | null }
 export type PlannedExercise = { name: string; sets: PlannedSet[] }
 
 // What to do today, from the last time this day was trained: the newest done
-// log of the same day (by name, so either "Push" of a PPL counts) that has
+// log of this routine's same day (by name, so either "Push" of a PPL counts) that has
 // sets, its sets grouped by exercise in the order they were done. Empty when
 // there's no such session yet.
 export function lastSessionPlan(split: WorkoutSplit, logs: SplitLog[], sets: WorkoutSet[], dayIndex: number, exceptLogId?: string): PlannedExercise[] {
@@ -16,7 +16,7 @@ export function lastSessionPlan(split: WorkoutSplit, logs: SplitLog[], sets: Wor
     byLog.set(set.splitLogId, [...(byLog.get(set.splitLogId) ?? []), set])
   }
   const last = logs
-    .filter((log) => log.completed && log.id !== exceptLogId && split.days[log.dayIndex] === day && byLog.has(log.id))
+    .filter((log) => log.splitId === split.id && log.completed && log.id !== exceptLogId && split.days[log.dayIndex] === day && byLog.has(log.id))
     .sort((a, b) => b.loggedAt.localeCompare(a.loggedAt))[0]
   if (!last) return []
 

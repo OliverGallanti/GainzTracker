@@ -21,7 +21,7 @@ Track what you eat, what you weigh and how you train, in one place: a web app an
 
 ### Training
 
-- **Your routine:** start from a template (6-Day PPL, Upper/Lower and others) or name your own days, and set how many days a week make a good week.
+- **Your routine:** start from a template (6-Day PPL, Upper/Lower and others) or name your own days, and set how many days a week make a good week. Edit it any time; starting a new one keeps your history on the calendar.
 - **A month calendar:** mark each day done or skipped; any past day can be filled in later. Give each day of your routine its own colour and icon.
 - **Weekly streak:** how many weeks in a row you hit your goal. Switching routines doesn't reset it.
 - **Sessions:** the exercises of a day, with kg, reps, sets and how long it took.

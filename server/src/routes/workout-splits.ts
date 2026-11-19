@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { requireAuth } from '../middleware/require-auth.ts'
 import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
-import { createLogSchema, createSplitSchema, replaceSetsSchema, updateLogSchema, updateSplitSchema } from '@gainz/shared/schemas'
+import { createLogSchema, createSplitSchema, editSplitSchema, replaceSetsSchema, updateLogSchema, updateSplitSchema } from '@gainz/shared/schemas'
 
 export default async function workoutSplitRoutes(app: FastifyInstance) {
   app.addHook('onRequest', requireAuth)
@@ -44,6 +44,54 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
       }),
     ])
     return reply.code(201).send(split)
+  })
+
+  // Edit a routine in place: name, days (renamed, added, moved, or removed when
+  // nothing was logged on them), goal and styles. Past training days are
+  // renumbered in the same transaction, so a logged "Pull" stays Pull.
+  app.put<{ Params: { id: string } }>('/workout-splits/:id', async (request, reply) => {
+    const parsed = editSplitSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.badRequest(parsed.error.message)
+    }
+    const { days, dayColors, dayIcons, ...rest } = parsed.data
+
+    const split = await prisma.workoutSplit.findFirst({ where: { id: request.params.id, userId: request.userId } })
+    if (!split) {
+      return reply.notFound()
+    }
+    const froms = days.flatMap((d) => (d.from == null ? [] : [d.from]))
+    if (froms.some((from) => from >= split.days.length) || new Set(froms).size !== froms.length) {
+      return reply.badRequest('Each day can come from one existing day at most')
+    }
+    const logged = await prisma.splitLog.groupBy({ by: ['dayIndex'], where: { splitId: split.id }, _count: true })
+    const dropped = logged.find((l) => !froms.includes(l.dayIndex))
+    if (dropped) {
+      return reply.conflict(`"${split.days[dropped.dayIndex]}" has training logged, so it can't be removed`)
+    }
+
+    const names = new Set(days.map((d) => d.name))
+    const keep = (map: Record<string, string> | undefined, saved: unknown) =>
+      Object.fromEntries(Object.entries(map ?? (saved as Record<string, string> | null) ?? {}).filter(([day]) => names.has(day)))
+
+    await prisma.$transaction(async (tx) => {
+      // Two passes through negative numbers, so a swap never collides midway.
+      for (const [to, day] of days.entries()) {
+        if (day.from != null && day.from !== to) {
+          await tx.splitLog.updateMany({ where: { splitId: split.id, dayIndex: day.from }, data: { dayIndex: -1 - to } })
+        }
+      }
+      for (const [to, day] of days.entries()) {
+        if (day.from != null && day.from !== to) {
+          await tx.splitLog.updateMany({ where: { splitId: split.id, dayIndex: -1 - to }, data: { dayIndex: to } })
+        }
+      }
+      await tx.workoutSplit.update({
+        where: { id: split.id },
+        data: { ...rest, days: days.map((d) => d.name), dayColors: keep(dayColors, split.dayColors), dayIcons: keep(dayIcons, split.dayIcons) },
+      })
+    })
+    return prisma.workoutSplit.findUnique({ where: { id: split.id } })
   })
 
   app.patch<{ Params: { id: string } }>('/workout-splits/:id', async (request, reply) => {
@@ -113,8 +161,9 @@ export default async function workoutSplitRoutes(app: FastifyInstance) {
       return reply.badRequest('loggedAt must fall within the day being logged')
     }
 
+    // One per calendar day across every routine: the calendar shows them all.
     const alreadyLogged = await prisma.splitLog.count({
-      where: { splitId: split.id, loggedAt: { gte: dayStart, lt: dayEnd } },
+      where: { userId: request.userId, loggedAt: { gte: dayStart, lt: dayEnd } },
     })
     if (alreadyLogged > 0) {
       return reply.conflict('Already logged a session for that day')

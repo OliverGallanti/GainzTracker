@@ -54,6 +54,10 @@ export function uniqueDays(days: string[]) {
   return days.flatMap((label, index) => (days.indexOf(label) === index ? [{ label, index }] : []))
 }
 
+// The routine a training day belongs to (any routine, active or not).
+export const routineOf = <S extends Pick<WorkoutSplit, 'id'>>(splits: S[], log: Pick<SplitLog, 'splitId'>) =>
+  splits.find((s) => s.id === log.splitId)
+
 // The log on a calendar day (this device's day), if there is one: at most one
 // per day, which the server enforces.
 export function logOnDay<T extends Pick<SplitLog, 'loggedAt'>>(logs: T[], date: Date): T | undefined {

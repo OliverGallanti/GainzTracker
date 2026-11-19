@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { SplitLog } from '@gainz/shared/types'
-import { uniqueDays } from '@gainz/shared/splits'
+import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
+import { routineOf, uniqueDays } from '@gainz/shared/splits'
 import { dayColor } from '@gainz/shared/dayColors'
 import MonthGrid from './MonthGrid'
 import SessionEditor from './SessionEditor'
@@ -9,19 +9,21 @@ import SessionEditor from './SessionEditor'
 // confirm-remove prompt and session editor never carry over to another log.
 type LogActions = {
   busy: boolean
-  onUpdate: (logId: string, changes: Partial<Pick<SplitLog, 'dayIndex' | 'completed'>>) => void
-  onRemove: (logId: string) => void
+  onUpdate: (log: SplitLog, changes: Partial<Pick<SplitLog, 'dayIndex' | 'completed'>>) => void
+  onRemove: (log: SplitLog) => void
   onSessionChange: () => void
 }
 
+// `routine` is the log's own routine (an older one shows its name).
 function LogDetail({
   log,
-  days,
+  routine,
   busy,
   onUpdate,
   onRemove,
   onSessionChange,
-}: { log: SplitLog; days: string[] } & LogActions) {
+}: { log: SplitLog; routine: WorkoutSplit } & LogActions) {
+  const { days } = routine
   const [sessionEditorOpen, setSessionEditorOpen] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
 
@@ -31,7 +33,7 @@ function LogDetail({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <select
             value={days.indexOf(days[log.dayIndex])}
-            onChange={(e) => onUpdate(log.id, { dayIndex: Number(e.target.value) })}
+            onChange={(e) => onUpdate(log, { dayIndex: Number(e.target.value) })}
             disabled={busy}
             aria-label="Training day"
             className="rounded-md border border-secondary/40 bg-main px-1.5 py-0.5 text-third outline-none focus:border-secondary"
@@ -47,10 +49,11 @@ function LogDetail({
               month: 'short',
               day: 'numeric',
             })}
+            {!routine.active && ` · ${routine.name}`}
           </span>
           <button
             type="button"
-            onClick={() => onUpdate(log.id, { completed: !log.completed })}
+            onClick={() => onUpdate(log, { completed: !log.completed })}
             disabled={busy}
             title={log.completed ? 'Change to skipped' : 'Change to done'}
             className={`text-xs underline decoration-secondary/40 underline-offset-2 hover:decoration-secondary ${
@@ -91,7 +94,7 @@ function LogDetail({
           <button
             type="button"
             onClick={() => {
-              onRemove(log.id)
+              onRemove(log)
               setConfirmingRemove(false)
               setSessionEditorOpen(false)
             }}
@@ -123,11 +126,11 @@ function LogDetail({
 }
 
 // Controlled: the card owns which day is selected (the logger above the calendar
-// acts on it). Any past day or today can be picked; future days can't.
+// acts on it). Any past day or today can be picked; future days can't. `logs`
+// are every routine's, each drawn with its own routine's days and colours.
 function TrainingCalendar({
   logs,
-  days,
-  dayColors,
+  splits,
   selectedDate,
   onSelectDate,
   busy,
@@ -136,31 +139,33 @@ function TrainingCalendar({
   onSessionChange,
 }: {
   logs: SplitLog[]
-  days: string[]
-  dayColors?: Record<string, string> | null
+  splits: WorkoutSplit[]
   selectedDate: Date
   onSelectDate: (date: Date | null) => void
 } & LogActions) {
   // Enforced once-per-day server-side, so this map is always at most one log per key.
   const logsByDate = new Map<string, SplitLog>(logs.map((log) => [new Date(log.loggedAt).toDateString(), log]))
   const selectedLog = logsByDate.get(selectedDate.toDateString()) ?? null
+  const selectedRoutine = selectedLog ? routineOf(splits, selectedLog) : undefined
+  const active = splits.find((s) => s.active)
 
   return (
     <div className="mt-5 border-t border-secondary/25 pt-4">
       <MonthGrid
         mark={(date) => {
           const log = logsByDate.get(date.toDateString())
-          return log && { filled: log.completed, note: log.completed ? `${days[log.dayIndex]} done` : 'skipped', color: dayColor({ days, dayColors }, log.dayIndex) }
+          const routine = log && routineOf(splits, log)
+          return log && routine && { filled: log.completed, note: log.completed ? `${routine.days[log.dayIndex]} done` : 'skipped', color: dayColor(routine, log.dayIndex) }
         }}
         selected={selectedDate}
         onSelect={onSelectDate}
       />
 
-      {selectedLog && (
+      {selectedLog && selectedRoutine && (
         <LogDetail
           key={selectedLog.id}
           log={selectedLog}
-          days={days}
+          routine={selectedRoutine}
           busy={busy}
           onUpdate={onUpdate}
           onRemove={onRemove}
@@ -172,8 +177,8 @@ function TrainingCalendar({
         <span className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded bg-third" /> Done
         </span>
-        {uniqueDays(days).map(({ label, index }) => {
-          const color = dayColor({ days, dayColors }, index)
+        {active && uniqueDays(active.days).map(({ label, index }) => {
+          const color = dayColor(active, index)
           return (
             color && (
               <span key={index} className="flex items-center gap-1">

@@ -16,7 +16,7 @@ A Fastify backend-for-frontend (BFF) between the two apps and Postgres. It handl
 | `/api/meals`, `/api/meals/:id` | GET, POST, PATCH, DELETE | Logged foods (`?since=` and `?until=` for a day) |
 | `/api/saved-foods`, `/api/saved-foods/:id` | GET, POST, PUT, DELETE | My foods |
 | `/api/weights`, `/api/weights/:id` | GET, POST, PATCH, DELETE | Weight and body fat |
-| `/api/workout-splits`, `/api/workout-splits/:id` | GET, POST, PATCH, DELETE | Routines (one active) |
+| `/api/workout-splits`, `/api/workout-splits/:id` | GET, POST, PUT, PATCH, DELETE | Routines (one active). PUT edits one in place and renumbers its past days; a day with training logged can't be removed (409) |
 | `/api/workout-splits/logs` | GET | Every training day, newest first |
 | `/api/workout-splits/:id/logs`, `.../logs/:logId` | GET, POST, PATCH, DELETE | Training days (one per calendar day) |
 | `/api/workout-splits/:id/logs/:logId/sets` | PUT | Save a day's sets (replaces them in one transaction) |
@@ -74,7 +74,7 @@ PostgreSQL through Prisma ([prisma/schema.prisma](prisma/schema.prisma)), metric
 - **`WorkoutSplit`:** a routine (`days`, `daysPerWeek`, and `dayColors`, a colour per day name). Only one is active per user; older ones stay, so their days still count toward the streak.
 - **`SplitLog`:** a training day.
   - It stores the day the user picked (`dayIndex`) and whether it was done or skipped.
-  - Only one is allowed per calendar day; the route returns 409, the database doesn't enforce it.
+  - Only one is allowed per calendar day, across all routines; the route returns 409, the database doesn't enforce it.
 - **`WorkoutSet`:** a set.
   - With a `splitLogId` it belongs to a training day and is deleted with it. Without one it's a Big 4 lift.
   - `durationSeconds` and `restSeconds` come from the phone's live workout timer.

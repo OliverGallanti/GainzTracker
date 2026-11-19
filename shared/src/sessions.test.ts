@@ -41,6 +41,11 @@ describe('lastSessionPlan', () => {
     expect(lastSessionPlan(split, logs, sets, 0, 'today')).toEqual([{ name: 'Bench Press', sets: [{ weightKg: 70, reps: 8 }] }])
   })
 
+  it("ignores other routines' days (their positions mean other days)", () => {
+    const other = { ...log('old', 0, '05'), splitId: 'another' }
+    expect(lastSessionPlan(split, [other], [set('old', 'Squat', 100, 5)], 0)).toEqual([])
+  })
+
   it('is empty the first time a day is trained', () => {
     expect(lastSessionPlan(split, [log('pull', 1, '02')], [set('pull', 'Row', 60, 10)], 0)).toEqual([])
   })

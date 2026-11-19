@@ -1,6 +1,6 @@
 import { MutationObserver, useMutation, useMutationState, useQueryClient, type Mutation, type QueryClient } from '@tanstack/react-query'
 import type { MacroGoal, Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
-import type { LiftGoalsBody, ReplaceSetsBody, UpdateLogBody, UpdateMealBody, UpdateSplitBody, UpdateWeightBody } from '@gainz/shared/schemas'
+import type { EditSplitBody, LiftGoalsBody, ReplaceSetsBody, UpdateLogBody, UpdateMealBody, UpdateSplitBody, UpdateWeightBody } from '@gainz/shared/schemas'
 import { api } from './api'
 
 // The offline write queue. Each kind of write registers its send function once
@@ -57,10 +57,13 @@ export type UpdateLogVars = Label & {
 export type UpdateSplitVars = Label & { splitId: string } & UpdateSplitBody
 // Creating a routine makes it the active one (the server deactivates the rest).
 export type CreateSplitVars = Label & { split: Pick<WorkoutSplit, 'id' | 'name' | 'days' | 'dayColors' | 'dayIcons'> & { daysPerWeek: number } }
+// A PUT of the whole routine: repeating it is harmless (renumbering is by `from`,
+// and a repeat finds each day already where it says).
+export type EditSplitVars = Label & { splitId: string; body: EditSplitBody }
 
-// The Training tab's query: the streak counts every routine's logs, the rest
-// only the active routine's.
-export type TrainingData = { split: WorkoutSplit | null; logs: SplitLog[]; allLogs: SplitLog[] }
+// The Training tab's query: the active routine, every routine (a log is shown
+// with its own routine's days), and every log, newest first.
+export type TrainingData = { split: WorkoutSplit | null; splits: WorkoutSplit[]; logs: SplitLog[] }
 
 // One kind for every remove. `cacheKey` is the query (or prefix, e.g. ['today']
 // covers every day) the item is shown in; it's taken out of any list there.
@@ -79,6 +82,7 @@ export const QUEUED = {
   updateLog: ['queue', 'updateLog'],
   updateSplit: ['queue', 'updateSplit'],
   createSplit: ['queue', 'createSplit'],
+  editSplit: ['queue', 'editSplit'],
   saveFood: ['queue', 'saveFood'],
   addSet: ['queue', 'addSet'],
   replaceSets: ['queue', 'replaceSets'],
@@ -88,7 +92,7 @@ export const QUEUED = {
 const without = <T extends { id: string }>(list: T[] | undefined, id: string) => (list ?? []).filter((x) => x.id !== id)
 
 // Removes an id from a cached list, or from every list in a cached object
-// (today's { goal, meals }, training's { logs, allLogs }).
+// (today's { goal, meals }, training's { splits, logs }).
 function dropId(data: unknown, id: string): unknown {
   if (Array.isArray(data)) return without(data, id)
   if (data && typeof data === 'object') {
@@ -263,7 +267,7 @@ export function registerQueuedMutations(queryClient: QueryClient) {
       // Newest first, like the API: a past day filled in goes in its place, not on top.
       const insert = (list: SplitLog[]) => [...without(list, log.id), saved].sort((a, b) => b.loggedAt.localeCompare(a.loggedAt))
       queryClient.setQueryData<TrainingData>(['training'], (old) =>
-        old ? { ...old, logs: insert(old.logs), allLogs: insert(old.allLogs) } : old,
+        old ? { ...old, logs: insert(old.logs) } : old,
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
@@ -276,7 +280,7 @@ export function registerQueuedMutations(queryClient: QueryClient) {
     onMutate: ({ logId, changes }: UpdateLogVars) => {
       const patch = (list: SplitLog[]) => list.map((l) => (l.id === logId ? { ...l, ...changes } : l))
       queryClient.setQueryData<TrainingData>(['training'], (old) =>
-        old ? { ...old, logs: patch(old.logs), allLogs: patch(old.allLogs) } : old,
+        old ? { ...old, logs: patch(old.logs) } : old,
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
@@ -294,7 +298,13 @@ export function registerQueuedMutations(queryClient: QueryClient) {
         ...(dayIcons !== undefined && { dayIcons }),
       }
       queryClient.setQueryData<TrainingData>(['training'], (old) =>
-        old?.split?.id === splitId ? { ...old, split: { ...old.split, ...changes } } : old,
+        old
+          ? {
+              ...old,
+              split: old.split?.id === splitId ? { ...old.split, ...changes } : old.split,
+              splits: (old.splits ?? []).map((s) => (s.id === splitId ? { ...s, ...changes } : s)),
+            }
+          : old,
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
@@ -304,7 +314,36 @@ export function registerQueuedMutations(queryClient: QueryClient) {
     ...common,
     mutationFn: ({ split }: CreateSplitVars) => api('/api/workout-splits', { method: 'POST', body: JSON.stringify(split) }),
     onMutate: ({ split }: CreateSplitVars) => {
-      queryClient.setQueryData<TrainingData>(['training'], (old) => (old ? { ...old, split: { ...split, active: true }, logs: [] } : old))
+      // The old routine is set aside, not deleted: its days stay on the calendar.
+      const made = { dayColors: null, dayIcons: null, ...split, active: true }
+      queryClient.setQueryData<TrainingData>(['training'], (old) =>
+        old ? { ...old, split: made, splits: [made, ...(old.splits ?? []).filter((s) => s.id !== split.id).map((s) => ({ ...s, active: false }))] } : old,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
+  })
+
+  queryClient.setMutationDefaults(QUEUED.editSplit, {
+    ...common,
+    // 409 = a day it drops got training logged meanwhile: the server keeps the
+    // routine as it was, which the refetch shows; there's nothing to retry.
+    mutationFn: ({ splitId, body }: EditSplitVars) =>
+      api(`/api/workout-splits/${splitId}`, { method: 'PUT', body: JSON.stringify(body) }).catch((err: { status?: number }) => {
+        if (err.status !== 409) throw err
+      }),
+    onMutate: ({ splitId, body }: EditSplitVars) => {
+      queryClient.setQueryData<TrainingData>(['training'], (old) => {
+        const before = old?.splits?.find((s) => s.id === splitId)
+        if (!old || !before) return old
+        const moved = new Map(body.days.flatMap((d, to) => (d.from == null ? [] : [[d.from, to] as const])))
+        const edited: WorkoutSplit = { ...before, ...body, days: body.days.map((d) => d.name), daysPerWeek: body.daysPerWeek ?? before.daysPerWeek }
+        return {
+          ...old,
+          split: old.split?.id === splitId ? edited : old.split,
+          splits: old.splits.map((s) => (s.id === splitId ? edited : s)),
+          logs: old.logs.map((l) => (l.splitId === splitId && moved.has(l.dayIndex) ? { ...l, dayIndex: moved.get(l.dayIndex)! } : l)),
+        }
+      })
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),
   })

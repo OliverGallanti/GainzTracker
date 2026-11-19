@@ -212,6 +212,38 @@ describe.skipIf(!url)('API routes', () => {
       expect((await call('GET', '/api/workout-splits', a.auth)).json()[0]).toMatchObject({ dayColors: { Push: 'red', Legs: 'blue' }, dayIcons: { Push: 'dumbbell' } })
     })
 
+    it('edits a routine in place, keeping past days on the same day, and refuses to drop a logged day', async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const split = (await call('POST', '/api/workout-splits', a.auth, { name: 'PPL', days: ['Push', 'Pull', 'Legs'], dayColors: { Legs: 'red' } })).json()
+      const on = (d: string) => ({ dayStart: `2026-03-${d}T00:00:00Z`, dayEnd: `2026-03-${d}T23:59:59Z`, loggedAt: `2026-03-${d}T18:00:00Z` })
+      await call('POST', `/api/workout-splits/${split.id}/logs`, a.auth, { completed: true, dayIndex: 0, ...on('02') }) // Push
+      await call('POST', `/api/workout-splits/${split.id}/logs`, a.auth, { completed: true, dayIndex: 1, ...on('03') }) // Pull
+      const url = `/api/workout-splits/${split.id}`
+      const namesOfLogs = async () => {
+        const [saved] = (await call('GET', '/api/workout-splits', a.auth)).json()
+        const logs = (await call('GET', '/api/workout-splits/logs', a.auth)).json()
+        return logs.map((l: { dayIndex: number }) => saved.days[l.dayIndex]).sort()
+      }
+
+      // Legs has nothing logged: it can go. Pull moves first, Push is renamed, Arms is new.
+      const edit = { name: 'PP+', days: [{ name: 'Pull', from: 1 }, { name: 'Chest', from: 0 }, { name: 'Arms', from: null }], daysPerWeek: 3 }
+      expect((await call('PUT', url, b.auth, edit)).statusCode).toBe(404)
+      const res = await call('PUT', url, a.auth, edit)
+      expect(res.statusCode).toBe(200)
+      expect(res.json()).toMatchObject({ name: 'PP+', days: ['Pull', 'Chest', 'Arms'], dayColors: {} })
+      expect(await namesOfLogs()).toEqual(['Chest', 'Pull'])
+
+      // Pull is logged: leaving it out is refused and changes nothing.
+      expect((await call('PUT', url, a.auth, { name: 'X', days: [{ name: 'Chest', from: 1 }] })).statusCode).toBe(409)
+      expect((await call('PUT', url, a.auth, { name: 'X', days: [{ name: 'A', from: 0 }, { name: 'B', from: 0 }, { name: 'C', from: 1 }] })).statusCode).toBe(400)
+      expect(await namesOfLogs()).toEqual(['Chest', 'Pull'])
+
+      // One training day per calendar day, whichever routine.
+      const other = (await call('POST', '/api/workout-splits', a.auth, { name: 'UL', days: ['Upper'] })).json()
+      expect((await call('POST', `/api/workout-splits/${other.id}/logs`, a.auth, { completed: true, dayIndex: 0, ...on('02') })).statusCode).toBe(409)
+    })
+
     it('saves day colours and icons given when a routine is created', async () => {
       const a = await t.newUser()
       const body = { name: 'UL', days: ['Upper', 'Lower'], dayColors: { Upper: 'teal' }, dayIcons: { Lower: 'legs' } }

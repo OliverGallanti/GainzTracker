@@ -15,7 +15,7 @@ export const persister = createAsyncStoragePersister({ storage: AsyncStorage })
 export const CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30
 
 // Bump when a query's data shape changes, so an old saved cache isn't read as new.
-export const CACHE_VERSION = '1'
+export const CACHE_VERSION = '2' // 2: training data keeps every routine and log
 
 // TanStack Query assumes it's always online on React Native; tell it the truth.
 onlineManager.setEventListener((setOnline) =>

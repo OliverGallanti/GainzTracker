@@ -3,7 +3,7 @@ import { View } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { startOfLocalDay } from '@gainz/shared/dates'
 import { dayColor, dayIcon } from '@gainz/shared/dayColors'
-import { logOnDay, suggestedDayIndex, uniqueDays } from '@gainz/shared/splits'
+import { logOnDay, routineOf, suggestedDayIndex, uniqueDays } from '@gainz/shared/splits'
 import type { SplitLog, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
 import { Check, History, Timer } from '../../icons'
 import { QUEUED, useQueued, type LogDayVars } from '../../queue'
@@ -15,14 +15,18 @@ import { DAY_ICON_COMPONENTS } from './dayStyle'
 import Calendar from './Calendar'
 import LogRow from './LogRow'
 
+// `logs` are every routine's: the calendar shows them all, each with its own
+// routine's days. Logging and the next-day suggestion use the active routine.
 export default function Logger({
   split,
+  splits,
   logs,
   sets,
   onOpenLog,
   onOpenHistory,
 }: {
   split: WorkoutSplit
+  splits: WorkoutSplit[]
   logs: SplitLog[]
   sets: WorkoutSet[] | undefined
   onOpenLog: (logId: string) => void
@@ -30,13 +34,16 @@ export default function Logger({
 }) {
   const [pickedDate, setPickedDate] = useAnimatedState<Date | null>(null) // null: today
   const [picked, setPicked] = useState<number | null>(null)
-  const suggested = split.days.indexOf(split.days[suggestedDayIndex(split.days, logs)])
+  const own = logs.filter((l) => l.splitId === split.id)
+  const routineFor = (log: SplitLog) => routineOf(splits, log) ?? split
+  const suggested = split.days.indexOf(split.days[suggestedDayIndex(split.days, own)])
   const selected = picked ?? suggested
   const logDay = useQueued<LogDayVars>(QUEUED.logDay)
   const workout = useWorkout()
 
   const target = pickedDate ?? startOfLocalDay()
   const targetLog = logOnDay(logs, target)
+  const targetRoutine = targetLog ? routineFor(targetLog) : split
 
   // Queued (see queue.ts). The day's bounds are fixed now, on the phone: sent
   // after midnight, it still counts for the day it was meant for. A past day is
@@ -59,7 +66,8 @@ export default function Logger({
 
   // Only today can be trained live. One workout at a time: while one is going,
   // this takes you back to it.
-  const live = !pickedDate && (!targetLog || targetLog.completed)
+  // Not on a day logged under an older routine: its workout would use that routine's days.
+  const live = !pickedDate && (!targetLog || (targetLog.completed && targetLog.splitId === split.id))
   const liveButton = workout ? (
     <Button label={`Back to ${workout.day} workout`} icon={Timer} onPress={() => setWorkout({ ...workout, open: true })} />
   ) : (
@@ -76,7 +84,8 @@ export default function Logger({
       <Calendar
         mark={(date) => {
           const day = logOnDay(logs, date)
-          return day && { filled: day.completed, note: day.completed ? `${split.days[day.dayIndex]} done` : 'skipped', color: dayColor(split, day.dayIndex) }
+          const routine = day && routineFor(day)
+          return day && routine && { filled: day.completed, note: day.completed ? `${routine.days[day.dayIndex]} done` : 'skipped', color: dayColor(routine, day.dayIndex) }
         }}
         selected={target}
         onSelect={setPickedDate}
@@ -102,7 +111,7 @@ export default function Logger({
 
       {targetLog ? (
         <>
-          <LogRow split={split} log={targetLog} onEdit={() => onOpenLog(targetLog.id)} />
+          <LogRow split={targetRoutine} log={targetLog} onEdit={() => onOpenLog(targetLog.id)} />
           {live && liveButton}
           <Muted>{REMOVE_NOTE}</Muted>
         </>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
-import { Check, Repeat } from 'lucide-react'
+import { Check, Pencil, Repeat } from 'lucide-react'
 import { colorFor, dayColorKey, dayIcon, withDayStyle, type DayColor, type DayIcon } from '@gainz/shared/dayColors'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '@gainz/shared/dates'
@@ -18,7 +18,7 @@ import RoutineEditor from './RoutineEditor'
 // is only a name and a list of days.
 function TrainingLogCard() {
   const [editingLog, setEditingLog] = useState<SplitLog | null>(null)
-  const [editingRoutine, setEditingRoutine] = useState(false)
+  const [editingRoutine, setEditingRoutine] = useState<'new' | 'edit' | null>(null) // a new routine, or an edit of the current one
   const [styling, setStyling] = useState<string | null>(null) // the day name whose picker is open
 
   // The day the logger below acts on. null = today; the calendar sets it when a
@@ -34,19 +34,18 @@ function TrainingLogCard() {
     return () => document.removeEventListener('mousedown', onOutsideClick)
   }, [selectedDate])
 
-  // The logs depend on which split is active, so this is one dependent load. The
-  // weekly streak counts days across every routine (switching routine mid-week
-  // shouldn't wipe it), so all splits' logs are fetched; the calendar and day
-  // logger only use the active split's.
+  // Every routine and every log. The calendar and the streak use all of them
+  // (each log with its own routine's days), so switching routines never makes
+  // the past look empty or resets the streak. Logging uses the active routine.
   const { data, error: loadError, reload } = useLoad(['training'], async () => {
-    const [splits, allLogs] = await Promise.all([api<WorkoutSplit[]>('/api/workout-splits'), api<SplitLog[]>('/api/workout-splits/logs')])
-    const split = splits.find((s) => s.active) ?? null
-    return { splits, split, logs: split ? allLogs.filter((log) => log.splitId === split.id) : null, allLogs }
+    const [splits, logs] = await Promise.all([api<WorkoutSplit[]>('/api/workout-splits'), api<SplitLog[]>('/api/workout-splits/logs')])
+    return { splits, split: splits.find((s) => s.active) ?? null, logs }
   })
 
   const splits = data?.splits ?? []
   const split = data?.split // undefined = loading, null = none active
   const logs = data?.logs ?? null
+  const ownLogs = split && logs ? logs.filter((l) => l.splitId === split.id) : []
   const pastSplits = splits.filter((s) => !s.active)
 
   // Every change to a log goes through here, so they all disable the controls
@@ -82,16 +81,12 @@ function TrainingLogCard() {
       if (completed) setEditingLog(created)
     })
 
-  const updateLog = (logId: string, changes: Partial<Pick<SplitLog, 'dayIndex' | 'completed'>>) =>
-    mutate(() =>
-      api(splitUrl(`/logs/${logId}`), {
-        method: 'PATCH',
-        body: JSON.stringify(changes),
-      }),
-    )
+  // By the log's own routine: it may be an older one.
+  const logUrl = (log: SplitLog) => `/api/workout-splits/${log.splitId}/logs/${log.id}`
+  const updateLog = (log: SplitLog, changes: Partial<Pick<SplitLog, 'dayIndex' | 'completed'>>) =>
+    mutate(() => api(logUrl(log), { method: 'PATCH', body: JSON.stringify(changes) }))
 
-  const removeLog = (logId: string) =>
-    mutate(() => api(splitUrl(`/logs/${logId}`), { method: 'DELETE' }))
+  const removeLog = (log: SplitLog) => mutate(() => api(logUrl(log), { method: 'DELETE' }))
 
   const changeWeeklyGoal = (daysPerWeek: number) =>
     mutate(() =>
@@ -101,13 +96,16 @@ function TrainingLogCard() {
   const changeDayStyle = (day: string, color: DayColor | null, icon: DayIcon | null) =>
     split && mutate(() => api(splitUrl(), { method: 'PATCH', body: JSON.stringify(withDayStyle(split, day, color, icon)) }))
 
-  const handleDeleteSplit = async (id: string) => {
-    await api(`/api/workout-splits/${id}`, { method: 'DELETE' })
+  // Removing a past routine deletes its training days too (they belong to it).
+  const handleDeleteSplit = async (s: WorkoutSplit) => {
+    const count = logs?.filter((l) => l.splitId === s.id).length ?? 0
+    if (count > 0 && !window.confirm(`Remove "${s.name}" and its ${count} training ${count === 1 ? 'day' : 'days'}? This can't be undone.`)) return
+    await api(`/api/workout-splits/${s.id}`, { method: 'DELETE' })
     reload()
   }
 
   const handleRoutineSaved = () => {
-    setEditingRoutine(false)
+    setEditingRoutine(null)
     reload()
   }
 
@@ -115,9 +113,9 @@ function TrainingLogCard() {
   const showLog = !isLoading && !editingRoutine && split
 
   const goal = split ? weeklyGoal(split) : 1
-  const { streak, thisWeekDays } = computeWeeklyStreak(data?.allLogs ?? [], goal)
+  const { streak, thisWeekDays } = computeWeeklyStreak(logs ?? [], goal)
   const goalMet = thisWeekDays >= goal
-  const suggestedIndex = split && logs ? suggestedDayIndex(split.days, logs) : 0
+  const suggestedIndex = split ? suggestedDayIndex(split.days, ownLogs) : 0
 
   const target = selectedDate ?? new Date()
   const targetIsToday = !selectedDate
@@ -128,14 +126,16 @@ function TrainingLogCard() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="card-title">Training log</h2>
         {showLog && (
-          <button
-            type="button"
-            onClick={() => setEditingRoutine(true)}
-            className="btn btn-secondary"
-          >
-            <Repeat size={14} />
-            Change routine
-          </button>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setEditingRoutine('edit')} className="btn btn-secondary">
+              <Pencil size={14} />
+              Edit routine
+            </button>
+            <button type="button" onClick={() => setEditingRoutine('new')} title="Starts a new routine; your history stays" className="btn btn-secondary">
+              <Repeat size={14} />
+              New routine
+            </button>
+          </div>
         )}
       </div>
 
@@ -151,7 +151,12 @@ function TrainingLogCard() {
       )}
 
       {!isLoading && editingRoutine && (
-        <RoutineEditor onSaved={handleRoutineSaved} onCancel={() => setEditingRoutine(false)} />
+        <RoutineEditor
+          editing={editingRoutine === 'edit' && split ? split : undefined}
+          loggedDays={new Set(ownLogs.map((l) => l.dayIndex))}
+          onSaved={handleRoutineSaved}
+          onCancel={() => setEditingRoutine(null)}
+        />
       )}
 
       {!isLoading && !editingRoutine && !split && (
@@ -161,7 +166,7 @@ function TrainingLogCard() {
           </p>
           <button
             type="button"
-            onClick={() => setEditingRoutine(true)}
+            onClick={() => setEditingRoutine('new')}
             className="rounded-lg border border-secondary/40 px-4 py-2 text-sm font-medium text-third transition hover:border-secondary active:scale-[0.98]"
           >
             Create a routine
@@ -261,8 +266,7 @@ function TrainingLogCard() {
 
           <TrainingCalendar
             logs={logs ?? []}
-            days={split.days}
-            dayColors={split.dayColors}
+            splits={splits}
             selectedDate={target}
             onSelectDate={setSelectedDate}
             busy={busy}
@@ -285,7 +289,7 @@ function TrainingLogCard() {
                 <span className="text-third/60">{s.name}</span>
                 <button
                   type="button"
-                  onClick={() => handleDeleteSplit(s.id)}
+                  onClick={() => handleDeleteSplit(s)}
                   className="text-xs font-medium text-third/60 transition hover:text-red-400"
                 >
                   Remove
