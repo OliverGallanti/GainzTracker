@@ -15,7 +15,7 @@ A Fastify backend-for-frontend (BFF) between the two apps and Postgres. It handl
 | `/api/macro-goal`, `/api/lift-goals` | GET, PUT | Daily macro targets, Big 4 goals |
 | `/api/meals`, `/api/meals/:id` | GET, POST, PATCH, DELETE | Logged foods (`?since=` and `?until=` for a day) |
 | `/api/saved-foods`, `/api/saved-foods/:id` | GET, POST, PUT, DELETE | My foods |
-| `/api/weights`, `/api/weights/:id` | GET, POST, DELETE | Weight and body fat |
+| `/api/weights`, `/api/weights/:id` | GET, POST, PATCH, DELETE | Weight and body fat |
 | `/api/workout-splits`, `/api/workout-splits/:id` | GET, POST, PATCH, DELETE | Routines (one active) |
 | `/api/workout-splits/logs` | GET | Every training day, newest first |
 | `/api/workout-splits/:id/logs`, `.../logs/:logId` | GET, POST, PATCH, DELETE | Training days (one per calendar day) |
@@ -71,7 +71,7 @@ PostgreSQL through Prisma ([prisma/schema.prisma](prisma/schema.prisma)), metric
   - It keeps `amount` and `unit` (`g` or `serving`), so an edit can rescale it.
 - **`SavedFood`:** My foods, with values per serving or per 100 g (`basis`), plus a serving's weight when known. Names are unique per user, and saving a name again replaces it.
 - **`MacroGoal`:** one row per user. **`LiftGoal`:** one row per user and lift, keyed by the lift's name.
-- **`WorkoutSplit`:** a routine (`days` and `daysPerWeek`). Only one is active per user; older ones stay, so their days still count toward the streak.
+- **`WorkoutSplit`:** a routine (`days`, `daysPerWeek`, and `dayColors`, a colour per day name). Only one is active per user; older ones stay, so their days still count toward the streak.
 - **`SplitLog`:** a training day.
   - It stores the day the user picked (`dayIndex`) and whether it was done or skipped.
   - Only one is allowed per calendar day; the route returns 409, the database doesn't enforce it.

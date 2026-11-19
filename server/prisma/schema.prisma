@@ -71,6 +71,8 @@ model WorkoutSplit {
   // Days per week that make a good week for the weekly streak. Null (routines made
   // before this existed) means "as many as `days` lists", worked out client-side.
   daysPerWeek Int?
+  // Day name -> colour key (shared/src/dayColors.ts), e.g. {"Push":"red"}. Null = no colours.
+  dayColors Json?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 

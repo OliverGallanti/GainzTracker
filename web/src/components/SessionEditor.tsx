@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { describeTiming, setRow, setsBody, type SetRow } from '@gainz/shared/sessions'
+import { describeTiming, setsBody, toSetRows, type SetRow } from '@gainz/shared/sessions'
 import type { SplitLog, WorkoutSet } from '@gainz/shared/types'
 import { api } from '../lib/api'
 import { useLoad } from '../lib/useLoad'
@@ -11,8 +11,8 @@ type Row = SetRow
 
 const emptyRow = (): Row => ({ exerciseName: '', weightKg: '', reps: '' })
 
-// The API lists newest first; the form shows them in the order done.
-const toRows = (sets: WorkoutSet[]): Row[] => (sets.length > 0 ? [...sets].reverse().map(setRow) : [emptyRow()])
+// In the order done, repeats folded into one row with a count.
+const toRows = (sets: WorkoutSet[]): Row[] => (sets.length > 0 ? toSetRows(sets) : [emptyRow()])
 
 // Reused from both TrainingLogCard (right after marking a day done) and
 // TrainingCalendar (editing a past day's session). `log` is the full
@@ -38,7 +38,7 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
   // The form only renders once rows exist (a failed or pending load blocks it).
   const currentRows = rows ?? []
 
-  const updateRow = (index: number, field: 'exerciseName' | 'weightKg' | 'reps', value: string) => {
+  const updateRow = (index: number, field: 'exerciseName' | 'weightKg' | 'reps' | 'sets', value: string) => {
     setRows(currentRows.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
   }
 
@@ -116,6 +116,18 @@ function SessionEditor({ log, onClose }: { log: SplitLog; onClose: () => void })
                   value={row.reps}
                   onChange={(e) => updateRow(index, 'reps', e.target.value)}
                   placeholder="reps"
+                  className="w-16 rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-sm text-third outline-none focus:border-secondary"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  step="1"
+                  value={row.sets ?? ''}
+                  onChange={(e) => updateRow(index, 'sets', e.target.value)}
+                  placeholder="sets"
+                  aria-label="Sets"
+                  title="How many sets like this (blank = 1)"
                   className="w-16 rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-sm text-third outline-none focus:border-secondary"
                 />
                 <button

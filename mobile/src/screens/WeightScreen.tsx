@@ -2,19 +2,25 @@ import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { computeBmi } from '@gainz/shared/body'
+import { dayLabel, loggedAtOn, startOfLocalDay } from '@gainz/shared/dates'
 import type { WeightEntry } from '@gainz/shared/types'
 import { History, Scale } from '../icons'
 import LineChart from '../LineChart'
-import { QUEUED, useQueued, useUnsyncedIds, type AddWeightVars, type RemoveVars, type UpdateMeVars } from '../queue'
+import { QUEUED, useQueued, useUnsyncedIds, type AddWeightVars, type RemoveVars, type UpdateMeVars, type UpdateWeightVars } from '../queue'
 import { useMe, useWeights } from '../queries'
 import { Text, Button, Card, Chip, ErrorText, Field, Muted, Screen, Sheet, Unsynced, styles as ui, useAnimatedState } from '../ui'
+import Calendar from './training/Calendar'
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function WeightScreen() {
   const me = useMe()
   const weights = useWeights()
-  const [logging, setLogging] = useAnimatedState(false)
+  // The form: logging a new weigh-in, or editing one. Closed = null.
+  const [form, setForm] = useAnimatedState<{ editing?: WeightEntry } | null>(null)
+  // The calendar's day: null = today, so it moves on at midnight.
+  const [picked, setPicked] = useState<Date | null>(null)
+  const day = picked ?? startOfLocalDay()
   const [historyOpen, setHistoryOpen] = useState(false)
   const remove = useQueued<RemoveVars>(QUEUED.remove)
   const unsynced = useUnsyncedIds()
@@ -24,6 +30,10 @@ export default function WeightScreen() {
   const latestBodyFat = entries.find((e) => e.bodyFatPercent != null)?.bodyFatPercent
   const height = me.data?.heightCm ?? null
   const bmi = latest ? computeBmi(latest.weightKg, height) : null
+  const loggedDays = new Set(entries.map((e) => new Date(e.loggedAt).toDateString()))
+  const onDay = entries.filter((e) => new Date(e.loggedAt).toDateString() === day.toDateString())
+  const removeEntry = (entry: WeightEntry) =>
+    remove.mutate({ label: `Remove ${entry.weightKg} kg`, path: `/api/weights/${entry.id}`, cacheKey: ['weights'], id: entry.id })
   const goals = [me.data?.weightGoalKg && `${me.data.weightGoalKg} kg`, me.data?.bodyFatGoalPercent && `${me.data.bodyFatGoalPercent}% body fat`]
     .filter(Boolean)
     .join(' · ')
@@ -46,10 +56,40 @@ export default function WeightScreen() {
               <Stat label="BMI" value={bmi != null ? bmi.toFixed(1) : '–'} />
             </View>
             {goals ? <Muted>Goal: {goals}</Muted> : null}
-            {logging ? (
-              <LogWeightForm askHeight={height == null} onDone={() => setLogging(false)} />
+            <Calendar
+              mark={(date) => (loggedDays.has(date.toDateString()) ? { filled: true, note: 'weighed in' } : undefined)}
+              selected={day}
+              onSelect={(date) => {
+                setPicked(date)
+                setForm(null)
+              }}
+            />
+            <Text style={styles.strong}>{dayLabel(day)}</Text>
+            {onDay.length === 0 && !form && <Muted>No weigh-in on this day.</Muted>}
+            {onDay.map((entry) =>
+              form?.editing?.id === entry.id ? null : (
+                <View key={entry.id} style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={ui.text}>
+                      {entry.weightKg} kg{entry.bodyFatPercent != null ? ` · ${entry.bodyFatPercent}%` : ''}
+                    </Text>
+                    {unsynced.has(entry.id) && <Unsynced />}
+                  </View>
+                  <Button label="Edit" variant="small" onPress={() => setForm({ editing: entry })} accessibilityLabel={`Edit ${entry.weightKg} kg`} />
+                  <Button label="Remove" variant="small" onPress={() => removeEntry(entry)} accessibilityLabel={`Remove ${entry.weightKg} kg`} />
+                </View>
+              ),
+            )}
+            {form ? (
+              <LogWeightForm
+                key={form.editing?.id ?? 'new'}
+                askHeight={height == null}
+                day={day}
+                editing={form.editing}
+                onDone={() => setForm(null)}
+              />
             ) : (
-              <Button label="Log weight" icon={Scale} onPress={() => setLogging(true)} />
+              <Button label={picked ? `Log weight on ${dayLabel(day)}` : 'Log weight'} icon={Scale} onPress={() => setForm({})} />
             )}
           </>
         )}
@@ -72,9 +112,7 @@ export default function WeightScreen() {
             <Button
               label="Remove"
               variant="small"
-              onPress={() =>
-                remove.mutate({ label: `Remove ${entry.weightKg} kg`, path: `/api/weights/${entry.id}`, cacheKey: ['weights'], id: entry.id })
-              }
+              onPress={() => removeEntry(entry)}
               accessibilityLabel={`Remove ${entry.weightKg} kg from ${formatDate(entry.loggedAt)}`}
             />
           </View>
@@ -149,24 +187,29 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-// Height is asked for only while it's missing: BMI and the calorie estimate need it.
-// Both writes are queued (see queue.ts), height first: one queue, sent in order.
-function LogWeightForm({ askHeight, onDone }: { askHeight: boolean; onDone: () => void }) {
-  const [form, setForm] = useState({ weightKg: '', bodyFatPercent: '', heightCm: '' })
+// Logs a weigh-in on `day`, or edits `editing` (its day stays). Height is asked
+// for only while it's missing: BMI and the calorie estimate need it. The writes
+// are queued (see queue.ts), height first: one queue, sent in order.
+function LogWeightForm({ askHeight, day, editing, onDone }: { askHeight: boolean; day: Date; editing?: WeightEntry; onDone: () => void }) {
+  const [form, setForm] = useState({
+    weightKg: editing ? String(editing.weightKg) : '',
+    bodyFatPercent: editing?.bodyFatPercent != null ? String(editing.bodyFatPercent) : '',
+    heightCm: '',
+  })
   const updateMe = useQueued<UpdateMeVars>(QUEUED.updateMe)
   const addWeight = useQueued<AddWeightVars>(QUEUED.addWeight)
+  const updateWeight = useQueued<UpdateWeightVars>(QUEUED.updateWeight)
 
   const save = () => {
     if (askHeight && form.heightCm) {
       updateMe.mutate({ label: 'Height', changes: { heightCm: Number(form.heightCm) } })
     }
-    const entry = {
-      id: randomUUID(),
-      weightKg: Number(form.weightKg),
-      bodyFatPercent: form.bodyFatPercent ? Number(form.bodyFatPercent) : null,
-      loggedAt: new Date().toISOString(),
+    const values = { weightKg: Number(form.weightKg), bodyFatPercent: form.bodyFatPercent ? Number(form.bodyFatPercent) : null }
+    if (editing) {
+      updateWeight.mutate({ label: `${values.weightKg} kg`, id: editing.id, changes: values })
+    } else {
+      addWeight.mutate({ label: `${values.weightKg} kg`, entry: { id: randomUUID(), ...values, loggedAt: loggedAtOn(day) } })
     }
-    addWeight.mutate({ label: `${entry.weightKg} kg`, entry })
     onDone()
   }
 
@@ -192,4 +235,5 @@ const styles = StyleSheet.create({
   stat: { flex: 1, gap: 2 },
   statValue: { fontSize: 20, fontWeight: '600', color: '#dce0d9' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  strong: { fontWeight: '600', color: '#dce0d9' },
 })

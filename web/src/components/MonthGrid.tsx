@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { buildMonthGrid, startOfLocalDay } from '@gainz/shared/dates'
 
-const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
-export type DayMark = { filled: boolean; note: string } // not filled = amber; note is read out, e.g. 'done'
+// not filled = amber; note is read out, e.g. 'done'; color: a filled day's own colour
+export type DayMark = { filled: boolean; note: string; color?: string | null }
 
 // A month to pick a day from: marked days filled in, any past day or today can
 // be picked, future days can't. Today and re-clicking the picked day both mean
@@ -86,6 +87,7 @@ function MonthGrid({
               onClick={() => selectCell(date)}
               disabled={!selectable}
               aria-pressed={isSelected}
+              style={marked?.filled && marked.color ? { backgroundColor: marked.color } : undefined}
               aria-label={`${date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${marked ? `, ${marked.note}` : ''}`}
               className={classes}
             >

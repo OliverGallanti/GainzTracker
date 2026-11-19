@@ -1,6 +1,6 @@
 import { MutationObserver, useMutation, useMutationState, useQueryClient, type Mutation, type QueryClient } from '@tanstack/react-query'
 import type { MacroGoal, Me, Meal, SavedFood, SplitLog, WeightEntry, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
-import type { LiftGoalsBody, ReplaceSetsBody, UpdateLogBody, UpdateMealBody, UpdateSplitBody } from '@gainz/shared/schemas'
+import type { LiftGoalsBody, ReplaceSetsBody, UpdateLogBody, UpdateMealBody, UpdateSplitBody, UpdateWeightBody } from '@gainz/shared/schemas'
 import { api } from './api'
 
 // The offline write queue. Each kind of write registers its send function once
@@ -28,6 +28,8 @@ export type UpdateMealVars = Label & { id: string; changes: UpdateMealBody }
 // PUT replaces the row: repeating it is harmless.
 export type UpdateSavedFoodVars = Label & { food: SavedFood }
 export type AddWeightVars = Label & { entry: WeightEntry }
+// A PATCH to values: repeating it is harmless.
+export type UpdateWeightVars = Label & { id: string; changes: UpdateWeightBody & { loggedAt?: string } }
 export type UpdateMeVars = Label & {
   changes: Partial<Pick<Me, 'heightCm' | 'sex' | 'age' | 'activityLevel' | 'weightGoalKg' | 'bodyFatGoalPercent'>>
 }
@@ -71,6 +73,7 @@ export const QUEUED = {
   updateMeal: ['queue', 'updateMeal'],
   updateSavedFood: ['queue', 'updateSavedFood'],
   addWeight: ['queue', 'addWeight'],
+  updateWeight: ['queue', 'updateWeight'],
   updateMe: ['queue', 'updateMe'],
   logDay: ['queue', 'logDay'],
   updateLog: ['queue', 'updateLog'],
@@ -171,6 +174,23 @@ export function registerQueuedMutations(queryClient: QueryClient) {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['weights'] }),
   })
 
+  queryClient.setMutationDefaults(QUEUED.updateWeight, {
+    ...common,
+    // 404 = removed meanwhile (here or on the web): nothing left to edit.
+    mutationFn: ({ id, changes }: UpdateWeightVars) =>
+      api(`/api/weights/${id}`, { method: 'PATCH', body: JSON.stringify(changes) }).catch((err: { status?: number }) => {
+        if (err.status !== 404) throw err
+      }),
+    onMutate: ({ id, changes }: UpdateWeightVars) => {
+      queryClient.setQueryData<WeightEntry[]>(['weights'], (old) =>
+        old
+          ?.map((e) => (e.id === id ? ({ ...e, ...changes } as WeightEntry) : e))
+          .sort((a, b) => b.loggedAt.localeCompare(a.loggedAt)),
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['weights'] }),
+  })
+
   queryClient.setMutationDefaults(QUEUED.updateMe, {
     ...common,
     mutationFn: ({ changes }: UpdateMeVars) => api('/api/me', { method: 'PUT', body: JSON.stringify(changes) }),
@@ -264,11 +284,13 @@ export function registerQueuedMutations(queryClient: QueryClient) {
 
   queryClient.setMutationDefaults(QUEUED.updateSplit, {
     ...common,
-    mutationFn: ({ splitId, daysPerWeek }: UpdateSplitVars) =>
-      api(`/api/workout-splits/${splitId}`, { method: 'PATCH', body: JSON.stringify({ daysPerWeek }) }),
-    onMutate: ({ splitId, daysPerWeek }: UpdateSplitVars) => {
+    // Either change (weekly goal or day colours); a key left out stays as it is.
+    mutationFn: ({ splitId, daysPerWeek, dayColors }: UpdateSplitVars) =>
+      api(`/api/workout-splits/${splitId}`, { method: 'PATCH', body: JSON.stringify({ daysPerWeek, dayColors }) }),
+    onMutate: ({ splitId, daysPerWeek, dayColors }: UpdateSplitVars) => {
+      const changes = { ...(daysPerWeek !== undefined && { daysPerWeek }), ...(dayColors !== undefined && { dayColors }) }
       queryClient.setQueryData<TrainingData>(['training'], (old) =>
-        old?.split?.id === splitId ? { ...old, split: { ...old.split, daysPerWeek } } : old,
+        old?.split?.id === splitId ? { ...old, split: { ...old.split, ...changes } } : old,
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['training'] }),

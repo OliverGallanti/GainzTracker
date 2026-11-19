@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeTiming, formatSeconds, lastSessionPlan, setRow, setsBody } from './sessions'
+import { describeTiming, formatSeconds, lastSessionPlan, setRow, setsBody, toSetRows } from './sessions'
 
 const split = { id: 's', name: 'PPL', days: ['Push', 'Pull', 'Legs', 'Push', 'Pull', 'Legs'], daysPerWeek: 6, active: true }
 const log = (id, dayIndex, day, completed = true) => ({ id, splitId: 's', dayIndex, completed, loggedAt: `2026-11-${day}T18:00:00.000Z`, durationMinutes: null })
@@ -81,5 +81,31 @@ describe('setsBody', () => {
         { exerciseName: 'Row' },
       ],
     })
+  })
+})
+
+describe('sets per row', () => {
+  const untimed = (id, weightKg, reps, performedAt) => ({ id, splitLogId: 'l', exerciseName: 'Squat', weightKg, reps, performedAt })
+
+  it('sends a row done 3 times as 3 sets, a blank count as 1', () => {
+    const body = setsBody([
+      { exerciseName: 'Squat', weightKg: '100', reps: '5', sets: '3' },
+      { exerciseName: 'Dips', weightKg: '', reps: '12', sets: '' },
+      { exerciseName: 'Row', weightKg: '60', reps: '10', sets: '0' },
+    ])
+    expect(body.sets.map((s) => s.exerciseName)).toEqual(['Squat', 'Squat', 'Squat', 'Dips', 'Row'])
+  })
+
+  it('folds repeats back into one row, in the order done', () => {
+    // newest first, as the API lists them
+    const sets = [untimed('c', 90, 8, '3'), untimed('b', 100, 5, '2'), untimed('a', 100, 5, '1')]
+    const rows = toSetRows(sets)
+    expect(rows.map((r) => [r.weightKg, r.reps, r.sets])).toEqual([['100', '5', '2'], ['90', '8', undefined]])
+    expect(setsBody(rows).sets).toHaveLength(3)
+  })
+
+  it('keeps timed sets on their own rows', () => {
+    const timed = (id, at) => ({ ...untimed(id, 100, 5, at), durationSeconds: 40, restSeconds: 90 })
+    expect(toSetRows([timed('b', '2'), timed('a', '1')])).toHaveLength(2)
   })
 })

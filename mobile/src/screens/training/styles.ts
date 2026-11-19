@@ -3,7 +3,7 @@ import { colors } from '../../theme'
 
 export const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 export const WEEK = [1, 2, 3, 4, 5, 6, 7]
-export const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+export const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 export const REMOVE_NOTE = 'Removing a day also removes any exercises logged on it.'
 
 export const styles = StyleSheet.create({
@@ -30,7 +30,9 @@ export const styles = StyleSheet.create({
   daySkipped: { backgroundColor: 'rgba(251, 191, 36, 0.8)' },
   dayTextLogged: { color: colors.main, fontWeight: '600' },
   dayTextFuture: { color: 'rgba(220, 224, 217, 0.3)' },
-  legend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'transparent' },
+  swatchPicked: { borderColor: colors.text },
   legendSwatch: { width: 12, height: 12, borderRadius: 3, marginLeft: 4 },
   divider: { height: 1, backgroundColor: colors.border },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },

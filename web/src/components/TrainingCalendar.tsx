@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SplitLog } from '@gainz/shared/types'
 import { uniqueDays } from '@gainz/shared/splits'
+import { dayColor } from '@gainz/shared/dayColors'
 import MonthGrid from './MonthGrid'
 import SessionEditor from './SessionEditor'
 
@@ -126,6 +127,7 @@ function LogDetail({
 function TrainingCalendar({
   logs,
   days,
+  dayColors,
   selectedDate,
   onSelectDate,
   busy,
@@ -135,6 +137,7 @@ function TrainingCalendar({
 }: {
   logs: SplitLog[]
   days: string[]
+  dayColors?: Record<string, string> | null
   selectedDate: Date
   onSelectDate: (date: Date | null) => void
 } & LogActions) {
@@ -147,7 +150,7 @@ function TrainingCalendar({
       <MonthGrid
         mark={(date) => {
           const log = logsByDate.get(date.toDateString())
-          return log && { filled: log.completed, note: log.completed ? 'done' : 'skipped' }
+          return log && { filled: log.completed, note: log.completed ? `${days[log.dayIndex]} done` : 'skipped', color: dayColor({ days, dayColors }, log.dayIndex) }
         }}
         selected={selectedDate}
         onSelect={onSelectDate}
@@ -169,6 +172,16 @@ function TrainingCalendar({
         <span className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded bg-third" /> Done
         </span>
+        {uniqueDays(days).map(({ label, index }) => {
+          const color = dayColor({ days, dayColors }, index)
+          return (
+            color && (
+              <span key={index} className="flex items-center gap-1">
+                <span className="inline-block h-2.5 w-2.5 rounded" style={{ backgroundColor: color }} /> {label}
+              </span>
+            )
+          )
+        })}
         <span className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded bg-amber-400/80" /> Skipped
         </span>

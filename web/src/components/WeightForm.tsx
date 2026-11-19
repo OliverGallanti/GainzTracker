@@ -1,20 +1,32 @@
 import { useState } from 'react'
+import { loggedAtOn } from '@gainz/shared/dates'
+import type { WeightEntry } from '@gainz/shared/types'
 import { api } from '../lib/api'
 import { useSubmit } from '../lib/useSubmit'
 
-function WeightForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
-  const [form, setForm] = useState({ weightKg: '', bodyFatPercent: '' })
+// Logs a weigh-in on `day`, or edits `editing` (its day stays).
+function WeightForm({ day, editing, onSaved, onCancel }: { day: Date; editing?: WeightEntry; onSaved: () => void; onCancel: () => void }) {
+  const [form, setForm] = useState({
+    weightKg: editing ? String(editing.weightKg) : '',
+    bodyFatPercent: editing?.bodyFatPercent != null ? String(editing.bodyFatPercent) : '',
+  })
 
   const { submit, saving, error } = useSubmit(async () => {
-    await api('/api/weights', {
-      method: 'POST',
-      body: JSON.stringify({
-        weightKg: Number(form.weightKg),
-        ...(form.bodyFatPercent ? { bodyFatPercent: Number(form.bodyFatPercent) } : {}),
-      }),
-    })
+    const bodyFatPercent = form.bodyFatPercent ? Number(form.bodyFatPercent) : null
+    if (editing) {
+      await api(`/api/weights/${editing.id}`, { method: 'PATCH', body: JSON.stringify({ weightKg: Number(form.weightKg), bodyFatPercent }) })
+    } else {
+      await api('/api/weights', {
+        method: 'POST',
+        body: JSON.stringify({
+          weightKg: Number(form.weightKg),
+          ...(bodyFatPercent != null ? { bodyFatPercent } : {}),
+          loggedAt: loggedAtOn(day),
+        }),
+      })
+    }
     onSaved()
-  }, 'Could not log that weight: please check the values and try again')
+  }, editing ? 'Could not save that change: please try again' : 'Could not log that weight: please check the values and try again')
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
@@ -50,7 +62,7 @@ function WeightForm({ onSaved, onCancel }: { onSaved: () => void; onCancel: () =
           disabled={saving}
           className="flex-1 rounded-lg bg-third px-4 py-2 text-sm font-medium text-main transition hover:bg-third/90 disabled:opacity-60 active:scale-[0.98]"
         >
-          {saving ? 'Saving…' : 'Add'}
+          {saving ? 'Saving…' : editing ? 'Save' : 'Add'}
         </button>
         <button
           type="button"

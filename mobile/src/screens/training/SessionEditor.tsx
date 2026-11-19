@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { View } from 'react-native'
-import { describeTiming, setRow, setsBody, type SetRow } from '@gainz/shared/sessions'
+import { describeTiming, setsBody, toSetRows, type SetRow } from '@gainz/shared/sessions'
 import type { SplitLog, WorkoutSet } from '@gainz/shared/types'
 import { Plus, X } from '../../icons'
 import { QUEUED, useQueued, type ReplaceSetsVars, type UpdateLogVars } from '../../queue'
@@ -15,7 +15,7 @@ const emptyRow = (): SetRow => ({ exerciseName: '', weightKg: '', reps: '' })
 export default function SessionEditor({ log, sets, onDone }: { log: SplitLog; sets: WorkoutSet[]; onDone: () => void }) {
   const replaceSets = useQueued<ReplaceSetsVars>(QUEUED.replaceSets)
   const updateLog = useQueued<UpdateLogVars>(QUEUED.updateLog)
-  const [rows, setRows] = useState<SetRow[]>(() => (sets.length > 0 ? [...sets].reverse().map(setRow) : [emptyRow()]))
+  const [rows, setRows] = useState<SetRow[]>(() => (sets.length > 0 ? toSetRows(sets) : [emptyRow()]))
   const [duration, setDuration] = useState(log.durationMinutes ? String(log.durationMinutes) : '')
 
   const edit = (index: number, changes: Partial<SetRow>) => setRows(rows.map((r, i) => (i === index ? { ...r, ...changes } : r)))
@@ -38,6 +38,7 @@ export default function SessionEditor({ log, sets, onDone }: { log: SplitLog; se
           <View style={[ui.row, { alignItems: 'flex-end' }]}>
             <Field label="kg" value={row.weightKg} onChange={(v) => edit(index, { weightKg: v })} numeric />
             <Field label="Reps" value={row.reps} onChange={(v) => edit(index, { reps: v.replace(/\D/g, '') })} keyboardType="number-pad" />
+            <Field label="Sets" value={row.sets ?? ''} onChange={(v) => edit(index, { sets: v.replace(/\D/g, '') })} keyboardType="number-pad" />
             <IconButton icon={X} label={`Remove ${row.exerciseName || 'exercise'}`} onPress={() => animateLayout(() => setRows(rows.filter((_, i) => i !== index)))} />
           </View>
           {row.kept && describeTiming(row.kept) !== '' && <Muted>{describeTiming(row.kept)}</Muted>}

@@ -17,14 +17,14 @@ Track what you eat, what you weigh and how you train, in one place: a web app an
 
 ### Weight and body
 
-- **Weight and body fat:** log them, see your BMI, and follow both on charts over the range you choose, up to all time, with your goals drawn on them.
+- **Weight and body fat:** log them on any day from a calendar, edit or remove them, see your BMI, and follow both on charts over the range you choose, up to all time, with your goals drawn on them.
 
 ### Training
 
 - **Your routine:** start from a template (6-Day PPL, Upper/Lower and others) or name your own days, and set how many days a week make a good week.
-- **A month calendar:** mark each day done or skipped; any past day can be filled in later.
+- **A month calendar:** mark each day done or skipped; any past day can be filled in later. Give each day of your routine its own colour.
 - **Weekly streak:** how many weeks in a row you hit your goal. Switching routines doesn't reset it.
-- **Sessions:** the exercises of a day, with kg, reps and how long it took.
+- **Sessions:** the exercises of a day, with kg, reps, sets and how long it took.
 - **Live workout (Android):** start and finish each set on a timer, with a rest clock that tells you when to go again. A new session is filled in from the last time you trained that day.
 
 ### Big 4

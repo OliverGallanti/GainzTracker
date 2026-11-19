@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { BIG_FOUR_LIFTS } from './lifts.ts'
+import { DAY_COLOR_KEYS } from './dayColors.ts'
 import { ACTIVITY_LEVELS } from './tdee.ts'
 
 // The API's request bodies, in one place: the server validates with these, and
@@ -28,6 +29,13 @@ export const createWeightSchema = z.object({
   bodyFatPercent: z.number().min(0).max(100).optional(),
   loggedAt: z.coerce.date().optional(),
   note: z.string().optional(),
+})
+
+// Edits a weigh-in: only the keys sent change; bodyFatPercent null clears it.
+export const updateWeightSchema = z.object({
+  weightKg: z.number().positive().optional(),
+  bodyFatPercent: z.number().min(0).max(100).nullable().optional(),
+  loggedAt: z.coerce.date().optional(),
 })
 
 // Every field optional: only the keys present are written, so editing one
@@ -102,7 +110,10 @@ export const createSplitSchema = z.object({
   daysPerWeek: daysPerWeek.optional(),
 })
 
-export const updateSplitSchema = z.object({ daysPerWeek })
+// Day name -> colour key (dayColors.ts). Sent whole: it replaces the routine's map.
+const dayColors = z.record(z.string().min(1).max(60), z.enum(DAY_COLOR_KEYS))
+
+export const updateSplitSchema = z.object({ daysPerWeek: daysPerWeek.optional(), dayColors: dayColors.optional() })
 
 // `dayIndex` is the user's pick from the split's days, in any order. `dayStart`
 // and `dayEnd` bound the local calendar day being logged (the client knows its
@@ -155,6 +166,7 @@ export const liftGoalsSchema = z
 
 // Request bodies as the clients send them.
 export type UpdateMealBody = z.input<typeof updateMealSchema>
+export type UpdateWeightBody = z.input<typeof updateWeightSchema>
 export type UpdateLogBody = z.input<typeof updateLogSchema>
 export type UpdateSplitBody = z.input<typeof updateSplitSchema>
 export type LiftGoalsBody = z.input<typeof liftGoalsSchema>

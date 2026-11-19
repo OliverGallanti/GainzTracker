@@ -4,12 +4,12 @@ export function startOfLocalDay(date: Date = new Date()) {
   return start
 }
 
-// One month for a Sunday-first calendar. Leading nulls pad the grid so day 1
+// One month for a Monday-first calendar (as the weeks below). Leading nulls pad the grid so day 1
 // lands in the correct weekday column.
 export function buildMonthGrid(viewDate: Date) {
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
-  const cells: (Date | null)[] = Array(new Date(year, month, 1).getDay()).fill(null)
+  const cells: (Date | null)[] = Array((new Date(year, month, 1).getDay() + 6) % 7).fill(null)
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d))
   return cells

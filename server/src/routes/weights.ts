@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../middleware/require-auth.ts'
 import { repliedWithExisting } from '../lib/client-id.ts'
 import { prisma } from '../db.ts'
-import { createWeightSchema as createSchema } from '@gainz/shared/schemas'
+import { createWeightSchema as createSchema, updateWeightSchema as updateSchema } from '@gainz/shared/schemas'
 
 const listQuerySchema = z.object({
   since: z.coerce.date().optional(),
@@ -46,6 +46,21 @@ export default async function weightRoutes(app: FastifyInstance) {
       data: { ...parsed.data, userId: request.userId },
     })
     return reply.code(201).send(entry)
+  })
+
+  app.patch<{ Params: { id: string } }>('/weights/:id', async (request, reply) => {
+    const parsed = updateSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.badRequest(parsed.error.message)
+    }
+    const { count } = await prisma.weightEntry.updateMany({
+      where: { id: request.params.id, userId: request.userId },
+      data: parsed.data,
+    })
+    if (count === 0) {
+      return reply.notFound()
+    }
+    return prisma.weightEntry.findUnique({ where: { id: request.params.id } })
   })
 
   app.delete<{ Params: { id: string } }>('/weights/:id', async (request, reply) => {

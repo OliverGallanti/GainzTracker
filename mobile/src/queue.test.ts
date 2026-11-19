@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryCache, QueryClient, dehydrate, hydrate, onlineManager, MutationObserver } from '@tanstack/react-query'
-import { QUEUED, newDayToday, queuedItemId, reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type UpdateMealVars, type UpdateSavedFoodVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars } from './queue'
+import { QUEUED, newDayToday, queuedItemId, reapplyQueuedWrites, registerQueuedMutations, shouldSaveMutation, type RemoveVars, type MoveMealVars, type UpdateMealVars, type UpdateSavedFoodVars, type LogDayVars, type UpdateLogVars, type CreateSplitVars, type UpdateSplitVars, type TrainingData, type AddMealVars, type AddSetVars, type AddWeightVars, type SaveFoodVars, type SetLiftGoalsVars, type UpdateMeVars, type UpdateWeightVars } from './queue'
 
 // The real queue code against a fake server, a fake network switch and a fake
 // app restart (dehydrate -> new client -> hydrate), which is what the
@@ -250,6 +250,23 @@ describe('editing a food', () => {
     await client.resumePausedMutations()
     expect(api.mock.calls[0][0]).toBe('/api/saved-foods/o')
     expect(JSON.parse(api.mock.calls[0][1].body)).toEqual({ name: 'Avena', calories: 380, proteinG: 13, carbsG: 60, basis: '100g', servingG: 40 })
+  })
+})
+
+describe('editing a weigh-in', () => {
+  it('moves it to its new day straight away, newest first, and sends the PATCH', async () => {
+    const client = makeClient()
+    const entry = (id: string, loggedAt: string) => ({ id, weightKg: 80, bodyFatPercent: null, loggedAt, note: null })
+    client.setQueryData(['weights'], [entry('new', '2026-11-18T08:00:00.000Z'), entry('old', '2026-11-10T08:00:00.000Z')])
+    const changes = { weightKg: 79, bodyFatPercent: null, loggedAt: '2026-11-19T12:00:00.000Z' }
+
+    void mutate<UpdateWeightVars>(client, QUEUED.updateWeight, { label: '79 kg', id: 'old', changes })
+    await flush()
+    expect(client.getQueryData<{ id: string; weightKg: number }[]>(['weights'])?.map((e) => [e.id, e.weightKg])).toEqual([['old', 79], ['new', 80]])
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls[0]).toEqual(['/api/weights/old', { method: 'PATCH', body: JSON.stringify(changes) }])
   })
 })
 

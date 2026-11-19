@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { startOfLocalDay } from '@gainz/shared/dates'
+import { dayColor } from '@gainz/shared/dayColors'
 import { logOnDay, suggestedDayIndex, uniqueDays } from '@gainz/shared/splits'
 import type { SplitLog, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
 import { Check, History, Timer } from '../../icons'
@@ -74,7 +75,7 @@ export default function Logger({
       <Calendar
         mark={(date) => {
           const day = logOnDay(logs, date)
-          return day && { filled: day.completed, note: day.completed ? 'done' : 'skipped' }
+          return day && { filled: day.completed, note: day.completed ? `${split.days[day.dayIndex]} done` : 'skipped', color: dayColor(split, day.dayIndex) }
         }}
         selected={target}
         onSelect={setPickedDate}
@@ -82,6 +83,14 @@ export default function Logger({
       <View style={styles.legend}>
         <View style={[styles.legendSwatch, styles.dayDone]} />
         <Muted>Done</Muted>
+        {uniqueDays(split.days).map(({ label, index }) =>
+          dayColor(split, index) ? (
+            <View key={index} style={styles.legend}>
+              <View style={[styles.legendSwatch, { backgroundColor: dayColor(split, index)! }]} />
+              <Muted>{label}</Muted>
+            </View>
+          ) : null,
+        )}
         <View style={[styles.legendSwatch, styles.daySkipped]} />
         <Muted>Skipped</Muted>
         <View style={{ flex: 1 }} />

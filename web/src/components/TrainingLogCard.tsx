@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
-import { Check, Repeat } from 'lucide-react'
+import { Check, Palette, Repeat } from 'lucide-react'
 import { api } from '../lib/api'
 import { startOfLocalDay } from '@gainz/shared/dates'
 import { computeWeeklyStreak, logOnDay, suggestedDayIndex, weeklyGoal } from '@gainz/shared/splits'
@@ -8,6 +8,7 @@ import { useLoad } from '../lib/useLoad'
 import { useSubmit } from '../lib/useSubmit'
 import DayLogForm from './DayLogForm'
 import TrainingCalendar from './TrainingCalendar'
+import DayColorsForm from './DayColorsForm'
 import SessionEditor from './SessionEditor'
 import RoutineEditor from './RoutineEditor'
 
@@ -17,6 +18,7 @@ import RoutineEditor from './RoutineEditor'
 function TrainingLogCard() {
   const [editingLog, setEditingLog] = useState<SplitLog | null>(null)
   const [editingRoutine, setEditingRoutine] = useState(false)
+  const [editingColors, setEditingColors] = useState(false)
 
   // The day the logger below acts on. null = today; the calendar sets it when a
   // past day is picked, and a click anywhere outside this card puts it back.
@@ -94,6 +96,9 @@ function TrainingLogCard() {
     mutate(() =>
       api(splitUrl(), { method: 'PATCH', body: JSON.stringify({ daysPerWeek }) }),
     )
+
+  const changeDayColors = (dayColors: Record<string, string>) =>
+    mutate(() => api(splitUrl(), { method: 'PATCH', body: JSON.stringify({ dayColors }) }))
 
   const handleDeleteSplit = async (id: string) => {
     await api(`/api/workout-splits/${id}`, { method: 'DELETE' })
@@ -184,6 +189,16 @@ function TrainingLogCard() {
             </select>
             a week
           </label>
+          <button
+            type="button"
+            onClick={() => setEditingColors((v) => !v)}
+            aria-expanded={editingColors}
+            className="-mt-2 mb-4 flex items-center gap-1 text-xs font-medium text-third/60 transition hover:text-third"
+          >
+            <Palette size={12} />
+            Day colours
+          </button>
+          {editingColors && <DayColorsForm split={split} busy={busy} onChange={changeDayColors} />}
 
           <div className="mb-3 flex items-center justify-between">
             <p className="text-xs text-third/60">
@@ -234,6 +249,7 @@ function TrainingLogCard() {
           <TrainingCalendar
             logs={logs ?? []}
             days={split.days}
+            dayColors={split.dayColors}
             selectedDate={target}
             onSelectDate={setSelectedDate}
             busy={busy}

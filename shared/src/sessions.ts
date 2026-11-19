@@ -58,10 +58,12 @@ export function describeTiming(set: Pick<WorkoutSet, 'durationSeconds' | 'restSe
 
 // A session form's row: the inputs' text, plus what the form doesn't show
 // (effort, the live timer's times, when it was done), carried through an edit.
+// `sets` is how many times the row was done (blank = 1): "3 x 10 @ 80".
 export type SetRow = {
   exerciseName: string
   weightKg: string
   reps: string
+  sets?: string
   kept?: Pick<WorkoutSet, 'rpe' | 'durationSeconds' | 'restSeconds' | 'performedAt'>
 }
 
@@ -72,16 +74,44 @@ export const setRow = (set: WorkoutSet): SetRow => ({
   kept: { rpe: set.rpe, durationSeconds: set.durationSeconds, restSeconds: set.restSeconds, performedAt: set.performedAt },
 })
 
+// A session's sets as form rows, in the order done (the API lists newest
+// first). Repeats of the same set in a row fold into one row with a count;
+// timed sets don't, so each keeps its own times.
+export function toSetRows(sets: WorkoutSet[]): SetRow[] {
+  const rows: SetRow[] = []
+  const untimed = (r: SetRow) => r.kept?.durationSeconds == null && r.kept?.restSeconds == null
+  for (const set of [...sets].reverse()) {
+    const row = setRow(set)
+    const prev = rows.at(-1)
+    const same =
+      prev &&
+      untimed(prev) &&
+      untimed(row) &&
+      prev.exerciseName === row.exerciseName &&
+      prev.weightKg === row.weightKg &&
+      prev.reps === row.reps &&
+      prev.kept?.rpe === row.kept?.rpe
+    if (same) prev.sets = String(Number(prev.sets ?? 1) + 1)
+    else rows.push(row)
+  }
+  return rows
+}
+
 // The rows as the body of a session save (PUT .../logs/:logId/sets): rows with
-// no exercise are left out, and empty values are left out, not sent as null.
+// no exercise are left out, empty values are left out (not sent as null), and
+// a row done N times is sent as N sets.
+export const MAX_SETS_PER_ROW = 20
+
 export function setsBody(rows: SetRow[]): ReplaceSetsBody {
   const number = (text: string) => (text.trim() && Number.isFinite(Number(text)) ? Number(text) : null)
   return {
     sets: rows
       .filter((r) => r.exerciseName.trim())
-      .map((r) => {
+      .flatMap((r) => {
         const set = { exerciseName: r.exerciseName.trim(), weightKg: number(r.weightKg), reps: number(r.reps), ...r.kept }
-        return Object.fromEntries(Object.entries(set).filter(([, v]) => v != null)) as ReplaceSetsBody['sets'][number]
+        const body = Object.fromEntries(Object.entries(set).filter(([, v]) => v != null)) as ReplaceSetsBody['sets'][number]
+        const times = Math.min(Math.max(Math.floor(number(r.sets ?? '') ?? 1), 1), MAX_SETS_PER_ROW)
+        return Array.from({ length: times }, () => ({ ...body }))
       }),
   }
 }

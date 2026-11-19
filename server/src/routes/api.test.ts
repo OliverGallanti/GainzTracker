@@ -139,10 +139,31 @@ describe.skipIf(!url)('API routes', () => {
       expect((await call('DELETE', `/api/weights/${entry.id}`, b.auth)).statusCode).toBe(404)
       expect((await call('GET', '/api/weights', a.auth)).json()).toHaveLength(1)
     })
+
+    it('edits a weigh-in, its day included, only for its owner', async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      const entry = (await call('POST', '/api/weights', a.auth, { weightKg: 80, bodyFatPercent: 18 })).json()
+      const changes = { weightKg: 79.5, bodyFatPercent: null, loggedAt: '2026-11-10T12:00:00.000Z' }
+      expect((await call('PATCH', `/api/weights/${entry.id}`, b.auth, changes)).statusCode).toBe(404)
+      expect((await call('PATCH', `/api/weights/${entry.id}`, a.auth, { weightKg: -1 })).statusCode).toBe(400)
+      const edited = await call('PATCH', `/api/weights/${entry.id}`, a.auth, changes)
+      expect(edited.statusCode).toBe(200)
+      expect(edited.json()).toMatchObject(changes)
+    })
   })
 
   describe('training', () => {
     const day = { dayStart: '2026-03-02T00:00:00Z', dayEnd: '2026-03-03T00:00:00Z', loggedAt: '2026-03-02T18:00:00Z' }
+
+    it('saves a colour per routine day, only known colours, and keeps the weekly goal', async () => {
+      const a = await t.newUser()
+      const split = (await call('POST', '/api/workout-splits', a.auth, { name: 'PPL', days: ['Push', 'Pull', 'Legs'], daysPerWeek: 3 })).json()
+      expect((await call('PATCH', `/api/workout-splits/${split.id}`, a.auth, { dayColors: { Push: 'gold' } })).statusCode).toBe(400)
+      expect((await call('PATCH', `/api/workout-splits/${split.id}`, a.auth, { dayColors: { Push: 'red', Legs: 'blue' } })).statusCode).toBe(204)
+      const [saved] = (await call('GET', '/api/workout-splits', a.auth)).json()
+      expect(saved).toMatchObject({ daysPerWeek: 3, dayColors: { Push: 'red', Legs: 'blue' } })
+    })
 
     it("logs one day per calendar day, and only on the user's own routine", async () => {
       const a = await t.newUser()

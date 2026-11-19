@@ -3,14 +3,18 @@ import { addDays, buildMonthGrid, dayLabel, dayRange, loggedAtOn, startOfLocalDa
 
 describe('buildMonthGrid', () => {
   it('pads to the weekday of the 1st and has every day of the month', () => {
-    const cells = buildMonthGrid(new Date(2026, 1, 15)) // Feb 2026: starts on a Sunday, 28 days
-    expect(cells).toHaveLength(28)
-    expect(cells[0]?.getDate()).toBe(1)
+    const june = buildMonthGrid(new Date(2026, 5, 15)) // Jun 2026: starts on a Monday, 30 days
+    expect(june).toHaveLength(30)
+    expect(june[0]?.getDate()).toBe(1)
+
+    const feb = buildMonthGrid(new Date(2026, 1, 15)) // Feb 2026: starts on a Sunday, the last column
+    expect(feb.slice(0, 6)).toEqual(Array(6).fill(null))
+    expect(feb[6]?.getDate()).toBe(1)
 
     const sept = buildMonthGrid(new Date(2026, 8, 1)) // Sep 2026: starts on a Tuesday, 30 days
-    expect(sept.slice(0, 2)).toEqual([null, null])
-    expect(sept[2]?.getDate()).toBe(1)
-    expect(sept).toHaveLength(32)
+    expect(sept[0]).toBeNull()
+    expect(sept[1]?.getDate()).toBe(1)
+    expect(sept).toHaveLength(31)
   })
 })
 

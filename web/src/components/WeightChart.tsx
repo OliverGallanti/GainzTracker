@@ -1,7 +1,12 @@
 import { useState } from 'react'
 import { Flag, Ruler, Scale } from 'lucide-react'
 import { computeBmi } from '@gainz/shared/body'
+import { dayLabel, startOfLocalDay } from '@gainz/shared/dates'
+import type { WeightEntry } from '@gainz/shared/types'
+import { api } from '../lib/api'
 import { useMe, useWeights } from '../lib/sharedData'
+import { useSubmit } from '../lib/useSubmit'
+import MonthGrid from './MonthGrid'
 import WeightCharts from './WeightCharts'
 import WeightForm from './WeightForm'
 import HeightForm from './HeightForm'
@@ -15,6 +20,10 @@ function WeightChart() {
   // which would reset the user's chosen window every time they log a weight.
   const [chartMode, setChartMode] = useState('weight') // 'weight' | 'bodyFat' | 'both'
   const [range, setRange] = useState('1y')
+  // The calendar's day (null = today) and the weigh-in being edited, if any.
+  const [picked, setPicked] = useState<Date | null>(null)
+  const [editing, setEditing] = useState<WeightEntry | undefined>()
+  const day = picked ?? startOfLocalDay()
 
   const me = useMe()
   const weights = useWeights()
@@ -36,8 +45,13 @@ function WeightChart() {
   // Each form knows which of the two shared resources its write invalidates.
   const handleWeightSaved = () => {
     setMode('view')
+    setEditing(undefined)
     weights.reload()
   }
+  const { submit: removeEntry, error: removeError } = useSubmit(async (id: string) => {
+    await api(`/api/weights/${id}`, { method: 'DELETE' })
+    weights.reload()
+  }, 'Could not remove that weigh-in: please try again')
   const handleMeasurementsSaved = () => {
     weights.reload()
     me.reload()
@@ -53,6 +67,8 @@ function WeightChart() {
   const latestEntry = entries?.length ? entries[entries.length - 1] : null
   const latestBodyFat = entries ? [...entries].reverse().find((e) => e.bodyFatPercent != null) : null
   const bmi = latestEntry ? computeBmi(latestEntry.weightKg, height) : null
+  const loggedDays = new Set(entries?.map((e) => new Date(e.loggedAt).toDateString()))
+  const onDay = (entries ?? []).filter((e) => new Date(e.loggedAt).toDateString() === day.toDateString())
 
   return (
     <div id="weight-card" className="glow-card w-full rounded-2xl border border-secondary/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8">
@@ -65,7 +81,7 @@ function WeightChart() {
             className="btn btn-secondary"
           >
             <Scale size={14} />
-            Log weight
+            {picked ? `Log weight on ${dayLabel(day)}` : 'Log weight'}
           </button>
         )}
       </div>
@@ -153,8 +169,51 @@ function WeightChart() {
         />
       )}
 
+      {!isLoading && mode === 'view' && !isEmpty && (
+        <div className="mt-5 border-t border-secondary/25 pt-4">
+          <MonthGrid
+            mark={(date) => (loggedDays.has(date.toDateString()) ? { filled: true, note: 'weighed in' } : undefined)}
+            selected={day}
+            onSelect={setPicked}
+          />
+          <p className="mt-3 text-sm font-medium text-third">{dayLabel(day)}</p>
+          {onDay.length === 0 && <p className="mt-1 text-xs text-third/60">No weigh-in on this day.</p>}
+          {onDay.map((entry) => (
+            <div key={entry.id} className="mt-2 flex items-center justify-between gap-3 text-sm">
+              <span className="text-third">
+                {entry.weightKg} kg{entry.bodyFatPercent != null ? ` · ${entry.bodyFatPercent}%` : ''}
+              </span>
+              <span className="flex gap-3 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(entry)
+                    setMode('logWeight')
+                  }}
+                  className="text-third/60 transition hover:text-third"
+                >
+                  Edit
+                </button>
+                <button type="button" onClick={() => removeEntry(entry.id)} className="text-third/60 transition hover:text-red-400">
+                  Remove
+                </button>
+              </span>
+            </div>
+          ))}
+          {removeError && <p className="mt-2 text-xs text-red-400">{removeError}</p>}
+        </div>
+      )}
+
       {mode === 'logWeight' && (
-        <WeightForm onSaved={handleWeightSaved} onCancel={() => setMode('view')} />
+        <WeightForm
+          day={day}
+          editing={editing}
+          onSaved={handleWeightSaved}
+          onCancel={() => {
+            setMode('view')
+            setEditing(undefined)
+          }}
+        />
       )}
 
       {mode === 'editHeight' && (

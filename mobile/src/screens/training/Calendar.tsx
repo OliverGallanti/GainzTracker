@@ -5,7 +5,8 @@ import { ChevronLeft, ChevronRight } from '../../icons'
 import { Text, IconButton, styles as ui } from '../../ui'
 import { formatDate, WEEKDAY_LABELS, styles } from './styles'
 
-export type DayMark = { filled: boolean; note: string } // note: what TalkBack adds, e.g. 'done'
+// note: what TalkBack adds, e.g. 'done'; color: a filled day's own colour (a routine day's)
+export type DayMark = { filled: boolean; note: string; color?: string | null }
 
 // The month, as on the web: marked days filled in (amber when not `filled`), any
 // past day can be picked, future ones can't. Tapping today or the picked day
@@ -62,7 +63,7 @@ export default function Calendar({
               accessibilityState={{ selected: isSelected, disabled: future }}
               style={[styles.cell, styles.day, isToday && styles.dayToday, isSelected && styles.daySelected]}
             >
-              <View style={[styles.dayFill, log && (log.filled ? styles.dayDone : styles.daySkipped)]}>
+              <View style={[styles.dayFill, log && (log.filled ? styles.dayDone : styles.daySkipped), log?.filled && log.color ? { backgroundColor: log.color } : null]}>
                 <Text style={log ? styles.dayTextLogged : future ? styles.dayTextFuture : ui.muted}>{date.getDate()}</Text>
               </View>
             </Pressable>

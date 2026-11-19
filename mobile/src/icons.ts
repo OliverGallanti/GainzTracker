@@ -8,6 +8,7 @@ export { default as ChevronRight } from 'lucide-react-native/icons/chevron-right
 export { default as ChevronUp } from 'lucide-react-native/icons/chevron-up'
 export { default as Dumbbell } from 'lucide-react-native/icons/dumbbell'
 export { default as History } from 'lucide-react-native/icons/history'
+export { default as Palette } from 'lucide-react-native/icons/palette'
 export { default as Pencil } from 'lucide-react-native/icons/pencil'
 export { default as Play } from 'lucide-react-native/icons/play'
 export { default as Plus } from 'lucide-react-native/icons/plus'
