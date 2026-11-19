@@ -129,11 +129,12 @@ export function Button({
 }: {
   label: string
   onPress: () => void
-  variant?: 'primary' | 'secondary' | 'small'
+  variant?: 'primary' | 'secondary' | 'small' | 'danger' // danger: filled red, for what can't be undone
   disabled?: boolean
   accessibilityLabel?: string
   icon?: LucideIcon
 }) {
+  const filled = variant === 'primary' || variant === 'danger'
   return (
     <Pressable
       onPress={onPress}
@@ -145,8 +146,8 @@ export function Button({
       style={({ pressed }) => [styles[variant], (pressed || disabled) && styles.dim]}
     >
       <View style={styles.buttonContent}>
-        {Icon && <Icon size={16} color={variant === 'primary' ? colors.main : colors.text} />}
-        <Text style={[variant === 'primary' ? styles.primaryText : styles.secondaryText, { flexShrink: 1 }]}>{label}</Text>
+        {Icon && <Icon size={16} color={filled ? colors.main : colors.text} />}
+        <Text style={[filled ? styles.primaryText : styles.secondaryText, { flexShrink: 1 }]}>{label}</Text>
       </View>
     </Pressable>
   )
@@ -258,6 +259,7 @@ export const styles = StyleSheet.create({
   buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   iconButton: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: colors.border },
   primary: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 12, backgroundColor: colors.text },
+  danger: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 12, backgroundColor: colors.danger },
   secondary: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
   small: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
   primaryText: { fontSize: 16, fontWeight: '600', color: colors.main },

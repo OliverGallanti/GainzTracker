@@ -31,6 +31,9 @@ export const createWeightSchema = z.object({
   note: z.string().optional(),
 })
 
+// Deleting an account must say so in the body, so a stray request can't.
+export const deleteAccountSchema = z.object({ confirm: z.literal('DELETE') })
+
 // Edits a weigh-in: only the keys sent change; bodyFatPercent null clears it.
 export const updateWeightSchema = z.object({
   weightKg: z.number().positive().optional(),

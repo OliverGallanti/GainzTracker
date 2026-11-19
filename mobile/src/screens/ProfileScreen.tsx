@@ -15,6 +15,7 @@ const text = (value: number | null | undefined) => (value == null ? '' : String(
 export default function ProfileScreen() {
   const { signOut } = useAuth()
   const me = useMe()
+  const [deleting, setDeleting] = useState(false)
 
   return (
     <Screen>
@@ -27,10 +28,45 @@ export default function ProfileScreen() {
       <Card title="Account">
         {me.data && <Muted>Signed in as {me.data.email}</Muted>}
         <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
+        <Button label="Delete account" variant="small" onPress={() => setDeleting(true)} />
       </Card>
+
+      <Sheet visible={deleting} title="Delete account" onClose={() => setDeleting(false)}>
+        <DeleteAccount />
+      </Sheet>
 
       <About />
     </Screen>
+  )
+}
+
+// Erases the account and everything in it on the server, then signs out.
+function DeleteAccount() {
+  const { deleteAccount } = useAuth()
+  const [typed, setTyped] = useState('')
+  const [sending, setSending] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  const confirm = async () => {
+    setSending(true)
+    setFailed(false)
+    try {
+      await deleteAccount() // signs out on success, which closes this screen
+    } catch {
+      setFailed(true)
+      setSending(false)
+    }
+  }
+
+  return (
+    <Card>
+      <Text>This erases your account and everything in it: profile, foods, weights, routines, training and passkeys, on the phone and the website.</Text>
+      <Text style={{ fontWeight: '600' }}>It happens at once and can't be undone.</Text>
+      <Muted>You need a connection for this.</Muted>
+      <Field label="Type DELETE to confirm" value={typed} onChange={setTyped} autoCapitalize="characters" autoCorrect={false} />
+      <Button label={sending ? 'Deleting…' : 'Delete my account'} variant="danger" disabled={typed !== 'DELETE' || sending} onPress={() => void confirm()} />
+      {failed && <ErrorText>Could not delete your account: check your connection and try again</ErrorText>}
+    </Card>
   )
 }
 

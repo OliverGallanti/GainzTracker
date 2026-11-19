@@ -19,7 +19,7 @@ React single-page app in `web/`, built with Vite and styled with Tailwind CSS.
 
 ## The screen
 
-`Dashboard.tsx` lays out the cards: one column on a phone, two on a desktop. The profile page swaps in through a `view` state; there's no router yet.
+`Dashboard.tsx` lays out the cards: one column on a phone, two on a desktop. The profile page (`ProfileSecurityPage`: profile, passkeys, delete account) swaps in through a `view` state; there's no router yet.
 
 | Card | What it does |
 | --- | --- |

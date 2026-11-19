@@ -29,6 +29,50 @@ describe.skipIf(!url)('API routes', () => {
     expect((await call('GET', '/api/meals', { authorization: 'Bearer not-a-real-token' })).statusCode).toBe(401)
   })
 
+  describe('deleting an account', () => {
+    it('needs the confirmation, then erases everything of that user and nobody else', async () => {
+      const a = await t.newUser()
+      const b = await t.newUser()
+      for (const user of [a, b]) {
+        await call('POST', '/api/meals', user.auth, { description: 'Banana', calories: 90 })
+        await call('POST', '/api/weights', user.auth, { weightKg: 80 })
+        await call('POST', '/api/saved-foods', user.auth, { name: 'Oats', calories: 389 })
+        await call('PUT', '/api/macro-goal', user.auth, { proteinG: 150, fatG: 70, carbsG: 250 })
+        const split = (await call('POST', '/api/workout-splits', user.auth, { name: 'PPL', days: ['Push'] })).json()
+        const day = { completed: true, dayIndex: 0, dayStart: '2026-03-02T00:00:00Z', dayEnd: '2026-03-03T00:00:00Z', loggedAt: '2026-03-02T18:00:00Z' }
+        const log = (await call('POST', `/api/workout-splits/${split.id}/logs`, user.auth, day)).json()
+        await call('PUT', `/api/workout-splits/${split.id}/logs/${log.id}/sets`, user.auth, { sets: [{ exerciseName: 'Bench Press', weightKg: 80, reps: 8 }] })
+      }
+      const rows = async (userId: string) => {
+        const where = { userId }
+        const counts = await Promise.all([
+          t.prisma.user.count({ where: { id: userId } }),
+          t.prisma.macroEntry.count({ where }),
+          t.prisma.weightEntry.count({ where }),
+          t.prisma.savedFood.count({ where }),
+          t.prisma.macroGoal.count({ where }),
+          t.prisma.workoutSplit.count({ where }),
+          t.prisma.splitLog.count({ where }),
+          t.prisma.workoutSet.count({ where }),
+          t.prisma.authToken.count({ where }),
+        ])
+        return counts.reduce((sum, n) => sum + n, 0)
+      }
+      const before = await rows(a.id)
+      expect(before).toBeGreaterThanOrEqual(9)
+
+      expect((await call('DELETE', '/api/me', a.auth)).statusCode).toBe(400)
+      expect((await call('DELETE', '/api/me', a.auth, { confirm: 'delete' })).statusCode).toBe(400)
+      expect(await rows(a.id)).toBe(before)
+
+      expect((await call('DELETE', '/api/me', a.auth, { confirm: 'DELETE' })).statusCode).toBe(204)
+      expect(await rows(a.id)).toBe(0)
+      expect((await call('GET', '/api/me', a.auth)).statusCode).toBe(401)
+      expect(await rows(b.id)).toBe(before)
+      expect((await call('GET', '/api/meals', b.auth)).json()).toHaveLength(1)
+    })
+  })
+
   describe('meals', () => {
     it('logs a food with its amount, and refuses invalid values', async () => {
       const a = await t.newUser()

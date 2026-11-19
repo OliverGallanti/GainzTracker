@@ -19,7 +19,7 @@ function formatDate(isoString: string) {
 // Passkey management lives here, not on the dashboard — adding a new sign-in
 // credential is a security-sensitive action that shouldn't sit one tap away
 // on the page you land on every visit.
-function ProfileSecurityPage({ user, onBack }: { user: Me; onBack: () => void }) {
+function ProfileSecurityPage({ user, onBack, onDeleted }: { user: Me; onBack: () => void; onDeleted: () => void }) {
   // Profile fields come from the shared /api/me resource; saving one reloads it
   // so the dashboard's completeness badge and every card reading the profile
   // update too, with no plumbing back up the tree.
@@ -240,7 +240,50 @@ function ProfileSecurityPage({ user, onBack }: { user: Me; onBack: () => void })
 
         {passkeyError && <p className="mt-2 text-center text-xs text-red-400">{passkeyError}</p>}
       </div>
+
+      <DeleteAccountCard onDeleted={onDeleted} />
     </div>
+  )
+}
+
+// Erases the account and everything in it on the server (the session too),
+// then returns to the sign-in screen.
+function DeleteAccountCard({ onDeleted }: { onDeleted: () => void }) {
+  const [typed, setTyped] = useState('')
+  const { submit, saving, error } = useSubmit(async () => {
+    await api('/api/me', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) })
+    onDeleted()
+  }, 'Could not delete your account: please try again')
+
+  return (
+    <form
+      onSubmit={submit}
+      className="glow-card rounded-2xl border border-red-400/40 bg-card/90 p-6 text-left shadow-2xl shadow-black/40 backdrop-blur sm:p-8"
+    >
+      <h2 className="card-title">Delete account</h2>
+      <p className="mt-1 text-xs text-third/60">
+        This erases your account and everything in it: profile, foods, weights, routines, training and passkeys, on
+        the website and the phone. <span className="font-medium text-third">It happens at once and can't be undone.</span>
+      </p>
+      <label className="mt-4 flex flex-col gap-1 text-sm">
+        <span className="text-third">Type DELETE to confirm</span>
+        <input
+          type="text"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          autoComplete="off"
+          className="rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={typed !== 'DELETE' || saving}
+        className="mt-4 w-full rounded-lg bg-red-400 px-4 py-2.5 text-sm font-medium text-main transition hover:bg-red-400/90 disabled:opacity-40 active:scale-[0.98]"
+      >
+        {saving ? 'Deleting…' : 'Delete my account'}
+      </button>
+      {error && <p className="mt-2 text-center text-xs text-red-400">{error}</p>}
+    </form>
   )
 }
 

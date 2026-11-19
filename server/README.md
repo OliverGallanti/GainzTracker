@@ -11,7 +11,7 @@ A Fastify backend-for-frontend (BFF) between the two apps and Postgres. It handl
 | `/auth/token` | DELETE | Revoke the phone's token |
 | `/auth/logout` | POST | End the web session |
 | `/auth/passkey/registration/*`, `/auth/passkey/authentication/*` | POST | Add a passkey, sign in with one |
-| `/api/me` | GET, PUT | Profile and meal names |
+| `/api/me` | GET, PUT, DELETE | Profile and meal names; DELETE (body `{ "confirm": "DELETE" }`) erases the account and all its data |
 | `/api/macro-goal`, `/api/lift-goals` | GET, PUT | Daily macro targets, Big 4 goals |
 | `/api/meals`, `/api/meals/:id` | GET, POST, PATCH, DELETE | Logged foods (`?since=` and `?until=` for a day) |
 | `/api/saved-foods`, `/api/saved-foods/:id` | GET, POST, PUT, DELETE | My foods |

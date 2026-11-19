@@ -43,7 +43,7 @@ function Dashboard({ user, onLogout }: DashboardProps) {
 
       <main className="flex flex-1 flex-col items-center px-4 py-12 sm:px-6">
         {view === 'profile' ? (
-          <ProfileSecurityPage user={user} onBack={() => setView('dashboard')} />
+          <ProfileSecurityPage user={user} onBack={() => setView('dashboard')} onDeleted={onLogout} />
         ) : (
           <div className="grid w-full max-w-sm grid-cols-1 gap-6 text-left sm:max-w-md md:max-w-3xl md:grid-cols-2 xl:max-w-7xl xl:grid-cols-3">
             <button

@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { api, clearToken, loadToken, saveToken } from './api'
 import { GOOGLE_WEB_CLIENT_ID } from './config'
 import { persister } from './offline'
+import { setWorkout } from './workout'
 
 GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID })
 
@@ -13,6 +14,7 @@ const AuthContext = createContext<{
   status: Status
   signIn: () => Promise<void>
   signOut: () => Promise<void>
+  deleteAccount: () => Promise<void>
 } | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -40,18 +42,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('signedIn')
   }, [])
 
-  // Local sign-out always succeeds; revoking on the server is best effort (the
-  // token expires on its own if this call can't reach it).
-  const signOut = useCallback(async () => {
-    await api('/auth/token', { method: 'DELETE' }).catch(() => {})
+  // Nothing of the account stays on the phone: token, cached data, queued
+  // writes (queryClient.clear() drops those too) and a live workout.
+  const forget = useCallback(async () => {
     await GoogleSignin.signOut().catch(() => {})
     await clearToken()
     queryClient.clear()
     await persister.removeClient()
+    setWorkout(null)
     setStatus('signedOut')
   }, [queryClient])
 
-  return <AuthContext.Provider value={{ status, signIn, signOut }}>{children}</AuthContext.Provider>
+  // Local sign-out always succeeds; revoking on the server is best effort (the
+  // token expires on its own if this call can't reach it).
+  const signOut = useCallback(async () => {
+    await api('/auth/token', { method: 'DELETE' }).catch(() => {})
+    await forget()
+  }, [forget])
+
+  // Not queued: it needs the server now, and must never run later on its own.
+  // A failure throws and leaves everything as it was.
+  const deleteAccount = useCallback(async () => {
+    await api('/api/me', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) })
+    await GoogleSignin.revokeAccess().catch(() => {}) // unlinks the app from the Google account
+    await forget()
+  }, [forget])
+
+  return <AuthContext.Provider value={{ status, signIn, signOut, deleteAccount }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

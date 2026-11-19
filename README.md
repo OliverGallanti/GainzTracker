@@ -36,6 +36,7 @@ Track what you eat, what you weigh and how you train, in one place: a web app an
 
 - **Sign in with Google**, or on the web with a passkey (fingerprint, face or security key, no password).
 - **Profile:** sex, age, activity level, height and goals, which the calorie estimate and strength levels use.
+- **Delete your account:** from the profile, on the web or the phone. Everything is erased at once.
 
 ### Web and Android
 
