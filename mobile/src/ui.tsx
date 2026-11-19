@@ -46,7 +46,8 @@ export function useAnimatedState<T>(initial: T) {
 // React Native has no app-wide default font, so every screen uses this Text,
 // which is the native one with Manrope first (a style can still override it).
 export function Text({ style, ...props }: TextProps) {
-  return <NativeText style={[{ fontFamily: FONT }, style]} {...props} />
+  // Light text by default (React Native's default is black, unreadable here).
+  return <NativeText style={[{ fontFamily: FONT, color: colors.text }, style]} {...props} />
 }
 
 // Small shared building blocks so every screen looks and behaves the same:

@@ -1,8 +1,10 @@
 import { View } from 'react-native'
+import { dayColor, dayIcon } from '@gainz/shared/dayColors'
 import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
 import { QUEUED, useQueued, useUnsyncedIds, type RemoveVars } from '../../queue'
-import { Text, Button, Muted, Unsynced, styles as ui } from '../../ui'
+import { Button, Muted, Unsynced } from '../../ui'
 import { formatDate, styles } from './styles'
+import { DayPill } from './dayStyle'
 
 export default function LogRow({ split, log, onEdit }: { split: WorkoutSplit; log: SplitLog; onEdit: () => void }) {
   const remove = useQueued<RemoveVars>(QUEUED.remove)
@@ -12,7 +14,9 @@ export default function LogRow({ split, log, onEdit }: { split: WorkoutSplit; lo
   return (
     <View style={styles.row}>
       <View style={{ flex: 1 }}>
-        <Text style={ui.text}>{split.days[log.dayIndex]}</Text>
+        <View style={{ alignItems: 'flex-start' }}>
+          <DayPill name={split.days[log.dayIndex]} color={dayColor(split, log.dayIndex)} icon={dayIcon(split, split.days[log.dayIndex])} />
+        </View>
         <Muted>
           {formatDate(log.loggedAt)} · {log.completed ? 'Done' : 'Skipped'}
           {log.durationMinutes ? ` · ${log.durationMinutes} min` : ''}

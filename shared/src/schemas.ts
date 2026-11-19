@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { BIG_FOUR_LIFTS } from './lifts.ts'
-import { DAY_COLOR_KEYS } from './dayColors.ts'
+import { DAY_COLOR_KEYS, DAY_ICON_KEYS } from './dayColors.ts'
 import { ACTIVITY_LEVELS } from './tdee.ts'
 
 // The API's request bodies, in one place: the server validates with these, and
@@ -106,17 +106,20 @@ export const saveFoodSchema = z.object({
 // How many completed days make a good week (the weekly streak's threshold).
 const daysPerWeek = z.number().int().min(1).max(7)
 
+// Day name -> colour or icon key (dayColors.ts). Sent whole: each replaces the routine's map.
+const dayColors = z.record(z.string().min(1).max(60), z.enum(DAY_COLOR_KEYS))
+const dayIcons = z.record(z.string().min(1).max(60), z.enum(DAY_ICON_KEYS))
+
 export const createSplitSchema = z.object({
   id: clientId,
   name: z.string().min(1),
   days: z.array(z.string().min(1)).min(1),
   daysPerWeek: daysPerWeek.optional(),
+  dayColors: dayColors.optional(),
+  dayIcons: dayIcons.optional(),
 })
 
-// Day name -> colour key (dayColors.ts). Sent whole: it replaces the routine's map.
-const dayColors = z.record(z.string().min(1).max(60), z.enum(DAY_COLOR_KEYS))
-
-export const updateSplitSchema = z.object({ daysPerWeek: daysPerWeek.optional(), dayColors: dayColors.optional() })
+export const updateSplitSchema = z.object({ daysPerWeek: daysPerWeek.optional(), dayColors: dayColors.optional(), dayIcons: dayIcons.optional() })
 
 // `dayIndex` is the user's pick from the split's days, in any order. `dayStart`
 // and `dayEnd` bound the local calendar day being logged (the client knows its

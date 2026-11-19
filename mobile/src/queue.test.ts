@@ -197,6 +197,20 @@ describe('training', () => {
     ])
   })
 
+  it("restyles a day straight away, keeping the weekly goal, and sends only the styles", async () => {
+    const client = makeClient()
+    client.setQueryData(['training'], { split: { ...split, daysPerWeek: 3 }, logs: [], allLogs: [] })
+    const styles = { dayColors: { Push: 'red' as const }, dayIcons: { Push: 'dumbbell' as const } }
+
+    void mutate<UpdateSplitVars>(client, QUEUED.updateSplit, { label: 'Push', splitId: split.id, ...styles })
+    await flush()
+    expect(client.getQueryData<TrainingData>(['training'])!.split).toMatchObject({ daysPerWeek: 3, ...styles })
+
+    onlineManager.setOnline(true)
+    await client.resumePausedMutations()
+    expect(api.mock.calls[0]).toEqual([`/api/workout-splits/${split.id}`, { method: 'PATCH', body: JSON.stringify(styles) }])
+  })
+
   it('sends a session exercise with the log it belongs to', async () => {
     const client = makeClient()
     const set = { id: 'set-1', splitLogId: 'log-1', exerciseName: 'Dips', weightKg: null, reps: 10, performedAt: '2026-10-05T12:00:00.000Z' }

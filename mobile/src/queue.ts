@@ -56,7 +56,7 @@ export type UpdateLogVars = Label & {
 }
 export type UpdateSplitVars = Label & { splitId: string } & UpdateSplitBody
 // Creating a routine makes it the active one (the server deactivates the rest).
-export type CreateSplitVars = Label & { split: Pick<WorkoutSplit, 'id' | 'name' | 'days'> & { daysPerWeek: number } }
+export type CreateSplitVars = Label & { split: Pick<WorkoutSplit, 'id' | 'name' | 'days' | 'dayColors' | 'dayIcons'> & { daysPerWeek: number } }
 
 // The Training tab's query: the streak counts every routine's logs, the rest
 // only the active routine's.
@@ -284,11 +284,15 @@ export function registerQueuedMutations(queryClient: QueryClient) {
 
   queryClient.setMutationDefaults(QUEUED.updateSplit, {
     ...common,
-    // Either change (weekly goal or day colours); a key left out stays as it is.
-    mutationFn: ({ splitId, daysPerWeek, dayColors }: UpdateSplitVars) =>
-      api(`/api/workout-splits/${splitId}`, { method: 'PATCH', body: JSON.stringify({ daysPerWeek, dayColors }) }),
-    onMutate: ({ splitId, daysPerWeek, dayColors }: UpdateSplitVars) => {
-      const changes = { ...(daysPerWeek !== undefined && { daysPerWeek }), ...(dayColors !== undefined && { dayColors }) }
+    // Any of: weekly goal, day colours, day icons; a key left out stays as it is.
+    mutationFn: ({ splitId, daysPerWeek, dayColors, dayIcons }: UpdateSplitVars) =>
+      api(`/api/workout-splits/${splitId}`, { method: 'PATCH', body: JSON.stringify({ daysPerWeek, dayColors, dayIcons }) }),
+    onMutate: ({ splitId, daysPerWeek, dayColors, dayIcons }: UpdateSplitVars) => {
+      const changes = {
+        ...(daysPerWeek !== undefined && { daysPerWeek }),
+        ...(dayColors !== undefined && { dayColors }),
+        ...(dayIcons !== undefined && { dayIcons }),
+      }
       queryClient.setQueryData<TrainingData>(['training'], (old) =>
         old?.split?.id === splitId ? { ...old, split: { ...old.split, ...changes } } : old,
       )

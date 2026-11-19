@@ -26,7 +26,7 @@ React single-page app in `web/`, built with Vite and styled with Tailwind CSS.
 | `MacroStatsCard` | Today's macros and calories against your targets, and the foods logged under each meal. Food is logged in `LogFoodDialog` (the same steps as the phone), with name search and barcodes in `ProductLookup` and `BarcodeScanner` (ZXing, loaded only when opened). Arrows and a calendar (`MonthGrid`, shared with the training calendar) move to earlier days. |
 | `GettingStarted` | Shown to new users only, until the profile, height and a weight exist (`shared/src/onboarding.ts`). |
 | `WeightChart` | Weight and body fat charts, BMI, goals, the first measurements form, and a calendar of weigh-ins to log, edit or remove on any day. |
-| `TrainingLogCard` | Routine, weekly streak, day colours (`DayColorsForm`), the month calendar (`TrainingCalendar`) and sessions (`SessionEditor`). |
+| `TrainingLogCard` | Routine, weekly streak, day pills with a colour and an icon each (`DayStyle`), the month calendar (`TrainingCalendar`) and sessions (`SessionEditor`). |
 | `BigFourCard` | The four lifts, ranked, with charts, goals and strength levels. |
 | `ProfileSecurityPage` | Profile fields and passkeys. |
 | `Footer` | Version and credits. The shared credits are in `shared/src/about.ts`. |

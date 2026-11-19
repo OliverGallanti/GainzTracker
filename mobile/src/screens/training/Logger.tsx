@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View } from 'react-native'
 import { randomUUID } from 'expo-crypto'
 import { startOfLocalDay } from '@gainz/shared/dates'
-import { dayColor } from '@gainz/shared/dayColors'
+import { dayColor, dayIcon } from '@gainz/shared/dayColors'
 import { logOnDay, suggestedDayIndex, uniqueDays } from '@gainz/shared/splits'
 import type { SplitLog, WorkoutSet, WorkoutSplit } from '@gainz/shared/types'
 import { Check, History, Timer } from '../../icons'
@@ -11,6 +11,7 @@ import { Text, Button, Card, Muted, styles as ui, useAnimatedState } from '../..
 import { setWorkout, startWorkout, useWorkout } from '../../workout'
 import { formatDate, REMOVE_NOTE, styles } from './styles'
 import { Tile } from './parts'
+import { DAY_ICON_COMPONENTS } from './dayStyle'
 import Calendar from './Calendar'
 import LogRow from './LogRow'
 
@@ -116,6 +117,8 @@ export default function Logger({
                 key={index}
                 half
                 title={label}
+                icon={dayIcon(split, label) && DAY_ICON_COMPONENTS[dayIcon(split, label)!]}
+                color={dayColor(split, index)}
                 subtitle={index === suggested ? 'Up next' : undefined}
                 selected={selected === index}
                 onPress={() => setPicked(index)}

@@ -1,18 +1,20 @@
-import { Pressable, View } from 'react-native'
-import { DAY_COLORS, type DayColor } from '@gainz/shared/dayColors'
+import { useState } from 'react'
+import { View } from 'react-native'
+import { colorFor, dayColorKey, dayIcon, withDayStyle, type DayColor, type DayIcon } from '@gainz/shared/dayColors'
 import { computeWeeklyStreak, uniqueDays, weeklyGoal } from '@gainz/shared/splits'
 import type { SplitLog, WorkoutSplit } from '@gainz/shared/types'
-import { Check, Palette, Repeat, Target } from '../../icons'
+import { Check, Repeat, Target } from '../../icons'
 import { QUEUED, useQueued, type UpdateSplitVars } from '../../queue'
 import { colors } from '../../theme'
 import { Text, Button, Card, Muted, styles as ui, useAnimatedState } from '../../ui'
 import { styles } from './styles'
 import { DaysPerWeek } from './parts'
+import { DayPill, DayStyleSheet } from './dayStyle'
 
 export default function RoutineSummary({ split, allLogs, onChange }: { split: WorkoutSplit; allLogs: SplitLog[]; onChange: () => void }) {
   const updateSplit = useQueued<UpdateSplitVars>(QUEUED.updateSplit)
   const [editingGoal, setEditingGoal] = useAnimatedState(false)
-  const [editingColors, setEditingColors] = useAnimatedState(false)
+  const [styling, setStyling] = useState<string | null>(null) // the day name whose picker is open
   const goal = weeklyGoal(split)
   const { streak, thisWeekDays } = computeWeeklyStreak(allLogs, goal)
 
@@ -21,17 +23,24 @@ export default function RoutineSummary({ split, allLogs, onChange }: { split: Wo
     if (daysPerWeek !== goal) updateSplit.mutate({ label: `Weekly goal ${daysPerWeek}`, splitId: split.id, daysPerWeek })
   }
 
-  // null = no colour for that day.
-  const changeColor = (day: string, color: DayColor | null) => {
-    const next = { ...split.dayColors } as Record<string, DayColor>
-    if (color) next[day] = color
-    else delete next[day]
-    updateSplit.mutate({ label: `${day} colour`, splitId: split.id, dayColors: next })
-  }
+  const changeStyle = (day: string, color: DayColor | null, icon: DayIcon | null) =>
+    updateSplit.mutate({ label: `${day} colour and icon`, splitId: split.id, ...withDayStyle(split, day, color, icon) })
 
   return (
     <Card title={split.name} right={<Button label="Change routine" icon={Repeat} variant="small" onPress={onChange} />}>
-      <Muted>{split.days.join(' → ')}</Muted>
+      <View style={[ui.row, { flexWrap: 'wrap', gap: 8 }]}>
+        {uniqueDays(split.days).map(({ label, index }) => (
+          <DayPill key={index} name={label} color={colorFor(dayColorKey(split, label))} icon={dayIcon(split, label)} onPress={() => setStyling(label)} />
+        ))}
+      </View>
+      <Muted>Tap a day to give it a colour and an icon.</Muted>
+      <DayStyleSheet
+        day={styling}
+        color={styling ? dayColorKey(split, styling) : null}
+        icon={styling ? dayIcon(split, styling) : null}
+        onChange={(color, icon) => styling && changeStyle(styling, color, icon)}
+        onClose={() => setStyling(null)}
+      />
       <View style={ui.row}>
         <View style={styles.stat} accessible accessibilityLabel={`${streak} week streak`}>
           <Text style={styles.statNumber}>{streak}</Text>
@@ -55,35 +64,6 @@ export default function RoutineSummary({ split, allLogs, onChange }: { split: Wo
         </View>
       ) : (
         <Button label="Change weekly goal" icon={Target} variant="small" onPress={() => setEditingGoal(true)} />
-      )}
-      {editingColors ? (
-        <View style={{ gap: 12 }}>
-          <Muted>A colour for each day, shown on the calendar</Muted>
-          {uniqueDays(split.days).map(({ label }) => (
-            <View key={label} style={{ gap: 6 }}>
-              <Text>{label}</Text>
-              <View style={[ui.row, { flexWrap: 'wrap' }]}>
-                {([null, ...Object.keys(DAY_COLORS)] as (DayColor | null)[]).map((key) => {
-                  const picked = (split.dayColors?.[label] ?? null) === key
-                  return (
-                    <Pressable
-                      key={key ?? 'none'}
-                      onPress={() => changeColor(label, key)}
-                      hitSlop={6}
-                      accessibilityRole="radio"
-                      accessibilityLabel={`${label}: ${key ?? 'no colour'}`}
-                      accessibilityState={{ selected: picked }}
-                      style={[styles.swatch, picked && styles.swatchPicked, { backgroundColor: key ? DAY_COLORS[key] : colors.text }]}
-                    />
-                  )
-                })}
-              </View>
-            </View>
-          ))}
-          <Button label="Done" variant="small" onPress={() => setEditingColors(false)} />
-        </View>
-      ) : (
-        <Button label="Day colours" icon={Palette} variant="small" onPress={() => setEditingColors(true)} />
       )}
     </Card>
   )

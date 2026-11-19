@@ -207,6 +207,15 @@ describe.skipIf(!url)('API routes', () => {
       expect((await call('PATCH', `/api/workout-splits/${split.id}`, a.auth, { dayColors: { Push: 'red', Legs: 'blue' } })).statusCode).toBe(204)
       const [saved] = (await call('GET', '/api/workout-splits', a.auth)).json()
       expect(saved).toMatchObject({ daysPerWeek: 3, dayColors: { Push: 'red', Legs: 'blue' } })
+      expect((await call('PATCH', `/api/workout-splits/${split.id}`, a.auth, { dayIcons: { Push: 'rocket' } })).statusCode).toBe(400)
+      expect((await call('PATCH', `/api/workout-splits/${split.id}`, a.auth, { dayIcons: { Push: 'dumbbell' } })).statusCode).toBe(204)
+      expect((await call('GET', '/api/workout-splits', a.auth)).json()[0]).toMatchObject({ dayColors: { Push: 'red', Legs: 'blue' }, dayIcons: { Push: 'dumbbell' } })
+    })
+
+    it('saves day colours and icons given when a routine is created', async () => {
+      const a = await t.newUser()
+      const body = { name: 'UL', days: ['Upper', 'Lower'], dayColors: { Upper: 'teal' }, dayIcons: { Lower: 'legs' } }
+      expect((await call('POST', '/api/workout-splits', a.auth, body)).json()).toMatchObject(body)
     })
 
     it("logs one day per calendar day, and only on the user's own routine", async () => {

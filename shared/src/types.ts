@@ -47,6 +47,7 @@ export interface WorkoutSplit {
   days: string[]
   daysPerWeek: number | null
   dayColors?: Record<string, string> | null // day name -> colour key, see dayColors.ts
+  dayIcons?: Record<string, string> | null // day name -> icon key, same file
   active: boolean
 }
 

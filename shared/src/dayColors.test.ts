@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DAY_COLORS, dayColor } from './dayColors'
+import { DAY_COLORS, dayColor, dayIcon, withDayStyle } from './dayColors'
 
 describe('dayColor', () => {
   const split = { days: ['Push', 'Pull', 'Legs', 'Push'], dayColors: { Push: 'red', Legs: 'nope' } }
@@ -13,5 +13,20 @@ describe('dayColor', () => {
     expect(dayColor(split, 1)).toBeNull()
     expect(dayColor(split, 2)).toBeNull()
     expect(dayColor({ days: ['Push'], dayColors: null }, 0)).toBeNull()
+  })
+})
+
+describe('day icons and styles', () => {
+  it('finds a day icon by name, null for unknown', () => {
+    const split = { dayIcons: { Push: 'dumbbell', Legs: 'rocket' } }
+    expect(dayIcon(split, 'Push')).toBe('dumbbell')
+    expect(dayIcon(split, 'Legs')).toBeNull()
+    expect(dayIcon({ dayIcons: null }, 'Push')).toBeNull()
+  })
+
+  it('changes one day and keeps the others, null removing', () => {
+    const split = { dayColors: { Push: 'red', Pull: 'blue' }, dayIcons: { Push: 'dumbbell' } }
+    expect(withDayStyle(split, 'Push', 'green', null)).toEqual({ dayColors: { Push: 'green', Pull: 'blue' }, dayIcons: {} })
+    expect(split.dayColors.Push).toBe('red')
   })
 })

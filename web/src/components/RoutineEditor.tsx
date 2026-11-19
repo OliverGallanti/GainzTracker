@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
 import { SPLIT_TEMPLATES } from '@gainz/shared/templates'
+import { colorFor, dayColorKey, dayIcon, withDayStyle } from '@gainz/shared/dayColors'
+import { DayStyleButton, DayStylePicker } from './DayStyle'
 import { useSubmit, ValidationError } from '../lib/useSubmit'
 
 // Template picker → day builder. Mounted only while the user is creating or
@@ -10,6 +12,9 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
   const [name, setName] = useState('')
   const [days, setDays] = useState<string[]>([])
   const [perWeek, setPerWeek] = useState<number | null>(null) // null until touched: then it follows the number of days listed
+  // Colours and icons by day name, as saved; the row whose picker is open.
+  const [styles, setStyles] = useState<{ dayColors: Record<string, string>; dayIcons: Record<string, string> }>({ dayColors: {}, dayIcons: {} })
+  const [styling, setStyling] = useState<number | null>(null)
 
   const filledDays = days.filter((d) => d.trim()).length
   const daysPerWeek = perWeek ?? Math.min(7, Math.max(1, filledDays))
@@ -17,9 +22,17 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
   const { submit, saving, error } = useSubmit(async () => {
     const cleanedDays = days.map((d) => d.trim()).filter(Boolean)
     if (cleanedDays.length === 0) throw new ValidationError('Add at least one day')
+    // Only the days still in the routine (a renamed day leaves its old name behind).
+    const kept = (map: Record<string, string>) => Object.fromEntries(Object.entries(map).filter(([day]) => cleanedDays.includes(day)))
     await api('/api/workout-splits', {
       method: 'POST',
-      body: JSON.stringify({ name: name.trim() || 'My routine', days: cleanedDays, daysPerWeek }),
+      body: JSON.stringify({
+        name: name.trim() || 'My routine',
+        days: cleanedDays,
+        daysPerWeek,
+        dayColors: kept(styles.dayColors),
+        dayIcons: kept(styles.dayIcons),
+      }),
     })
     onSaved()
   }, 'Could not save that routine: please check the values and try again')
@@ -42,6 +55,7 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
 
   const removeDay = (index: number) => {
     setDays(days.filter((_, i) => i !== index))
+    setStyling(null) // rows shift: close the picker rather than show it on another day
   }
 
   const addDay = () => {
@@ -54,6 +68,7 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
     const next = [...days]
     ;[next[index], next[target]] = [next[target], next[index]]
     setDays(next)
+    setStyling(null)
   }
 
   if (step === 'pick') {
@@ -122,41 +137,57 @@ function RoutineEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: (
       <div className="flex flex-col gap-2">
         <span className="text-sm text-third">Days (in order)</span>
         {days.map((day, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <input
-              type="text"
-              required
-              value={day}
-              onChange={(e) => updateDay(index, e.target.value)}
-              placeholder="e.g. Push"
-              className="flex-1 rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
-            />
-            <button
-              type="button"
-              onClick={() => moveDay(index, -1)}
-              disabled={index === 0}
-              className="text-third/60 hover:text-third disabled:opacity-30"
-              aria-label="Move up"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              onClick={() => moveDay(index, 1)}
-              disabled={index === days.length - 1}
-              className="text-third/60 hover:text-third disabled:opacity-30"
-              aria-label="Move down"
-            >
-              ↓
-            </button>
-            <button
-              type="button"
-              onClick={() => removeDay(index)}
-              className="text-third/60 hover:text-red-400"
-              aria-label="Remove day"
-            >
-              ✕
-            </button>
+          <div key={index} className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <DayStyleButton
+                color={colorFor(dayColorKey(styles, day.trim()))}
+                icon={dayIcon(styles, day.trim())}
+                active={styling === index}
+                disabled={!day.trim()}
+                onClick={() => setStyling(styling === index ? null : index)}
+              />
+              <input
+                type="text"
+                required
+                value={day}
+                onChange={(e) => updateDay(index, e.target.value)}
+                placeholder="e.g. Push"
+                className="flex-1 rounded-lg border border-secondary/40 bg-main px-2 py-1.5 text-third outline-none focus:border-secondary"
+              />
+              <button
+                type="button"
+                onClick={() => moveDay(index, -1)}
+                disabled={index === 0}
+                className="text-third/60 hover:text-third disabled:opacity-30"
+                aria-label="Move up"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => moveDay(index, 1)}
+                disabled={index === days.length - 1}
+                className="text-third/60 hover:text-third disabled:opacity-30"
+                aria-label="Move down"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                onClick={() => removeDay(index)}
+                className="text-third/60 hover:text-red-400"
+                aria-label="Remove day"
+              >
+                ✕
+              </button>
+            </div>
+            {styling === index && day.trim() && (
+              <DayStylePicker
+                color={dayColorKey(styles, day.trim())}
+                icon={dayIcon(styles, day.trim())}
+                onChange={(color, icon) => setStyles(withDayStyle(styles, day.trim(), color, icon))}
+              />
+            )}
           </div>
         ))}
         <button

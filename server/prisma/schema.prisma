@@ -73,6 +73,8 @@ model WorkoutSplit {
   daysPerWeek Int?
   // Day name -> colour key (shared/src/dayColors.ts), e.g. {"Push":"red"}. Null = no colours.
   dayColors Json?
+  // Day name -> icon key, same file. Null = no icons.
+  dayIcons  Json?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
